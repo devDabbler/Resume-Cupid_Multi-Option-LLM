@@ -242,20 +242,43 @@ def extract_job_description(url):
     driver = webdriver.Chrome(service=service, options=options)
     
     try:
+        st.write("Opening the job description URL...")
+        print("Opening the job description URL...")
         driver.get(url)
         
-        # Wait for the job description to load
-        wait = WebDriverWait(driver, 10)
+        st.write("Waiting for the page to load completely...")
+        print("Waiting for the page to load completely...")
+        WebDriverWait(driver, 20).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+        
+        st.write("Page loaded. Capturing screenshot...")
+        print("Page loaded. Capturing screenshot...")
+        driver.save_screenshot("/app/screenshot.png")
+        
+        st.write("Extracting page source for debugging...")
+        print("Extracting page source for debugging...")
+        page_source = driver.page_source
+        print(page_source)
+        
+        st.write("Waiting for the job description element to be located...")
+        print("Waiting for the job description element to be located...")
+        wait = WebDriverWait(driver, 20)  # Increased wait time
         job_description_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-automation-id='jobPostingDescription']")))
         
-        # Extract the text
+        st.write("Job description element found. Extracting text...")
+        print("Job description element found. Extracting text...")
         job_description = job_description_element.text
         
+        st.write("Job description extraction successful.")
+        print("Job description extraction successful.")
         return job_description
     except Exception as e:
-        st.error(f"Failed to extract job description: {str(e)}")
+        error_message = f"Failed to extract job description: {str(e)}"
+        st.error(error_message)
+        print(error_message)
         return None
     finally:
+        st.write("Closing the browser...")
+        print("Closing the browser...")
         driver.quit()
 
 def main_app():
