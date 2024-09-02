@@ -1,5 +1,6 @@
 services:
   app:
+    shm_size: '1g'
     build:
       context: .
       dockerfile: Dockerfile

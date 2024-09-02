@@ -229,7 +229,15 @@ def extract_job_description(url):
         raise ValueError("Invalid job link. Please use a link from Fractal's career site.")
     
     options = Options()
-    options.add_argument("--headless")
+    options.add_argument("--headless")  # Run Chrome in headless mode
+    options.add_argument("--no-sandbox")  # Bypass OS security model
+    options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+    options.add_argument("--disable-gpu")  # Disable GPU hardware acceleration
+    options.add_argument("--disable-software-rasterizer")  # Disable software rasterizer
+    options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
+    options.add_argument("--disable-extensions")  # Disable extensions
+    options.add_argument("--window-size=1920x1080")  # Set window size if needed
+    
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     
