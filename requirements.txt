@@ -1,0 +1,11 @@
+streamlit
+requests
+spacy
+PyPDF2
+python-docx
+python-dotenv
+numpy
+groq
+openai
+selenium
+webdriver_manager
