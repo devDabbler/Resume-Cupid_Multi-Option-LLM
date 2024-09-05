@@ -90,9 +90,9 @@ class ResumeProcessor:
                 sleep_time = (tokens_needed - self.token_bucket) / (self.token_limit / 60)
                 time.sleep(sleep_time + random.uniform(0, 1))  # Add jitter
 
-    def analyze_resume(self, resume_text: str, job_description: str, importance_factors: Dict[str, float] = None) -> Dict[str, Any]:
+    def analyze_resume(self, resume_text: str, job_description: str, job_title: str, importance_factors: Dict[str, float] = None) -> Dict[str, Any]:
         logger.debug(f"Starting resume analysis with {self.backend} backend")
-        cache_key = self._get_cache_key(resume_text, job_description)
+        cache_key = self._get_cache_key(resume_text, job_description, job_title)
         cached_result = self._get_cached_result(cache_key)
         if cached_result:
             logger.debug(f"Retrieved cached result for {self.backend} backend")
@@ -100,7 +100,7 @@ class ResumeProcessor:
 
         logger.debug(f"No cached result found. Performing new analysis with {self.backend} backend")
 
-        combined_text = resume_text + " " + job_description
+        combined_text = resume_text + " " + job_description + " " + job_title
         estimated_tokens = self.estimate_tokens(combined_text)
         logger.debug(f"Estimated tokens for analysis: {estimated_tokens}")
 
@@ -109,7 +109,7 @@ class ResumeProcessor:
             try:
                 self.wait_for_tokens(estimated_tokens)
                 logger.debug(f"Calling {self.backend} API for analysis")
-                analysis = self.analyzer.analyze_match(resume_text, job_description, {})
+                analysis = self.analyzer.analyze_match(resume_text, job_description, {}, job_title)
                 logger.debug(f"API analysis result: {analysis}")
             
                 years_of_experience = self._extract_years_of_experience(resume_text)
@@ -178,7 +178,7 @@ class ResumeProcessor:
         }
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
-        logger.debug(f"Delegating analyze_match to {self.backend} analyzer")
+        logger.debug(f"analyze_match called with args: {resume[:20]}..., {job_description[:20]}..., {candidate_data}, {job_title}")
         return self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
 
     def _invalidate_cache(self, cache_key: str):
@@ -189,8 +189,8 @@ class ResumeProcessor:
         conn.close()
         logger.debug(f"Invalidated cache for key: {cache_key}")
 
-    def _get_cache_key(self, resume_text: str, job_description: str) -> str:
-        combined = f"{self.backend}:{resume_text}{job_description}"
+    def _get_cache_key(self, resume_text: str, job_description: str, job_title: str) -> str:
+        combined = f"{self.backend}:{resume_text}{job_description}{job_title}"
         logger.debug(f"Generated cache key for backend: {self.backend}")
         return hashlib.md5(combined.encode()).hexdigest()
 
