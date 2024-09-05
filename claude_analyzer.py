@@ -167,12 +167,12 @@ class ClaudeAPI:
             logger.debug("Analyzing match between resume and job description")
             print("Analyzing match between resume and job description")  # Print for immediate visibility
             
-            # Placeholder logic for matching analysis
-            match_score = 50  # Example score
-            recommendation = "Recommend for interview"
-            experience_and_project_relevance = "Relevant experience and projects"
-            skills_gap = ["No significant skills gap"]
-            recruiter_questions = ["What motivated you to apply for this role?"]
+            # Matching logic
+            match_score = self._calculate_match_score(resume, job_description)
+            recommendation = self._generate_recommendation(match_score)
+            experience_and_project_relevance = self._assess_experience_and_project_relevance(resume, job_description)
+            skills_gap = self._identify_skills_gap(resume, job_description)
+            recruiter_questions = self._generate_recruiter_questions(resume, job_description)
             
             return {
                 "match_score": match_score,
