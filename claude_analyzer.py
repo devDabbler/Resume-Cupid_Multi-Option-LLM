@@ -39,8 +39,12 @@ class ClaudeAPI:
             logger.debug(f"Received response from Claude: {result}")
 
             # Extract the content from the Claude API response
-            if 'content' in result:
+            if 'content' in result and result['content']:
                 content = result['content'][0]['text']
+            else:
+                error_message = "No content found in Claude API response"
+                logger.error(error_message)
+                return self._generate_error_response(error_message)
                 logger.debug(f"Raw content from Claude: {content[:100]}...")  # Log first 100 characters
 
                 # Print the full raw content
