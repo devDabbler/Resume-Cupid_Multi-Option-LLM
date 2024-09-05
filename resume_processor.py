@@ -63,15 +63,15 @@ class ResumeProcessor:
         elif backend == "llama":
             self.analyzer = LlamaAPI(api_key)
         elif backend == "gpt4o_mini":
-            # GPT4oMiniAPI now gets the API key from an environment variable
             self.analyzer = GPT4oMiniAPI(api_key)
         else:
             raise ValueError(f"Unsupported backend: {backend}")
         
-        self.token_limit = 10000  # Token limit per minute
+        self.token_limit = 10000
         self.token_bucket = self.token_limit
         self.last_refill = time.time()
         self.encoder = tiktoken.encoding_for_model("gpt-4")
+        logger.info(f"ResumeProcessor initialized with {backend} backend")
 
     def estimate_tokens(self, text: str) -> int:
         return len(self.encoder.encode(text))
@@ -97,7 +97,7 @@ class ResumeProcessor:
         if cached_result:
             logger.debug(f"Retrieved cached result for {self.backend} backend")
             return cached_result
-    
+
         logger.debug(f"No cached result found. Performing new analysis with {self.backend} backend")
 
         combined_text = resume_text + " " + job_description
@@ -111,7 +111,7 @@ class ResumeProcessor:
                 logger.debug(f"Calling {self.backend} API for analysis")
                 analysis = self.analyzer.analyze_match(resume_text, job_description, {})
                 logger.debug(f"API analysis result: {analysis}")
-                
+            
                 years_of_experience = self._extract_years_of_experience(resume_text)
                 logger.debug(f"Extracted years of experience: {years_of_experience}")
 
@@ -121,13 +121,16 @@ class ResumeProcessor:
                     'years_of_experience': years_of_experience,
                     'summary': analysis.get('brief_summary', 'No summary available'),
                     'analysis': analysis.get('experience_and_project_relevance', 'No analysis available'),
-                    'strengths': [],  # This field is not provided by the new API response
-                    'areas_for_improvement': [],  # This field is not provided by the new API response
+                    'strengths': [],
+                    'areas_for_improvement': [],
                     'skills_gap': analysis.get('skills_gap', []),
-                    'recommendation': analysis.get('recommendation_for_interview', 'No recommendation available'),
+                    'recommendation_for_interview': analysis.get('recommendation_for_interview', 'No recommendation available'),
                     'interview_questions': analysis.get('recruiter_questions', []),
                     'project_relevance': analysis.get('experience_and_project_relevance', 'No project relevance analysis available')
                 }
+
+                # Ensure 'recommendation' field is always set
+                result['recommendation'] = result['recommendation_for_interview']
 
                 logger.debug("Analysis result compiled successfully")
                 self._cache_result(cache_key, result)
@@ -144,9 +147,8 @@ class ResumeProcessor:
                     logger.error(f"Traceback: {traceback.format_exc()}")
                     return self._generate_error_result(str(e))
 
-        # If we've exhausted all retries
         logger.error("Max retries reached. Unable to complete analysis.")
-        return self._generate_error_result("Max retries reached")
+        return self._generate_error_result("Max retries reached")    
 
     def analyze_with_fallback(self, resume_text: str, job_description: str, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -175,9 +177,9 @@ class ResumeProcessor:
             'project_relevance': 'Unable to analyze project relevance due to an error'
         }
 
-    def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
         logger.debug(f"Delegating analyze_match to {self.backend} analyzer")
-        return self.analyzer.analyze_match(resume, job_description, candidate_data)
+        return self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
 
     def _invalidate_cache(self, cache_key: str):
         conn = get_db_connection()
@@ -205,7 +207,6 @@ class ResumeProcessor:
         logger.debug("Cleared all entries from resume_cache")
 
     def _extract_years_of_experience(self, resume_text: str) -> int:
-        # Simple regex to find years of experience
         import re
         experience_matches = re.findall(r'(\d+)\s*(?:years?|yrs?)', resume_text, re.IGNORECASE)
         if experience_matches:
@@ -238,13 +239,10 @@ class ResumeProcessor:
         conn.commit()
         conn.close()
 
-    def rank_resumes(self, resumes: List[str], job_id: str, importance_factors: Dict[str, float] = None) -> List[Dict[str, Any]]:
-        if job_id not in self.job_descriptions:
-            raise ValueError(f"No job description found for job_id: {job_id}")
-
+    def rank_resumes(self, resumes: List[str], job_description: str, importance_factors: Dict[str, float] = None) -> List[Dict[str, Any]]:
         results = []
         for resume in resumes:
-            analysis = self.analyze_resume(resume, self.job_descriptions[job_id]['text'], importance_factors)
+            analysis = self.analyze_resume(resume, job_description, importance_factors)
             results.append(analysis)
 
         # Sort results by match score in descending order
