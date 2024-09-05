@@ -90,6 +90,7 @@ class ResumeProcessor:
                 sleep_time = (tokens_needed - self.token_bucket) / (self.token_limit / 60)
                 time.sleep(sleep_time + random.uniform(0, 1))  # Add jitter
 
+    @lru_cache(maxsize=128)
     def analyze_resume(self, resume_text: str, job_description: str, job_title: str, importance_factors: Dict[str, float] = None) -> Dict[str, Any]:
         logger.debug(f"Starting resume analysis with {self.backend} backend")
         cache_key = self._get_cache_key(resume_text, job_description, job_title)

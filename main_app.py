@@ -329,6 +329,11 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
                     else:
                         st.error("Failed to save feedback. Please try again.")
 
+    # Add a progress bar for the analysis process
+    progress_bar = st.progress(0)
+    for i, result in enumerate(evaluation_results):
+        progress_bar.progress((i + 1) / len(evaluation_results))
+
 def is_valid_fractal_job_link(url):
     # Pattern to match Fractal's Workday job posting URLs
     pattern = r'^https?://fractal\.wd1\.myworkdayjobs\.com/.*Careers/.*'
