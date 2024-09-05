@@ -344,19 +344,19 @@ def extract_job_description(url):
         raise ValueError("Invalid job link. Please use a link from Fractal's career site.")
     
     options = Options()
-    options.add_argument("--headless")  # Run Chrome in headless mode
-    options.add_argument("--no-sandbox")  # Bypass OS security model
-    options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-    options.add_argument("--disable-gpu")  # Disable GPU hardware acceleration
-    options.add_argument("--disable-software-rasterizer")  # Disable software rasterizer
-    options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
-    options.add_argument("--disable-extensions")  # Disable extensions
-    options.add_argument("--window-size=1920x1080")  # Set window size if needed
-    
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
+    options.binary_location = "/usr/bin/chromium-browser"  # Set the Chromium binary location
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--remote-debugging-port=9222")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--window-size=1920x1080")
     
     try:
+        driver = webdriver.Chrome(options=options)
+        
         st.write("Opening the job description URL...")
         driver.get(url)
         
@@ -371,7 +371,7 @@ def extract_job_description(url):
         print(page_source)
         
         st.write("Waiting for the job description element to be located...")
-        wait = WebDriverWait(driver, 20)  # Increased wait time
+        wait = WebDriverWait(driver, 20)
         job_description_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-automation-id='jobPostingDescription']")))
         
         st.write("Job description element found. Extracting text...")
@@ -386,7 +386,8 @@ def extract_job_description(url):
         return None
     finally:
         st.write("Closing the browser...")
-        driver.quit()
+        if 'driver' in locals():
+            driver.quit()
 
 def get_available_api_keys() -> Dict[str, str]:
     api_keys = {}
