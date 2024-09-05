@@ -54,9 +54,10 @@ class ClaudeAPI:
             print(f"Raw response from Claude API: {json.dumps(result, indent=2)}")  # Print for immediate visibility
 
             if 'content' not in result or not result['content']:
-                logger.error(f"Unexpected response structure. Full response: {json.dumps(result, indent=2)}")
-                print(f"Unexpected response structure. Full response: {json.dumps(result, indent=2)}")  # Print for immediate visibility
-                return self._generate_error_response("Unexpected response structure from Claude API")
+                error_message = "No content found in Claude API response"
+                logger.error(error_message)
+                print(error_message)  # Print for immediate visibility
+                return self._generate_error_response(error_message)
 
             content = result['content'][0]['text']
             logger.debug(f"Extracted content from Claude API response: {content[:1000]}...")
