@@ -162,28 +162,53 @@ class ClaudeAPI:
         else:
             return f"No {field.replace('_', ' ')} available due to an error in the analysis."
 
-    def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
         try:
-            logger.debug("Analyzing match between resume and job description")
-            print("Analyzing match between resume and job description")  # Print for immediate visibility
-            
-            # Matching logic
-            match_score = self._calculate_match_score(resume, job_description)
-            recommendation = self._generate_recommendation(match_score)
-            experience_and_project_relevance = self._assess_experience_and_project_relevance(resume, job_description)
-            skills_gap = self._identify_skills_gap(resume, job_description)
-            recruiter_questions = self._generate_recruiter_questions(resume, job_description)
-            
-            return {
-                "match_score": match_score,
-                "recommendation": recommendation,
-                "experience_and_project_relevance": experience_and_project_relevance,
-                "skills_gap": skills_gap,
-                "recruiter_questions": recruiter_questions
-            }
+            logger.info("Starting resume analysis")
+            prompt = f"""
+            Analyze the fit between the following resume and job description with extreme accuracy. 
+            Focus specifically on how well the candidate's skills and experience match the job requirements for the role of {job_title}.
+    
+            Provide a detailed analysis for each of the following areas:
+
+            1. Brief Summary: Provide a concise overview of the candidate's fit for the role of {job_title} in 2-3 sentences. This is mandatory and must always be included.
+            2. Match Score: Provide a percentage between 0 and 100, where 0% means the candidate has none of the required skills or experience, and 100% means the candidate perfectly matches all job requirements for {job_title}. Be very critical and realistic in this scoring.
+            3. Recommendation for Interview: Based on the match score and the candidate's fit for {job_title}, provide a recommendation (e.g., "Highly recommend", "Recommend", "Recommend with reservations", "Do not recommend").
+            4. Experience and Project Relevance: Provide a comprehensive analysis of the candidate's work experience and relevant projects, specifically relating them to the job requirements for {job_title}. This section is crucial and must always contain detailed information.
+            5. Skills Gap: List all important skills or qualifications mentioned in the job description for {job_title} that the candidate lacks. Be exhaustive in this analysis.
+            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements for {job_title}. These questions are mandatory and must always be included.
+
+            Format your response as JSON with the following structure:
+            {{
+            "brief_summary": "Your brief summary here",
+            "match_score": The percentage match (0-100),
+            "recommendation_for_interview": "Your recommendation here",
+            "experience_and_project_relevance": "Your detailed analysis here",
+            "skills_gap": ["Skill 1", "Skill 2", ...],
+            "recruiter_questions": ["Question 1?", "Question 2?", ...]
+            }}
+
+            Ensure that all fields are populated with relevant, detailed information.
+
+            Job Title: {job_title}
+
+            Candidate Data:
+            {json.dumps(candidate_data)}
+
+            Job Description:
+            {job_description}
+
+            Resume:
+            {resume}
+
+            JSON Response:
+            """
+            result = self.analyze(prompt)
+        
+            return result
+
         except Exception as e:
             logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
-            print(f"Error in analyze_match: {str(e)}")  # Print for immediate visibility
             return self._generate_error_response(f"Error in analyze_match: {str(e)}")
 
     def _generate_error_response(self, error_message: str) -> Dict[str, Any]:

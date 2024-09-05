@@ -109,46 +109,57 @@ class LlamaAPI:
             logger.error(f"Llama API request failed: {str(e)}")
             return self._generate_error_response(str(e))
 
-    def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
-        logger.info("Starting resume analysis")
-        prompt = f"""
-        Analyze the fit between the following resume and job description with extreme accuracy. 
-        Focus specifically on how well the candidate's skills and experience match the job requirements.
+    def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
+        try:
+            logger.info("Starting resume analysis")
+            prompt = f"""
+            Analyze the fit between the following resume and job description with extreme accuracy. 
+            Focus specifically on how well the candidate's skills and experience match the job requirements for the role of {job_title}.
     
-        Provide a detailed analysis for each of the following areas:
+            Provide a detailed analysis for each of the following areas:
 
-        1. Brief Summary: Provide a concise overview of the candidate's fit for the role in 2-3 sentences. This is mandatory and must always be included.
-        2. Match Score: Provide a percentage between 0 and 100, where 0% means the candidate has none of the required skills or experience, and 100% means the candidate perfectly matches all job requirements. Be very critical and realistic in this scoring.
-        3. Recommendation for Interview: Based on the match score, provide a recommendation (e.g., "Highly recommend", "Recommend", "Recommend with reservations", "Do not recommend").
-        4. Experience and Project Relevance: Provide a comprehensive analysis of the candidate's work experience and relevant projects, specifically relating them to the job requirements. This section is crucial and must always contain detailed information.
-        5. Skills Gap: List all important skills or qualifications mentioned in the job description that the candidate lacks. Be exhaustive in this analysis.
-        6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements. These questions are mandatory and must always be included.
+            1. Brief Summary: Provide a concise overview of the candidate's fit for the role of {job_title} in 2-3 sentences. This is mandatory and must always be included.
+            2. Match Score: Provide a percentage between 0 and 100, where 0% means the candidate has none of the required skills or experience, and 100% means the candidate perfectly matches all job requirements for {job_title}. Be very critical and realistic in this scoring.
+            3. Recommendation for Interview: Based on the match score and the candidate's fit for {job_title}, provide a recommendation (e.g., "Highly recommend", "Recommend", "Recommend with reservations", "Do not recommend").
+            4. Experience and Project Relevance: Provide a comprehensive analysis of the candidate's work experience and relevant projects, specifically relating them to the job requirements for {job_title}. This section is crucial and must always contain detailed information.
+            5. Skills Gap: List all important skills or qualifications mentioned in the job description for {job_title} that the candidate lacks. Be exhaustive in this analysis.
+            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements for {job_title}. These questions are mandatory and must always be included.
 
-        Format your response as JSON with the following structure:
-        {{
-        "brief_summary": "Your brief summary here",
-        "match_score": The percentage match (0-100),
-        "recommendation_for_interview": "Your recommendation here",
-        "experience_and_project_relevance": "Your detailed analysis here",
-        "skills_gap": ["Skill 1", "Skill 2", ...],
-        "recruiter_questions": ["Question 1?", "Question 2?", ...]
-        }}
+            Format your response as JSON with the following structure:
+            {{
+            "brief_summary": "Your brief summary here",
+            "match_score": The percentage match (0-100),
+            "recommendation_for_interview": "Your recommendation here",
+            "experience_and_project_relevance": "Your detailed analysis here",
+            "skills_gap": ["Skill 1", "Skill 2", ...],
+            "recruiter_questions": ["Question 1?", "Question 2?", ...]
+            }}
 
-        Ensure that all fields are populated with relevant, detailed information.
+            Ensure that all fields are populated with relevant, detailed information.
 
-        Candidate Data:
-        {json.dumps(candidate_data)}
+            Job Title: {job_title}
 
-        Job Description:
-        {job_description}
+            Candidate Data:
+            {json.dumps(candidate_data)}
 
-        Resume:
-        {resume}
+            Job Description:
+            {job_description}
 
-        JSON Response:
-        """
+            Resume:
+            {resume}
 
-        return self.analyze(prompt)
+            JSON Response:
+            """
+            result = self.analyze(prompt)
+        
+            logger.debug(f"Arguments for analyze_match: resume={resume[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
+            logger.debug(f"Number of arguments: {len([resume, job_description, candidate_data, job_title])}")
+        
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
+            return self._generate_error_response(f"Error in analyze_match: {str(e)}")
 
     def _generate_fallback_content(self, field: str, parsed_content: Dict[str, Any]) -> str:
         if field == 'brief_summary':
