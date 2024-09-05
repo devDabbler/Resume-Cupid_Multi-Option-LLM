@@ -162,6 +162,30 @@ class ClaudeAPI:
         else:
             return f"No {field.replace('_', ' ')} available due to an error in the analysis."
 
+    def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            logger.debug("Analyzing match between resume and job description")
+            print("Analyzing match between resume and job description")  # Print for immediate visibility
+            
+            # Placeholder logic for matching analysis
+            match_score = 50  # Example score
+            recommendation = "Recommend for interview"
+            experience_and_project_relevance = "Relevant experience and projects"
+            skills_gap = ["No significant skills gap"]
+            recruiter_questions = ["What motivated you to apply for this role?"]
+            
+            return {
+                "match_score": match_score,
+                "recommendation": recommendation,
+                "experience_and_project_relevance": experience_and_project_relevance,
+                "skills_gap": skills_gap,
+                "recruiter_questions": recruiter_questions
+            }
+        except Exception as e:
+            logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
+            print(f"Error in analyze_match: {str(e)}")  # Print for immediate visibility
+            return self._generate_error_response(f"Error in analyze_match: {str(e)}")
+
     def _generate_error_response(self, error_message: str) -> Dict[str, Any]:
         logger.warning(f"Generating error response: {error_message}")
         return {
