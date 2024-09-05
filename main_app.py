@@ -183,15 +183,16 @@ async def process_all_batches(batches: List[List], resume_processor, job_descrip
     return results
 
 @st.cache_data
-def process_resume(resume_file, _resume_processor, job_description, importance_factors, candidate_data):
+def process_resume(resume_file, _resume_processor, job_description, importance_factors, candidate_data, job_title):
     logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
     try:
         logger.debug("Extracting text from file")
         resume_text = extract_text_from_file(resume_file)
         logger.debug(f"Extracted text length: {len(resume_text)}")
         
-        logger.debug("Analyzing resume")
-        result = _resume_processor.analyze_match(resume_text, job_description, candidate_data)
+        logger.debug(f"Arguments for analyze_match: resume_text={resume_text[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
+        logger.debug(f"Number of arguments: {len([resume_text, job_description, candidate_data, job_title])}")
+        result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         logger.debug(f"Analysis result: {result}")
         
         if 'error' in result:
@@ -214,11 +215,21 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             'project_relevance': ''
         }
 
-def process_resumes_in_parallel(resume_files, resume_processor, job_description, importance_factors, candidate_data_list):
+def process_resumes_in_parallel(resume_files, resume_processor, job_description, importance_factors, candidate_data_list, job_title):
     def process_with_context(file, candidate_data):
         try:
-            return process_resume(file, resume_processor, job_description, importance_factors, candidate_data)
+            resume_text = extract_text_from_file(file)
+            logger.debug(f"Calling analyze_match with args: {resume_text[:20]}..., {job_description[:20]}..., {candidate_data}, {job_title}")
+            result = resume_processor.analyze_match(
+                resume_text,
+                job_description,
+                candidate_data,
+                job_title
+            )
+            result['file_name'] = file.name
+            return result
         except Exception as e:
+            logger.error(f"Error processing resume {file.name}: {str(e)}", exc_info=True)
             return {
                 'file_name': file.name,
                 'error': str(e),
@@ -251,7 +262,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
     # Ensure all required keys exist in each result, with default values if missing
     for result in evaluation_results:
         result['match_score'] = result.get('match_score', 0)
-        result['recommendation'] = result.get('recommendation', 'No recommendation available')
+        result['recommendation'] = result.get('recommendation', result.get('recommendation_for_interview', 'No recommendation available'))
     
     # Sort results by match_score
     evaluation_results.sort(key=lambda x: x['match_score'], reverse=True)
@@ -277,7 +288,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
                 st.error(f"Error: {result['error']}")
             else:
                 st.markdown("### Brief Summary")
-                st.write(result.get('brief_summary', 'No brief summary available'))
+                st.write(result.get('summary', 'No brief summary available'))
 
                 st.markdown("### Match Score")
                 st.write(f"{result.get('match_score', 'N/A')}%")
@@ -286,7 +297,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
                 st.write(result.get('recommendation', 'No recommendation available'))
 
                 st.markdown("### Experience and Project Relevance")
-                st.write(result.get('experience_and_project_relevance', 'No experience and project relevance data available'))
+                st.write(result.get('analysis', 'No experience and project relevance data available'))
                 
                 st.markdown("### Skills Gap")
                 skills_gap = result.get('skills_gap', [])
@@ -297,7 +308,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
                     st.write("No skills gap identified" if isinstance(skills_gap, list) else skills_gap)
                 
                 st.markdown("### Recruiter Questions")
-                recruiter_questions = result.get('recruiter_questions', [])
+                recruiter_questions = result.get('interview_questions', [])
                 if isinstance(recruiter_questions, list) and recruiter_questions:
                     for question in recruiter_questions:
                         st.write(f"- {question}")
@@ -342,33 +353,26 @@ def extract_job_description(url):
     
     try:
         st.write("Opening the job description URL...")
-        print("Opening the job description URL...")
         driver.get(url)
         
         st.write("Waiting for the page to load completely...")
-        print("Waiting for the page to load completely...")
         WebDriverWait(driver, 20).until(lambda d: d.execute_script('return document.readyState') == 'complete')
         
         st.write("Page loaded. Capturing screenshot...")
-        print("Page loaded. Capturing screenshot...")
         driver.save_screenshot("/app/screenshot.png")
         
         st.write("Extracting page source for debugging...")
-        print("Extracting page source for debugging...")
         page_source = driver.page_source
         print(page_source)
         
         st.write("Waiting for the job description element to be located...")
-        print("Waiting for the job description element to be located...")
         wait = WebDriverWait(driver, 20)  # Increased wait time
         job_description_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-automation-id='jobPostingDescription']")))
         
         st.write("Job description element found. Extracting text...")
-        print("Job description element found. Extracting text...")
         job_description = job_description_element.text
         
         st.write("Job description extraction successful.")
-        print("Job description extraction successful.")
         return job_description
     except Exception as e:
         error_message = f"Failed to extract job description: {str(e)}"
@@ -377,7 +381,6 @@ def extract_job_description(url):
         return None
     finally:
         st.write("Closing the browser...")
-        print("Closing the browser...")
         driver.quit()
 
 def get_available_api_keys() -> Dict[str, str]:
@@ -435,7 +438,7 @@ def main_app():
     if selected_backend != st.session_state.get('last_backend'):
         selected_api_key = api_keys[selected_backend]
         st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
-        clear_cache()  # Add this function to clear the cache
+        st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
         st.session_state.last_backend = selected_backend
         logger.debug(f"Switched to {selected_backend} backend and cleared cache")
 
@@ -452,6 +455,20 @@ def main_app():
     # Add this line to check if the analyze_match method exists
     if not hasattr(resume_processor, 'analyze_match'):
         raise AttributeError(f"ResumeProcessor for backend '{selected_backend}' does not have the 'analyze_match' method")
+
+    # Add dropdown for selecting saved roles
+    saved_role_options = ["Select a saved role"] + [f"{role['role_name']} - {role['client']}" for role in st.session_state.saved_roles]
+    selected_saved_role = st.selectbox("Select a saved role:", options=saved_role_options)
+
+    if selected_saved_role != "Select a saved role":
+        selected_role = next(role for role in st.session_state.saved_roles if f"{role['role_name']} - {role['client']}" == selected_saved_role)
+        st.session_state.job_description = selected_role['job_description']
+        st.session_state.job_description_link = selected_role['job_description_link']
+        st.session_state.role_name_input = selected_role['role_name']
+        st.session_state.client = selected_role['client']
+
+    # Add job title input field
+    st.session_state.job_title = st.text_input("Enter the job title:", value=st.session_state.get('job_title', ''))
 
     jd_option = st.radio("Job Description Input Method:", ("Paste Job Description", "Provide Link to Fractal Job Posting"))
 
@@ -478,6 +495,9 @@ def main_app():
     if st.session_state.job_description:
         st.text_area("Current Job Description:", value=st.session_state.job_description, height=200, key='current_jd', disabled=True)
 
+    # Move the client name input field here
+    st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
+
     st.subheader("Customize Importance Factors")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -497,43 +517,43 @@ def main_app():
         st.write(f"Number of resumes uploaded: {len(resume_files)}")
 
     if st.button('Process Resumes', key='process_resumes'):
-        if resume_files and st.session_state.job_description:
+        if resume_files and st.session_state.job_description and st.session_state.job_title:
             if len(resume_files) > 3:
                 st.warning("You've uploaded more than 3 resumes. Only the first 3 will be processed.")
                 resume_files = resume_files[:3]
         
-        run_id = str(uuid.uuid4())
-        insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
-        logger.info("Processing resumes...")
+            run_id = str(uuid.uuid4())
+            insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
+            logger.info("Processing resumes...")
 
-        st.write(f"Debug: Using backend: {st.session_state.backend}")
-        st.write(f"Debug: Resume processor type: {type(resume_processor).__name__}")
+            # Get candidate data
+            candidates = get_candidate_data()
+            candidate_data_list = []
+            for file in resume_files:
+                matching_candidate = next((c for c in candidates if c['candidate'] == file.name), None)
+                candidate_data_list.append(matching_candidate or {})
 
-        # Get candidate data
-        candidates = get_candidate_data()
-        candidate_data_list = []
-        for file in resume_files:
-            matching_candidate = next((c for c in candidates if c['candidate'] == file.name), None)
-            candidate_data_list.append(matching_candidate or {})
+            with st.spinner('Processing resumes...'):
+                evaluation_results = process_resumes_in_parallel(resume_files, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data_list, st.session_state.job_title)
+            
+            logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
+            insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
 
-        with st.spinner('Processing resumes...'):
-            evaluation_results = process_resumes_in_parallel(resume_files, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data_list)
-        
-        logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
-        insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
-
-        if evaluation_results:
-            st.success("Evaluation complete!")
-            logger.info("Evaluation complete, displaying results.")
-            display_results(evaluation_results, run_id)
+            if evaluation_results:
+                st.success("Evaluation complete!")
+                logger.info("Evaluation complete, displaying results.")
+                display_results(evaluation_results, run_id)
+            else:
+                st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
         else:
-            st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
-    else:
-        if not st.session_state.job_description:
-            st.error("Please ensure a job description is provided.")
+            if not st.session_state.job_description:
+                st.error("Please ensure a job description is provided.")
+            if not st.session_state.job_title:
+                st.error("Please enter a job title.")
+            if not resume_files:
+                st.error("Please upload at least one resume.")
 
     st.session_state.role_name_input = st.session_state.role_name_input
-    st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
     st.session_state.job_description_link = st.session_state.job_description_link
 
     save_role_option = st.checkbox("Save this role for future use")

@@ -178,7 +178,8 @@ class ResumeProcessor:
         }
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
-        logger.debug(f"analyze_match called with args: {resume[:20]}..., {job_description[:20]}..., {candidate_data}, {job_title}")
+        logger.debug(f"Arguments for analyze_match: resume={resume[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
+        logger.debug(f"Number of arguments: {len([resume, job_description, candidate_data, job_title])}")
         return self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
 
     def _invalidate_cache(self, cache_key: str):
