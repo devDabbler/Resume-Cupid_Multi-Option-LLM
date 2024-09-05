@@ -1,7 +1,9 @@
 import logging
 import os
+import time
+import random
 from typing import List, Dict, Any
-import numpy as np
+import tiktoken
 import spacy
 from utils import preprocess_text, calculate_similarity
 from claude_analyzer import ClaudeAPI
@@ -10,92 +12,197 @@ from gpt4o_mini_analyzer import GPT4oMiniAPI
 import json
 import hashlib
 import sqlite3
+import traceback
 
 logger = logging.getLogger(__name__)
 
 nlp = spacy.load("en_core_web_md")
 
-DB_PATH = os.getenv('SQLITE_DB_PATH')
-
-import os
-import sqlite3
-import logging
-
-logger = logging.getLogger(__name__)
-
 def get_db_connection():
     db_path = os.getenv('SQLITE_DB_PATH')
+    
+    logger.info(f"Current working directory: {os.getcwd()}")
+    
     if not db_path:
-        raise ValueError("SQLITE_DB_PATH environment variable is not set")
-
+        logger.error("SQLITE_DB_PATH is not set in the environment variables")
+        raise ValueError("SQLITE_DB_PATH is not set in the environment variables")
+    
+    logger.info(f"Environment variable SQLITE_DB_PATH: {db_path}")
+    
     # Ensure the directory exists
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
+    dir_path = os.path.dirname(db_path)
+    logger.info(f"Directory path: {dir_path}")
+    
     try:
-        conn = sqlite3.connect(db_path)
+        if not dir_path:
+            logger.error("Database directory path is empty")
+            raise ValueError("Invalid database path")
+        
+        logger.info(f"Attempting to create directory: {dir_path}")
+        os.makedirs(dir_path, exist_ok=True)
+        logger.info(f"Directory created successfully: {dir_path}")
+        
+        # Resolve the path within the container
+        resolved_path = os.path.abspath(db_path)
+        logger.info(f"Resolved database path: {resolved_path}")
+        
+        conn = sqlite3.connect(resolved_path)
         conn.row_factory = sqlite3.Row
+        logger.info("Database connection successful")
         return conn
-    except sqlite3.Error as e:
+    
+    except Exception as e:
         logger.error(f"Error connecting to database: {e}")
         raise
 
 class ResumeProcessor:
-    def __init__(self, api_key: str, backend: str = "claude"):
-        self.nlp = spacy.load("en_core_web_md")
+    def __init__(self, api_key: str, backend: str):
+        self.backend = backend
         if backend == "claude":
-            self.api = ClaudeAPI(api_key)
+            self.analyzer = ClaudeAPI(api_key)
         elif backend == "llama":
-            self.api = LlamaAPI(api_key)
-        elif backend == "gpt-4o-mini":
-            self.api = GPT4oMiniAPI(api_key)
+            self.analyzer = LlamaAPI(api_key)
+        elif backend == "gpt4o_mini":
+            # GPT4oMiniAPI now gets the API key from an environment variable
+            self.analyzer = GPT4oMiniAPI(api_key)
         else:
             raise ValueError(f"Unsupported backend: {backend}")
-        self.job_descriptions: Dict[str, Dict[str, Any]] = {}
-        self.cache = {}
+        
+        self.token_limit = 10000  # Token limit per minute
+        self.token_bucket = self.token_limit
+        self.last_refill = time.time()
+        self.encoder = tiktoken.encoding_for_model("gpt-4")
 
-    def _get_cache_key(self, resume_text: str, job_description: str) -> str:
-        combined = resume_text + job_description
-        return hashlib.md5(combined.encode()).hexdigest()
+    def estimate_tokens(self, text: str) -> int:
+        return len(self.encoder.encode(text))
+
+    def wait_for_tokens(self, tokens_needed: int):
+        while True:
+            current_time = time.time()
+            time_passed = current_time - self.last_refill
+            self.token_bucket = min(self.token_limit, self.token_bucket + time_passed * (self.token_limit / 60))
+            self.last_refill = current_time
+
+            if self.token_bucket >= tokens_needed:
+                self.token_bucket -= tokens_needed
+                return
+            else:
+                sleep_time = (tokens_needed - self.token_bucket) / (self.token_limit / 60)
+                time.sleep(sleep_time + random.uniform(0, 1))  # Add jitter
 
     def analyze_resume(self, resume_text: str, job_description: str, importance_factors: Dict[str, float] = None) -> Dict[str, Any]:
+        logger.debug(f"Starting resume analysis with {self.backend} backend")
         cache_key = self._get_cache_key(resume_text, job_description)
-        
-        # Check if result is in memory cache
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        
-        # Check if result is in database cache
         cached_result = self._get_cached_result(cache_key)
         if cached_result:
-            self.cache[cache_key] = cached_result
+            logger.debug(f"Retrieved cached result for {self.backend} backend")
             return cached_result
+    
+        logger.debug(f"No cached result found. Performing new analysis with {self.backend} backend")
 
-        # If not in cache, perform analysis
-        analysis = self.api.analyze_match(resume_text, job_description)
-        
-        # Extract years of experience
-        years_of_experience = self._extract_years_of_experience(resume_text)
+        combined_text = resume_text + " " + job_description
+        estimated_tokens = self.estimate_tokens(combined_text)
+        logger.debug(f"Estimated tokens for analysis: {estimated_tokens}")
 
-        # Combine all results
-        result = {
-            'file_name': '',  # This will be set in main_app.py
-            'match_score': analysis.get('match_score', 0),
-            'years_of_experience': years_of_experience,
-            'summary': analysis.get('summary', 'No summary available'),
-            'analysis': analysis.get('analysis', 'No analysis available'),
-            'strengths': analysis.get('strengths', []),
-            'areas_for_improvement': analysis.get('areas_for_improvement', []),
-            'skills_gap': analysis.get('skills_gap', []),
-            'recommendation': analysis.get('recommendation', 'No recommendation available'),
-            'interview_questions': analysis.get('interview_questions', []),
-            'project_relevance': analysis.get('project_relevance', 'No project relevance analysis available')
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                self.wait_for_tokens(estimated_tokens)
+                logger.debug(f"Calling {self.backend} API for analysis")
+                analysis = self.analyzer.analyze_match(resume_text, job_description, {})
+                logger.debug(f"API analysis result: {analysis}")
+                
+                years_of_experience = self._extract_years_of_experience(resume_text)
+                logger.debug(f"Extracted years of experience: {years_of_experience}")
+
+                result = {
+                    'file_name': '',
+                    'match_score': analysis.get('match_score', 0),
+                    'years_of_experience': years_of_experience,
+                    'summary': analysis.get('brief_summary', 'No summary available'),
+                    'analysis': analysis.get('experience_and_project_relevance', 'No analysis available'),
+                    'strengths': [],  # This field is not provided by the new API response
+                    'areas_for_improvement': [],  # This field is not provided by the new API response
+                    'skills_gap': analysis.get('skills_gap', []),
+                    'recommendation': analysis.get('recommendation_for_interview', 'No recommendation available'),
+                    'interview_questions': analysis.get('recruiter_questions', []),
+                    'project_relevance': analysis.get('experience_and_project_relevance', 'No project relevance analysis available')
+                }
+
+                logger.debug("Analysis result compiled successfully")
+                self._cache_result(cache_key, result)
+
+                return result
+
+            except Exception as e:
+                if "Rate limit exceeded" in str(e) and attempt < max_retries - 1:
+                    sleep_time = (2 ** attempt) + random.uniform(0, 1)
+                    logger.warning(f"Rate limit exceeded. Retrying in {sleep_time:.2f} seconds.")
+                    time.sleep(sleep_time)
+                else:
+                    logger.error(f"Error in resume analysis: {str(e)}")
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    return self._generate_error_result(str(e))
+
+        # If we've exhausted all retries
+        logger.error("Max retries reached. Unable to complete analysis.")
+        return self._generate_error_result("Max retries reached")
+
+    def analyze_with_fallback(self, resume_text: str, job_description: str, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            logger.info(f"Attempting analysis with {self.backend} backend")
+            return self.analyzer.analyze_match(resume_text, job_description, candidate_data)
+        except Exception as e:
+            if "Rate limit exceeded" in str(e):
+                logger.warning(f"{self.backend} backend hit rate limit. No fallback available.")
+            else:
+                logger.error(f"Error with {self.backend} backend: {str(e)}")
+            raise Exception(f"Analysis failed with {self.backend} backend. Unable to complete analysis.")
+
+    def _generate_error_result(self, error_message: str) -> Dict[str, Any]:
+        return {
+            'file_name': '',
+            'error': error_message,
+            'match_score': 0,
+            'years_of_experience': 0,
+            'summary': 'Error occurred during analysis',
+            'analysis': 'Unable to complete analysis due to an error',
+            'strengths': [],
+            'areas_for_improvement': [],
+            'skills_gap': [],
+            'recommendation': 'Unable to provide a recommendation due to an error',
+            'interview_questions': [],
+            'project_relevance': 'Unable to analyze project relevance due to an error'
         }
 
-        # Cache the result
-        self._cache_result(cache_key, result)
-        self.cache[cache_key] = result
+    def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
+        logger.debug(f"Delegating analyze_match to {self.backend} analyzer")
+        return self.analyzer.analyze_match(resume, job_description, candidate_data)
 
-        return result
+    def _invalidate_cache(self, cache_key: str):
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('DELETE FROM resume_cache WHERE cache_key = ?', (cache_key,))
+        conn.commit()
+        conn.close()
+        logger.debug(f"Invalidated cache for key: {cache_key}")
+
+    def _get_cache_key(self, resume_text: str, job_description: str) -> str:
+        combined = f"{self.backend}:{resume_text}{job_description}"
+        logger.debug(f"Generated cache key for backend: {self.backend}")
+        return hashlib.md5(combined.encode()).hexdigest()
+
+    def clear_cache_for_resume(self, resume_text: str, job_description: str):
+        cache_key = self._get_cache_key(resume_text, job_description)
+        self._invalidate_cache(cache_key)
+        
+    def clear_cache(self):
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('DELETE FROM resume_cache')
+        conn.commit()
+        conn.close()
+        logger.debug("Cleared all entries from resume_cache")
 
     def _extract_years_of_experience(self, resume_text: str) -> int:
         # Simple regex to find years of experience
@@ -111,7 +218,15 @@ class ResumeProcessor:
         cur.execute('SELECT result FROM resume_cache WHERE cache_key = ?', (cache_key,))
         row = cur.fetchone()
         conn.close()
-        return json.loads(row[0]) if row else None
+        if row:
+            result = json.loads(row[0])
+            logger.debug(f"Retrieved cached result: {result}")
+            if 'error' in result or result.get('summary') == 'Unable to complete analysis':
+                logger.warning(f"Cached result contains an error. Invalidating cache.")
+                self._invalidate_cache(cache_key)
+                return None
+            return result
+        return None
 
     def _cache_result(self, cache_key: str, result: Dict[str, Any]):
         conn = get_db_connection()
@@ -138,6 +253,7 @@ class ResumeProcessor:
         return ranked_results
 
 def create_resume_processor(api_key: str, backend: str = "claude") -> ResumeProcessor:
+    logger.debug(f"Creating ResumeProcessor with backend: {backend}")
     return ResumeProcessor(api_key, backend)
 
 def init_resume_cache():
