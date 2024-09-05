@@ -31,7 +31,7 @@ from candidate_data import get_candidate_data
 load_dotenv()
 
 # Initialize logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Initialize SpaCy
