@@ -1,10 +1,12 @@
 import os
+from config import Config, ENV_TYPE
 import re
 import uuid
 from typing import List, Dict, Any
 from datetime import datetime
 import time
 import logging
+from logging.handlers import RotatingFileHandler
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
@@ -30,9 +32,23 @@ from candidate_data import get_candidate_data
 # Load environment variables
 load_dotenv()
 
-# Initialize logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Set up logging
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
+
+# Create logger
 logger = logging.getLogger(__name__)
+
+# Create RotatingFileHandler
+os.makedirs(Config.LOG_DIR, exist_ok=True)
+log_file = os.path.join(Config.LOG_DIR, "resume_cupid.log")
+file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)
+file_handler.setLevel(logging.DEBUG)
+
+# Create formatter and add it to the handler
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
 
 # Initialize SpaCy
 nlp = spacy.load("en_core_web_md")
@@ -343,16 +359,7 @@ def extract_job_description(url):
     if not is_valid_fractal_job_link(url):
         raise ValueError("Invalid job link. Please use a link from Fractal's career site.")
     
-    options = Options()
-    options.binary_location = "/usr/bin/chromium-browser"  # Set the Chromium binary location
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--disable-software-rasterizer")
-    options.add_argument("--remote-debugging-port=9222")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--window-size=1920x1080")
+    options = Config.get_chrome_options()
     
     try:
         driver = webdriver.Chrome(options=options)

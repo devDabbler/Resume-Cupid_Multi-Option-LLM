@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from config import Config
 from functools import lru_cache
 import random
 from typing import List, Dict, Any
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 nlp = spacy.load("en_core_web_md")
 
 def get_db_connection():
-    db_path = os.getenv('SQLITE_DB_PATH')
+    db_path = Config.DB_PATH
     
     logger.info(f"Current working directory: {os.getcwd()}")
     

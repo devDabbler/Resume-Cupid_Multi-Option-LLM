@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import uuid
 from datetime import datetime
 import logging
+from config import Config
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-DB_PATH = os.getenv('SQLITE_DB_PATH')
+DB_PATH = Config.DB_PATH
 
 def get_db_connection():
     try:
