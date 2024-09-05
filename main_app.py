@@ -391,7 +391,7 @@ def get_available_api_keys() -> Dict[str, str]:
 def clear_cache():
     if 'resume_processor' in st.session_state and hasattr(st.session_state.resume_processor, 'clear_cache'):
         st.session_state.resume_processor.clear_cache()
-        logger.debug("Cleared resume analysis cache due to backend change")
+        logger.debug(f"Cleared resume analysis cache for backend: {st.session_state.backend}")
     else:
         logger.warning("Unable to clear cache: resume_processor not found or doesn't have clear_cache method")
         
