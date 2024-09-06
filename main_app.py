@@ -455,7 +455,7 @@ def main_app():
     selected_backend = st.selectbox(
         "Select AI backend:",
         [f"{backend.capitalize()}: {llm_descriptions[backend]}" for backend in available_backends],
-        index=0 if "claude" in available_backends else 0
+        index=0 if "claude_3.5_Sonnet" in available_backends else 0
     )
     selected_backend = selected_backend.split(":")[0].strip().lower()
 
