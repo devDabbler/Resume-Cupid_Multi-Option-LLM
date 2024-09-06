@@ -440,8 +440,8 @@ def main_app():
         st.session_state.saved_roles = get_saved_roles(st.session_state.get("current_user", ""))
 
     llm_descriptions = {
-        "claude": "Highly effective for natural language understanding and generation. Developed by Anthropic.",
-        "llama": "Large language model with strong performance on various NLP tasks. Created by Meta AI.",
+        "claude_3.5_Sonnet": "Most recent moodel that is highly effective for natural language understanding and generation. Slightly pricey. Developed by Anthropic.",
+        "llama-3.1-8b": "Large language model with strong performance on various NLP tasks. Created by Meta AI.",
         "gpt4o_mini": "Compact version of GPT-4 with impressive capabilities. Open-source alternative."
     }
 

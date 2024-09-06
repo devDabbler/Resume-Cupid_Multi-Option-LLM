@@ -1,11 +1,7 @@
 import groq
 from groq import Groq
-import re
-import simplejson
 import json
 import logging
-import ast
-import ujson
 from typing import Dict, Any
 
 # Initialize logging
@@ -23,53 +19,25 @@ class LlamaAPI:
             completion = self.client.chat.completions.create(
                 messages=[
                     {
+                        "role": "system",
+                        "content": "You are an AI assistant specialized in analyzing resumes and job descriptions. Always provide your responses in JSON format.",
+                    },
+                    {
                         "role": "user",
                         "content": prompt,
                     }
                 ],
                 model="llama-3.1-8b-instant",
-                max_tokens=2000,
+                max_tokens=4000,  # Increased to take advantage of larger context window
+                temperature=0.7,
             )
             logger.debug(f"Received response from Llama: {completion}")
 
             result = completion.choices[0].message.content
             logger.debug(f"Raw response from Llama: {result[:100]}...")  # Log first 100 characters
 
-            # Print the full raw response
-            print("Full raw response:")
-            print(result)
-
-            # Define a function to clean the JSON string
-            def clean_json_string(s):
-                # Remove any invalid characters
-                s = re.sub(r'[^\x00-\x7F]+', '', s)
-                # Remove any control characters
-                s = re.sub(r'[\x00-\x1F\x7F]', '', s)
-                # Remove specific problematic characters
-                s = s.replace('\u2028', '').replace('\u2029', '')
-                return s
-
-            # Clean the JSON string
-            cleaned_result = clean_json_string(result)
-            print("Cleaned JSON:")
-            print(cleaned_result)
-
-            # Try parsing with different methods
-            try:
-                parsed_content = json.loads(cleaned_result)
-            except json.JSONDecodeError as e:
-                logger.error(f"Error parsing JSON response with json: {str(e)}")
-                try:
-                    parsed_content = ast.literal_eval(cleaned_result)
-                except (ValueError, SyntaxError) as e:
-                    logger.error(f"Error parsing response with ast.literal_eval: {str(e)}")
-                    logger.error(f"Problematic JSON: {result}")
-                    # Print the problematic part
-                    error_line = e.lineno if hasattr(e, 'lineno') else 0
-                    error_col = e.colno if hasattr(e, 'colno') else 0
-                    problematic_part = result.split('\n')[error_line-1:error_line+1]
-                    logger.error(f"Problematic part: {problematic_part}")
-                    return self._generate_error_response(f"Error parsing JSON response: {str(e)}")
+            # Parse JSON response
+            parsed_content = json.loads(result)
 
             # Ensure all required fields are present and populated
             required_fields = [
@@ -113,17 +81,17 @@ class LlamaAPI:
         try:
             logger.info("Starting resume analysis")
             prompt = f"""
-            Analyze the fit between the following resume and job description with extreme accuracy. 
+            You are a highly skilled AI recruiter. Your task is to analyze the fit between the following resume and job description with extreme accuracy. 
             Focus specifically on how well the candidate's skills and experience match the job requirements for the role of {job_title}.
     
             Provide a detailed analysis for each of the following areas:
 
-            1. Brief Summary: Provide a concise overview of the candidate's fit for the role of {job_title} in 2-3 sentences. This is mandatory and must always be included.
+            1. Brief Summary: Provide a concise overview of the candidate's fit for the role of {job_title} in 2-3 sentences.
             2. Match Score: Provide a percentage between 0 and 100, where 0% means the candidate has none of the required skills or experience, and 100% means the candidate perfectly matches all job requirements for {job_title}. Be very critical and realistic in this scoring.
             3. Recommendation for Interview: Based on the match score and the candidate's fit for {job_title}, provide a recommendation (e.g., "Highly recommend", "Recommend", "Recommend with reservations", "Do not recommend").
-            4. Experience and Project Relevance: Provide a comprehensive analysis of the candidate's work experience and relevant projects, specifically relating them to the job requirements for {job_title}. This section is crucial and must always contain detailed information.
-            5. Skills Gap: List all important skills or qualifications mentioned in the job description for {job_title} that the candidate lacks. Be exhaustive in this analysis.
-            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements for {job_title}. These questions are mandatory and must always be included.
+            4. Experience and Project Relevance: Provide a comprehensive analysis of the candidate's work experience and relevant projects, specifically relating them to the job requirements for {job_title}.
+            5. Skills Gap: List all important skills or qualifications mentioned in the job description for {job_title} that the candidate lacks.
+            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements for {job_title}.
 
             Format your response as JSON with the following structure:
             {{
@@ -135,7 +103,7 @@ class LlamaAPI:
             "recruiter_questions": ["Question 1?", "Question 2?", ...]
             }}
 
-            Ensure that all fields are populated with relevant, detailed information.
+            Ensure that all fields are populated with relevant, detailed information. Do not include any text outside of the JSON structure.
 
             Job Title: {job_title}
 
