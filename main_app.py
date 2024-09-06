@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 import time
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
 import streamlit as st
 import pandas as pd
@@ -31,6 +32,13 @@ from candidate_data import get_candidate_data
 
 # Load environment variables
 load_dotenv()
+
+# Create logger
+logger = logging.getLogger(__name__)
+
+for key in ["Claude_API_KEY", "Llama_API_KEY", "GPT4o_Mini_API_KEY"]:
+    value = os.getenv(key)
+    logger.debug(f"{key}: {'Set' if value else 'Not set'}")
 
 ENV_TYPE = Config.ENV_TYPE
 
@@ -80,7 +88,7 @@ if 'resume_processor' not in st.session_state:
 @st.cache_data
 def get_available_api_keys() -> Dict[str, str]:
     api_keys = {}
-    for backend in ["Claude", "Llama", "GPT4o_Mini"]:
+    for backend in ["claude", "llama", "gpt4o_mini"]:
         key = os.getenv(f'{backend.upper()}_API_KEY')
         if key:
             api_keys[backend] = key
@@ -423,10 +431,9 @@ def extract_job_description(url):
         st.write("Closing the browser...")
         if 'driver' in locals():
             driver.quit()
-
 def get_available_api_keys() -> Dict[str, str]:
     api_keys = {}
-    for backend in ["Claude", "Llama", "GPT4o_Mini"]:
+    for backend in ["claude", "llama", "gpt4o_mini"]:
         key = os.getenv(f'{backend.upper()}_API_KEY')
         if key:
             api_keys[backend] = key
