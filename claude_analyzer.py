@@ -25,94 +25,54 @@ class ClaudeAPI:
 
     def analyze(self, prompt: str) -> Dict[str, Any]:
         try:
-            logger.debug(f"Sending request to Claude API with prompt: {prompt[:100]}...")
-            print(f"Sending request to Claude API with prompt: {prompt[:100]}...")  # Print for immediate visibility
-            
-            payload = {
-                "model": "claude-3-5-sonnet-20240620",
-                "max_tokens": 2000,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ]
-            }
-            
-            logger.debug(f"Request payload: {json.dumps(payload, indent=2)}")
-            print(f"Request payload: {json.dumps(payload, indent=2)}")  # Print for immediate visibility
-            
-            response = requests.post(self.api_url, headers=self.headers, json=payload)
-            
-            logger.debug(f"Response status code: {response.status_code}")
-            print(f"Response status code: {response.status_code}")  # Print for immediate visibility
-            
-            logger.debug(f"Response headers: {dict(response.headers)}")
-            print(f"Response headers: {dict(response.headers)}")  # Print for immediate visibility
-            
-            response.raise_for_status()
+            logger.debug("Sending request to Llama API")
+            completion = self.client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                model="llama-3.1-8b-instant",
+                max_tokens=2000,
+            )
+            logger.debug(f"Received response from Llama: {completion}")
 
-            result = response.json()
-            logger.debug(f"Raw response from Claude API: {json.dumps(result, indent=2)}")
-            print(f"Raw response from Claude API: {json.dumps(result, indent=2)}")  # Print for immediate visibility
+            result = completion.choices[0].message.content
+            logger.debug(f"Raw response from Llama: {result}")
 
-            if 'content' not in result or not result['content']:
-                error_message = "No content found in Claude API response"
-                logger.error(error_message)
-                print(error_message)  # Print for immediate visibility
-                return self._generate_error_response(error_message)
-
-            content = result['content'][0]['text']
-            logger.debug(f"Extracted content from Claude API response: {content[:1000]}...")
-            print(f"Extracted content from Claude API response: {content[:1000]}...")  # Print for immediate visibility
-
-            cleaned_result = self._clean_json_string(content)
-            logger.debug(f"Cleaned JSON string: {cleaned_result[:1000]}...")
-            print(f"Cleaned JSON string: {cleaned_result[:1000]}...")  # Print for immediate visibility
-
+            # Clean and parse JSON
+            cleaned_result = self._clean_json_string(result)
             parsed_content = self._parse_json(cleaned_result)
+
             if parsed_content is None:
-                logger.error(f"Failed to parse JSON. Cleaned result: {cleaned_result}")
-                print(f"Failed to parse JSON. Cleaned result: {cleaned_result}")  # Print for immediate visibility
-                return self._generate_error_response("Failed to parse JSON response")
+                raise ValueError("Failed to parse JSON response")
 
-            logger.debug(f"Parsed content: {json.dumps(parsed_content, indent=2)}")
-            print(f"Parsed content: {json.dumps(parsed_content, indent=2)}")  # Print for immediate visibility
+            return parsed_content
 
-            processed_content = self._process_parsed_content(parsed_content)
-            logger.info(f"Analysis completed successfully for prompt: {prompt[:50]}...")
-            print(f"Analysis completed successfully for prompt: {prompt[:50]}...")  # Print for immediate visibility
-            return processed_content
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Claude API request failed: {str(e)}", exc_info=True)
-            print(f"Claude API request failed: {str(e)}")  # Print for immediate visibility
-            return self._generate_error_response(f"API request failed: {str(e)}")
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing Claude API response: {str(e)}", exc_info=True)
-            print(f"Error parsing Claude API response: {str(e)}")  # Print for immediate visibility
-            return self._generate_error_response(f"JSON parsing error: {str(e)}")
         except Exception as e:
-            logger.error(f"Unexpected error in Claude analysis: {str(e)}", exc_info=True)
-            print(f"Unexpected error in Claude analysis: {str(e)}")  # Print for immediate visibility
-            return self._generate_error_response(f"Unexpected error: {str(e)}")
+            logger.error(f"Llama API request failed: {str(e)}")
+            return self._generate_error_response(str(e))
 
-    def _clean_json_string(self, s: str) -> str:
+    def clean_json_string(s):
         # Remove any text before the first '{' and after the last '}'
         start = s.find('{')
         end = s.rfind('}')
         if start != -1 and end != -1:
             s = s[start:end+1]
-        s = re.sub(r'[^\x00-\x7F]+', '', s)
-        s = re.sub(r'[\x00-\x1F\x7F]', '', s)
-        return s.replace('\u2028', '').replace('\u2029', '')
+        # Remove any non-ASCII characters
+        s = ''.join(char for char in s if ord(char) < 128)
+        return s
 
-    def _parse_json(self, cleaned_result: str) -> Dict[str, Any]:
+    def parse_json(cleaned_result):
         try:
             return json.loads(cleaned_result)
-        except json.JSONDecodeError as json_err:
-            logger.error(f"JSON parsing error: {str(json_err)}")
+        except json.JSONDecodeError:
+            # If json.loads fails, try ast.literal_eval
             try:
                 return ast.literal_eval(cleaned_result)
-            except (ValueError, SyntaxError) as ast_err:
-                logger.error(f"AST parsing error: {str(ast_err)}")
+            except (ValueError, SyntaxError):
+                # If both methods fail, return None or raise an exception
                 return None
 
     def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
@@ -205,6 +165,9 @@ class ClaudeAPI:
             """
             result = self.analyze(prompt)
         
+            logger.debug(f"Arguments for analyze_match: resume={resume[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
+            logger.debug(f"Number of arguments: {len([resume, job_description, candidate_data, job_title])}")
+
             return result
 
         except Exception as e:

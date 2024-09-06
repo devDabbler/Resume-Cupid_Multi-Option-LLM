@@ -207,11 +207,12 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         
         logger.debug(f"Arguments for analyze_match: resume_text={resume_text[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
         logger.debug(f"Number of arguments: {len([resume_text, job_description, candidate_data, job_title])}")
+        
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         logger.debug(f"Analysis result: {result}")
         
-        if 'error' in result:
-            logger.error(f"Error in resume analysis: {result['error']}")
+        if result is None or 'error' in result:
+            raise ValueError(f"Failed to analyze resume: {result.get('error', 'Unknown error')}")
         
         result['file_name'] = resume_file.name
         return result
@@ -222,7 +223,7 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             'error': str(e),
             'match_score': 0,
             'recommendation': 'Unable to provide a recommendation due to an error.',
-            'analysis': 'Unable to complete analysis',
+            'analysis': f'Unable to complete analysis: {str(e)}',
             'strengths': [],
             'areas_for_improvement': [],
             'skills_gap': [],
