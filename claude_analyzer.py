@@ -2,16 +2,14 @@ import requests
 import logging
 import json
 import re
-import simplejson
 import ast
-import ujson
 from typing import Dict, Any
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class ClaudeAPI:
+class ClaudeClient:
     def __init__(self, api_key: str, api_url: str = "https://api.anthropic.com/v1/messages"):
         self.api_key = api_key
         self.api_url = api_url
@@ -20,26 +18,31 @@ class ClaudeAPI:
             "anthropic-version": "2023-06-01",
             "Content-Type": "application/json"
         }
+
+    def create_completion(self, messages: list, model: str = "claude-3-opus-20240229", max_tokens: int = 2000):
+        data = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens
+        }
+        response = requests.post(self.api_url, headers=self.headers, json=data)
+        response.raise_for_status()
+        return response.json()
+
+class ClaudeAPI:
+    def __init__(self, api_key: str):
+        self.client = ClaudeClient(api_key)
         logger.info("ClaudeAPI initialized")
-        print("ClaudeAPI initialized")  # Print for immediate visibility
 
     def analyze(self, prompt: str) -> Dict[str, Any]:
         try:
-            logger.debug("Sending request to Llama API")
-            completion = self.client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
-                model="llama-3.1-8b-instant",
-                max_tokens=2000,
-            )
-            logger.debug(f"Received response from Llama: {completion}")
+            logger.debug("Sending request to Claude API")
+            messages = [{"role": "user", "content": prompt}]
+            completion = self.client.create_completion(messages)
+            logger.debug(f"Received response from Claude: {completion}")
 
-            result = completion.choices[0].message.content
-            logger.debug(f"Raw response from Llama: {result}")
+            result = completion['content'][0]['text']
+            logger.debug(f"Raw response from Claude: {result}")
 
             # Clean and parse JSON
             cleaned_result = self._clean_json_string(result)
@@ -51,10 +54,10 @@ class ClaudeAPI:
             return parsed_content
 
         except Exception as e:
-            logger.error(f"Llama API request failed: {str(e)}")
+            logger.error(f"Claude API request failed: {str(e)}")
             return self._generate_error_response(str(e))
 
-    def clean_json_string(s):
+    def _clean_json_string(self, s: str) -> str:
         # Remove any text before the first '{' and after the last '}'
         start = s.find('{')
         end = s.rfind('}')
@@ -64,7 +67,7 @@ class ClaudeAPI:
         s = ''.join(char for char in s if ord(char) < 128)
         return s
 
-    def parse_json(cleaned_result):
+    def _parse_json(self, cleaned_result: str) -> Dict[str, Any]:
         try:
             return json.loads(cleaned_result)
         except json.JSONDecodeError:
