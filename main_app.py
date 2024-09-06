@@ -1,5 +1,5 @@
 import os
-from config import Config, ENV_TYPE
+from config import Config
 import re
 import uuid
 from typing import List, Dict, Any
@@ -32,23 +32,22 @@ from candidate_data import get_candidate_data
 # Load environment variables
 load_dotenv()
 
+ENV_TYPE = Config.ENV_TYPE
+
 # Set up logging
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.DEBUG if Config.ENV_TYPE == 'development' else logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
-# Create logger
 logger = logging.getLogger(__name__)
 
-# Create RotatingFileHandler
 os.makedirs(Config.LOG_DIR, exist_ok=True)
 log_file = os.path.join(Config.LOG_DIR, "resume_cupid.log")
 file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)
 file_handler.setLevel(logging.DEBUG)
-
-# Create formatter and add it to the handler
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 # Initialize SpaCy
 nlp = spacy.load("en_core_web_md")

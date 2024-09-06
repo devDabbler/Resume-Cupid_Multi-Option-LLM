@@ -16,15 +16,8 @@ DB_PATH = Config.DB_PATH
 
 def get_db_connection():
     try:
-        if not DB_PATH:
-            logger.error("SQLITE_DB_PATH is not set in the environment variables")
-            raise ValueError("SQLITE_DB_PATH is not set in the environment variables")
-        
-        logger.info(f"Attempting to connect to database at: {DB_PATH}")
-        
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
-        logger.info("Database connection successful")
         return conn
     except sqlite3.Error as e:
         logger.error(f"Error connecting to database: {e}")

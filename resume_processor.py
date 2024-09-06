@@ -20,43 +20,17 @@ logger = logging.getLogger(__name__)
 
 nlp = spacy.load("en_core_web_md")
 
+DB_PATH = Config.DB_PATH
+
 def get_db_connection():
-    db_path = Config.DB_PATH
-    
-    logger.info(f"Current working directory: {os.getcwd()}")
-    
-    if not db_path:
-        logger.error("SQLITE_DB_PATH is not set in the environment variables")
-        raise ValueError("SQLITE_DB_PATH is not set in the environment variables")
-    
-    logger.info(f"Environment variable SQLITE_DB_PATH: {db_path}")
-    
-    # Ensure the directory exists
-    dir_path = os.path.dirname(db_path)
-    logger.info(f"Directory path: {dir_path}")
-    
     try:
-        if not dir_path:
-            logger.error("Database directory path is empty")
-            raise ValueError("Invalid database path")
-        
-        logger.info(f"Attempting to create directory: {dir_path}")
-        os.makedirs(dir_path, exist_ok=True)
-        logger.info(f"Directory created successfully: {dir_path}")
-        
-        # Resolve the path within the container
-        resolved_path = os.path.abspath(db_path)
-        logger.info(f"Resolved database path: {resolved_path}")
-        
-        conn = sqlite3.connect(resolved_path)
+        conn = sqlite3.connect(Config.DB_PATH)
         conn.row_factory = sqlite3.Row
-        logger.info("Database connection successful")
         return conn
-    
-    except Exception as e:
+    except sqlite3.Error as e:
         logger.error(f"Error connecting to database: {e}")
         raise
-
+    
 class ResumeProcessor:
     def __init__(self, api_key: str, backend: str):
         self.backend = backend
