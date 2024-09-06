@@ -1,12 +1,14 @@
-import os
-from openai import OpenAI
+import requests
 import logging
 import json
-from typing import Dict, Any
+import re
+import ast
+from typing import Dict, Any, List
+from utils import get_logger
+from openai import OpenAI
 
 # Initialize logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class GPT4oMiniAPI:
     def __init__(self, api_key: str):

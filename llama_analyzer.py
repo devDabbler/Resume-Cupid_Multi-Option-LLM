@@ -1,12 +1,15 @@
 import groq
 from groq import Groq
-import json
+import requests
 import logging
-from typing import Dict, Any
+import json
+import re
+import ast
+from typing import Dict, Any, List
+from utils import get_logger
 
 # Initialize logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class LlamaAPI:
     def __init__(self, api_key: str):

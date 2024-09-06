@@ -37,7 +37,7 @@ class ClaudeClient:
 
 class ClaudeAPI:
     def __init__(self, api_key: str):
-        logger.info("Initializing ClaudeAPI")
+        logger.debug(f"Initializing ClaudeAPI with API key: {api_key[:5]}...")  # Log first 5 characters of API key
         try:
             self.client = ClaudeClient(api_key)
             logger.info("ClaudeAPI initialized successfully")
