@@ -30,3 +30,7 @@ class Config:
         options.add_argument("--disable-extensions")
         options.add_argument("--window-size=1920x1080")
         return options
+
+    @staticmethod
+    def get_api_key():
+        return os.getenv('API_KEY')
