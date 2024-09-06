@@ -32,6 +32,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from candidate_data import get_candidate_data
 from utils import get_logger
+from utils import root_logger
 
 # Add this line to import the logger module
 from logging import getLogger

@@ -9,6 +9,7 @@ import sys
 import traceback
 import threading
 import json
+import os
 
 # Set up logging
 def get_logger(name):
@@ -18,6 +19,20 @@ def get_logger(name):
 
 # Create a root logger
 root_logger = get_logger(__name__)
+
+# Environment-based logging level
+def setup_logger():
+    environment = os.getenv('ENVIRONMENT', 'development')  # Default to 'development' if not set
+    if environment == 'production':
+        logging_level = logging.INFO  # Only log important information
+    else:
+        logging_level = logging.DEBUG  # Verbose logging for development
+    
+    logging.basicConfig(level=logging_level)
+    root_logger.setLevel(logging_level)
+
+# Call the logger setup
+setup_logger()
 
 # Create handlers
 console_handler = logging.StreamHandler(sys.stdout)

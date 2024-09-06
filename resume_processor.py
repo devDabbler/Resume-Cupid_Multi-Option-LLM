@@ -15,6 +15,8 @@ import hashlib
 import sqlite3
 import traceback
 from config import Config
+from utils import get_logger
+from utils import root_logger
 
 logger = get_logger(__name__)
 
