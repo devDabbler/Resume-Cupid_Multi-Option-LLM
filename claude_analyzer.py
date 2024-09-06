@@ -3,7 +3,7 @@ import logging
 import json
 import re
 import ast
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -19,7 +19,7 @@ class ClaudeClient:
             "Content-Type": "application/json"
         }
 
-    def create_completion(self, messages: list, model: str = "claude-3-opus-20240229", max_tokens: int = 2000):
+    def create_completion(self, messages: list, model: str = "claude-3-5-sonnet-20240620", max_tokens: int = 2000):
         data = {
             "model": model,
             "messages": messages,
@@ -51,7 +51,7 @@ class ClaudeAPI:
             if parsed_content is None:
                 raise ValueError("Failed to parse JSON response")
 
-            return parsed_content
+            return self._process_parsed_content(parsed_content)
 
         except Exception as e:
             logger.error(f"Claude API request failed: {str(e)}")
@@ -65,18 +65,27 @@ class ClaudeAPI:
             s = s[start:end+1]
         # Remove any non-ASCII characters
         s = ''.join(char for char in s if ord(char) < 128)
-        return s
+        # Remove any newlines or extra whitespace
+        s = re.sub(r'\s+', ' ', s)
+        return s.strip()
 
     def _parse_json(self, cleaned_result: str) -> Dict[str, Any]:
+        logger.debug(f"Attempting to parse JSON: {cleaned_result}")
         try:
             return json.loads(cleaned_result)
-        except json.JSONDecodeError:
-            # If json.loads fails, try ast.literal_eval
+        except json.JSONDecodeError as json_err:
+            logger.error(f"JSON parsing error: {str(json_err)}")
             try:
-                return ast.literal_eval(cleaned_result)
-            except (ValueError, SyntaxError):
-                # If both methods fail, return None or raise an exception
-                return None
+                # Try to fix common JSON errors
+                fixed_json = re.sub(r"(?<!\\)\\(?![\"\\\/bfnrt]|u[0-9a-fA-F]{4})", r"\\\\", cleaned_result)
+                return json.loads(fixed_json)
+            except json.JSONDecodeError:
+                logger.error("Failed to fix and parse JSON")
+                try:
+                    return ast.literal_eval(cleaned_result)
+                except (ValueError, SyntaxError) as ast_err:
+                    logger.error(f"AST parsing error: {str(ast_err)}")
+                    return None
 
     def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
         required_fields = [
@@ -170,6 +179,7 @@ class ClaudeAPI:
         
             logger.debug(f"Arguments for analyze_match: resume={resume[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
             logger.debug(f"Number of arguments: {len([resume, job_description, candidate_data, job_title])}")
+            logger.debug(f"Analysis result: {result}")
 
             return result
 
