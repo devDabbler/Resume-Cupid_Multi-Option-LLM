@@ -229,18 +229,9 @@ class ResumeProcessor:
         
         return ranked_results
 
-def create_resume_processor(backend: str = "claude") -> ResumeProcessor:
+def create_resume_processor(api_key: str, backend: str = "claude") -> ResumeProcessor:
     logger.debug(f"Creating ResumeProcessor with backend: {backend}")
-    try:
-        api_key = Config.get_api_key()
-        if not api_key:
-            raise ValueError("API key is required")
-        processor = ResumeProcessor(api_key, backend)
-        logger.debug(f"Successfully created ResumeProcessor with backend: {backend}")
-        return processor
-    except Exception as e:
-        logger.error(f"Failed to create ResumeProcessor with backend {backend}: {str(e)}", exc_info=True)
-        raise
+    return ResumeProcessor(api_key, backend)
 
 def init_resume_cache():
     conn = get_db_connection()

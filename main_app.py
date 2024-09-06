@@ -6,7 +6,6 @@ from typing import List, Dict, Any
 from datetime import datetime
 import time
 import logging
-import sys
 from logging.handlers import RotatingFileHandler
 import streamlit as st
 import pandas as pd
@@ -32,13 +31,6 @@ from candidate_data import get_candidate_data
 
 # Load environment variables
 load_dotenv()
-
-# Create logger
-logger = logging.getLogger(__name__)
-
-for key in ["Claude_API_KEY", "Llama_API_KEY", "GPT4o_Mini_API_KEY"]:
-    value = os.getenv(key)
-    logger.debug(f"{key}: {'Set' if value else 'Not set'}")
 
 ENV_TYPE = Config.ENV_TYPE
 
@@ -71,7 +63,6 @@ USER_CREDENTIALS = {
 DB_PATH = Config.DB_PATH
 
 # Session State Initialization
-# Initialize session state variables only once
 if 'importance_factors' not in st.session_state:
     st.session_state.importance_factors = {
         'education': 0.5,
@@ -83,22 +74,6 @@ if 'backend' not in st.session_state:
     st.session_state.backend = None
 if 'resume_processor' not in st.session_state:
     st.session_state.resume_processor = None
-
-# Cache expensive computations
-@st.cache_data
-def get_available_api_keys() -> Dict[str, str]:
-    api_keys = {}
-    for backend in ["claude", "llama", "gpt4o_mini"]:
-        key = os.getenv(f'{backend.upper()}_API_KEY')
-        if key:
-            api_keys[backend] = key
-        else:
-            logger.warning(f"API key for {backend} is not set.")
-    return api_keys
-
-@st.cache_data
-def get_candidate_data():
-    return get_candidate_data()
 
 # Custom CSS for branding and UI enhancement
 custom_css = """
@@ -266,7 +241,6 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             'project_relevance': ''
         }
 
-@st.cache_data
 def process_resumes_in_parallel(resume_files, resume_processor, job_description, importance_factors, candidate_data_list, job_title):
     def process_with_context(file, candidate_data):
         try:
@@ -433,12 +407,13 @@ def extract_job_description(url):
         st.write("Closing the browser...")
         if 'driver' in locals():
             driver.quit()
+
 def get_available_api_keys() -> Dict[str, str]:
     api_keys = {}
     for backend in ["claude", "llama", "gpt4o_mini"]:
         key = os.getenv(f'{backend.upper()}_API_KEY')
         if key:
-            api_keys[backend] = key
+            api_keys[backend] = key  # This ensures the keys are lowercase
     return api_keys
 
 def clear_cache():
@@ -447,11 +422,7 @@ def clear_cache():
         logger.debug(f"Cleared resume analysis cache for backend: {st.session_state.backend}")
     else:
         logger.warning("Unable to clear cache: resume_processor not found or doesn't have clear_cache method")
-
-@st.cache_data
-def get_cached_candidate_data():
-    return get_candidate_data()
-
+        
 def main_app():
     st.markdown(custom_css, unsafe_allow_html=True)
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
@@ -483,8 +454,9 @@ def main_app():
     available_backends = list(api_keys.keys())
     backend_options = []
     for backend in available_backends:
-        if backend in llm_descriptions:
-            backend_options.append(f"{backend}: {llm_descriptions[backend]}")
+        backend_lower = backend.lower()
+        if backend_lower in llm_descriptions:
+            backend_options.append(f"{backend}: {llm_descriptions[backend_lower]}")
         else:
             backend_options.append(f"{backend}: No description available")
 
@@ -496,15 +468,11 @@ def main_app():
         selected_backend = st.session_state.selected_backend.split(":")[0].strip()
         if selected_backend != st.session_state.get('last_backend'):
             selected_api_key = api_keys[selected_backend]
-            try:
-                st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
-                if hasattr(st.session_state.resume_processor, 'clear_cache'):
-                    st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
-                st.session_state.last_backend = selected_backend
-                logger.debug(f"Switched to {selected_backend} backend and cleared cache")
-            except Exception as e:
-                logger.error(f"Failed to initialize ResumeProcessor with backend {selected_backend}: {str(e)}", exc_info=True)
-                st.error(f"Failed to initialize ResumeProcessor with backend {selected_backend}. Please check your configuration.")
+            st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend.lower())
+            if hasattr(st.session_state.resume_processor, 'clear_cache'):
+                st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
+            st.session_state.last_backend = selected_backend
+            logger.debug(f"Switched to {selected_backend} backend and cleared cache")
 
     selected_backend = st.selectbox(
         "Select AI backend:",
@@ -523,65 +491,67 @@ def main_app():
     if not hasattr(resume_processor, 'analyze_match'):
         raise AttributeError(f"ResumeProcessor for backend '{selected_backend}' does not have the 'analyze_match' method")
 
-    with st.form(key='main_form'):
-        # Add dropdown for selecting saved roles
-        saved_role_options = ["Select a saved role"] + [f"{role['role_name']} - {role['client']}" for role in st.session_state.saved_roles]
-        selected_saved_role = st.selectbox("Select a saved role:", options=saved_role_options)
+    # Add dropdown for selecting saved roles
+    saved_role_options = ["Select a saved role"] + [f"{role['role_name']} - {role['client']}" for role in st.session_state.saved_roles]
+    selected_saved_role = st.selectbox("Select a saved role:", options=saved_role_options)
 
-        # Add job title input field
-        job_title = st.text_input("Enter the job title:", value=st.session_state.get('job_title', ''))
+    if selected_saved_role != "Select a saved role":
+        selected_role = next(role for role in st.session_state.saved_roles if f"{role['role_name']} - {role['client']}" == selected_saved_role)
+        st.session_state.job_description = selected_role['job_description']
+        st.session_state.job_description_link = selected_role['job_description_link']
+        st.session_state.role_name_input = selected_role['role_name']
+        st.session_state.client = selected_role['client']
 
-        jd_option = st.radio("Job Description Input Method:", ("Paste Job Description", "Provide Link to Fractal Job Posting"))
+    # Add job title input field
+    st.session_state.job_title = st.text_input("Enter the job title:", value=st.session_state.get('job_title', ''))
 
-        if jd_option == "Paste Job Description":
-            job_description = st.text_area(
-                "Paste the Job Description here:", 
-                value=st.session_state.get('job_description', ''), 
-                placeholder="Job description. This field is required."
-            )
-            job_description_link = ""
+    jd_option = st.radio("Job Description Input Method:", ("Paste Job Description", "Provide Link to Fractal Job Posting"))
+
+    if jd_option == "Paste Job Description":
+        st.session_state.job_description = st.text_area(
+            "Paste the Job Description here:", 
+            value=st.session_state.get('job_description', ''), 
+            placeholder="Job description. This field is required."
+        )
+        st.session_state.job_description_link = ""
+    else:
+        st.session_state.job_description_link = st.text_input(
+            "Enter the link to the Fractal job posting:", 
+            value=st.session_state.get('job_description_link', '')
+        )
+    if 'job_description' not in st.session_state or not st.session_state.job_description:
+        if st.session_state.job_description_link and is_valid_fractal_job_link(st.session_state.job_description_link):
+            with st.spinner('Extracting job description...'):
+                st.session_state.job_description = extract_job_description(st.session_state.job_description_link)
         else:
-            job_description_link = st.text_input(
-                "Enter the link to the Fractal job posting:", 
-                value=st.session_state.get('job_description_link', '')
-            )
-            job_description = ""
+            st.session_state.job_description = ""
 
-        # Move the client name input field here
-        client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
+    # Display the current job description
+    if st.session_state.job_description:
+        st.text_area("Current Job Description:", value=st.session_state.job_description, height=200, key='current_jd', disabled=True)
 
-        st.subheader("Customize Importance Factors")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            education_importance = st.slider("Education Importance", 0.0, 1.0, st.session_state.importance_factors['education'], 0.1)
-        with col2:
-            experience_importance = st.slider("Experience Importance", 0.0, 1.0, st.session_state.importance_factors['experience'], 0.1)
-        with col3:
-            skills_importance = st.slider("Skills Importance", 0.0, 1.0, st.session_state.importance_factors['skills'], 0.1)
+    # Move the client name input field here
+    st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
 
-        st.write("Upload your resume(s) (Maximum 3 files allowed):")
-        resume_files = st.file_uploader("Upload resumes (max 3)", type=['pdf', 'docx'], accept_multiple_files=True)
+    st.subheader("Customize Importance Factors")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.session_state.importance_factors['education'] = st.slider("Education Importance", 0.0, 1.0, st.session_state.importance_factors['education'], 0.1)
+    with col2:
+        st.session_state.importance_factors['experience'] = st.slider("Experience Importance", 0.0, 1.0, st.session_state.importance_factors['experience'], 0.1)
+    with col3:
+        st.session_state.importance_factors['skills'] = st.slider("Skills Importance", 0.0, 1.0, st.session_state.importance_factors['skills'], 0.1)
 
-        submit_button = st.form_submit_button('Process Resumes')
+    st.write("Upload your resume(s) (Maximum 3 files allowed):")
+    resume_files = st.file_uploader("Upload resumes (max 3)", type=['pdf', 'docx'], accept_multiple_files=True)
 
-    if submit_button:
-        if selected_saved_role != "Select a saved role":
-            selected_role = next(role for role in st.session_state.saved_roles if f"{role['role_name']} - {role['client']}" == selected_saved_role)
-            st.session_state.job_description = selected_role['job_description']
-            st.session_state.job_description_link = selected_role['job_description_link']
-            st.session_state.role_name_input = selected_role['role_name']
-            st.session_state.client = selected_role['client']
-        else:
-            st.session_state.job_title = job_title
-            st.session_state.job_description = job_description
-            st.session_state.job_description_link = job_description_link
-            st.session_state.client = client
-            st.session_state.importance_factors = {
-                'education': education_importance,
-                'experience': experience_importance,
-                'skills': skills_importance
-            }
+    if resume_files:
+        if len(resume_files) > 3:
+            st.warning("You've uploaded more than 3 resumes. Only the first 3 will be processed.")
+            resume_files = resume_files[:3]  # Truncate to first 3 files
+        st.write(f"Number of resumes uploaded: {len(resume_files)}")
 
+    if st.button('Process Resumes', key='process_resumes'):
         if resume_files and st.session_state.job_description and st.session_state.job_title:
             if len(resume_files) > 3:
                 st.warning("You've uploaded more than 3 resumes. Only the first 3 will be processed.")
@@ -591,8 +561,8 @@ def main_app():
             insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
             logger.info("Processing resumes...")
 
-            # Get candidate data
-            candidates = get_cached_candidate_data()
+            #Get candidate data
+            candidates = get_candidate_data()
             candidate_data_list = []
             for file in resume_files:
                 matching_candidate = next((c for c in candidates if c['candidate'] == file.name), None)
