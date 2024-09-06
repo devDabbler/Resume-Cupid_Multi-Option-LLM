@@ -63,6 +63,7 @@ USER_CREDENTIALS = {
 DB_PATH = Config.DB_PATH
 
 # Session State Initialization
+# Initialize session state variables only once
 if 'importance_factors' not in st.session_state:
     st.session_state.importance_factors = {
         'education': 0.5,
@@ -74,6 +75,20 @@ if 'backend' not in st.session_state:
     st.session_state.backend = None
 if 'resume_processor' not in st.session_state:
     st.session_state.resume_processor = None
+
+# Cache expensive computations
+@st.cache_data
+def get_available_api_keys() -> Dict[str, str]:
+    api_keys = {}
+    for backend in ["claude", "llama", "gpt4o_mini"]:
+        key = os.getenv(f'{backend.upper()}_API_KEY')
+        if key:
+            api_keys[backend] = key
+    return api_keys
+
+@st.cache_data
+def get_candidate_data():
+    return candidate_data.get_candidate_data()
 
 # Custom CSS for branding and UI enhancement
 custom_css = """
@@ -241,6 +256,7 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             'project_relevance': ''
         }
 
+@st.cache_data
 def process_resumes_in_parallel(resume_files, resume_processor, job_description, importance_factors, candidate_data_list, job_title):
     def process_with_context(file, candidate_data):
         try:

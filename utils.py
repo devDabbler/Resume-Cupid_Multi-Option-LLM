@@ -9,6 +9,7 @@ import numpy as np
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+@st.cache_data
 def extract_text_from_pdf(file_content: bytes) -> str:
     logger.debug("Extracting text from PDF...")
     text = ""
@@ -25,6 +26,7 @@ def extract_text_from_pdf(file_content: bytes) -> str:
         logger.error(f"Error extracting text from PDF: {str(e)}")
         raise ValueError(f"Failed to extract text from PDF: {str(e)}")
 
+@st.cache_data
 def extract_text_from_docx(file_content: bytes) -> str:
     logger.debug("Extracting text from DOCX...")
     text = ""
