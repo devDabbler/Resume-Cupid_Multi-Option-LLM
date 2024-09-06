@@ -88,7 +88,7 @@ def get_available_api_keys() -> Dict[str, str]:
 
 @st.cache_data
 def get_candidate_data():
-    return candidate_data.get_candidate_data()
+    return get_candidate_data()
 
 # Custom CSS for branding and UI enhancement
 custom_css = """

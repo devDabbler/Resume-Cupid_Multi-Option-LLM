@@ -4,6 +4,7 @@ import io
 import PyPDF2
 from docx import Document
 import numpy as np
+import streamlit as st
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG)
