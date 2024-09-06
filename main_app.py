@@ -92,6 +92,8 @@ def get_available_api_keys() -> Dict[str, str]:
         key = os.getenv(f'{backend.upper()}_API_KEY')
         if key:
             api_keys[backend] = key
+        else:
+            logger.warning(f"API key for {backend} is not set.")
     return api_keys
 
 @st.cache_data
@@ -494,11 +496,15 @@ def main_app():
         selected_backend = st.session_state.selected_backend.split(":")[0].strip()
         if selected_backend != st.session_state.get('last_backend'):
             selected_api_key = api_keys[selected_backend]
-            st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
-            if hasattr(st.session_state.resume_processor, 'clear_cache'):
-                st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
-            st.session_state.last_backend = selected_backend
-            logger.debug(f"Switched to {selected_backend} backend and cleared cache")
+            try:
+                st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
+                if hasattr(st.session_state.resume_processor, 'clear_cache'):
+                    st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
+                st.session_state.last_backend = selected_backend
+                logger.debug(f"Switched to {selected_backend} backend and cleared cache")
+            except Exception as e:
+                logger.error(f"Failed to initialize ResumeProcessor with backend {selected_backend}: {str(e)}", exc_info=True)
+                st.error(f"Failed to initialize ResumeProcessor with backend {selected_backend}. Please check your configuration.")
 
     selected_backend = st.selectbox(
         "Select AI backend:",
