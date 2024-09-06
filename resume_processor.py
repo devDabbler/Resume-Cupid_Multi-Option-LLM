@@ -38,11 +38,11 @@ def get_db_connection():
 class ResumeProcessor:
     def __init__(self, api_key: str, backend: str):
         self.backend = backend
-        if backend == "claude":
+        if backend == "Claude":
             self.analyzer = ClaudeAPI(api_key)
-        elif backend == "llama":
+        elif backend == "Llama":
             self.analyzer = LlamaAPI(api_key)
-        elif backend == "gpt4o_mini":
+        elif backend == "GPT4o_Mini":
             self.analyzer = GPT4oMiniAPI(api_key)
         else:
             raise ValueError(f"Unsupported backend: {backend}")
@@ -229,7 +229,7 @@ class ResumeProcessor:
         
         return ranked_results
 
-def create_resume_processor(api_key: str, backend: str = "claude") -> ResumeProcessor:
+def create_resume_processor(api_key: str, backend: str = "Claude") -> ResumeProcessor:
     logger.debug(f"Creating ResumeProcessor with backend: {backend}")
     return ResumeProcessor(api_key, backend)
 
