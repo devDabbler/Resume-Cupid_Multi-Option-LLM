@@ -1,6 +1,8 @@
 import os
 from config import Config
 import re
+import sys
+import logging
 import uuid
 from typing import List, Dict, Any
 from datetime import datetime
@@ -28,29 +30,38 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from candidate_data import get_candidate_data
+from utils import get_logger
+
+# Add this line to import the logger module
+from logging import getLogger
+
+# Set up root logger
+root_logger = getLogger(__name__)
+
+# Add this line to define a logger object
+logger = getLogger(__name__)
+
+# Set up root logger
+root_logger = getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
 ENV_TYPE = Config.ENV_TYPE
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
+# Set up root logger
+root_logger = get_logger(__name__)
 
-# Create logger
-logger = logging.getLogger(__name__)
-
-# Create RotatingFileHandler
-os.makedirs(Config.LOG_DIR, exist_ok=True)
-log_file = os.path.join(Config.LOG_DIR, "resume_cupid.log")
-file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)
-file_handler.setLevel(logging.DEBUG)
+# Create handlers
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG)
 
 # Create formatter and add it to the handler
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+# Add the handler to the root logger
+root_logger.addHandler(console_handler)
 
 # Initialize SpaCy
 nlp = spacy.load("en_core_web_md")
@@ -468,11 +479,15 @@ def main_app():
         selected_backend = st.session_state.selected_backend.split(":")[0].strip()
         if selected_backend != st.session_state.get('last_backend'):
             selected_api_key = api_keys[selected_backend]
-            st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend.lower())
-            if hasattr(st.session_state.resume_processor, 'clear_cache'):
-                st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
-            st.session_state.last_backend = selected_backend
-            logger.debug(f"Switched to {selected_backend} backend and cleared cache")
+            try:
+                st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend.lower())
+                if hasattr(st.session_state.resume_processor, 'clear_cache'):
+                    st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
+                st.session_state.last_backend = selected_backend
+                logger.debug(f"Switched to {selected_backend} backend and cleared cache")
+            except Exception as e:
+                logger.error(f"Failed to create ResumeProcessor: {str(e)}")
+                st.error(f"Failed to initialize resume processor. Error: {str(e)}")
 
     selected_backend = st.selectbox(
         "Select AI backend:",
@@ -641,6 +656,7 @@ def main_app():
                     st.error(f"Failed to delete role '{delete_role_name}'. Error: {str(e)}")
 
 if __name__ == "__main__":
+    logger.info("Application starting...")
     init_db()
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False

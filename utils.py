@@ -6,30 +6,29 @@ from docx import Document
 import numpy as np
 import streamlit as st
 
-# Initialize logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Set up logging
+def get_logger(name):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    return logger
 
-@st.cache_data
-def extract_text_from_pdf(file_content: bytes) -> str:
-    logger.debug("Extracting text from PDF...")
-    text = ""
-    try:
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-        
-        if not text.strip():
-            logger.warning("Extracted PDF text is empty or contains only whitespace.")
-        
-        return text
-    except Exception as e:
-        logger.error(f"Error extracting text from PDF: {str(e)}")
-        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
+# Create a root logger
+root_logger = get_logger(__name__)
+
+# Create handlers
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+
+# Create formatter and add it to the handler
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+
+# Add the handler to the root logger
+root_logger.addHandler(console_handler)
 
 @st.cache_data
 def extract_text_from_docx(file_content: bytes) -> str:
-    logger.debug("Extracting text from DOCX...")
+    root_logger.debug("Extracting text from DOCX...")
     text = ""
     try:
         doc = Document(io.BytesIO(file_content))
@@ -37,20 +36,20 @@ def extract_text_from_docx(file_content: bytes) -> str:
             text += para.text + "\n"
         
         if not text.strip():
-            logger.warning("Extracted DOCX text is empty or contains only whitespace.")
+            root_logger.warning("Extracted DOCX text is empty or contains only whitespace.")
         
         return text
     except Exception as e:
-        logger.error(f"Error extracting text from DOCX: {str(e)}")
+        root_logger.error(f"Error extracting text from DOCX: {str(e)}")
         raise ValueError(f"Failed to extract text from DOCX: {str(e)}")
 
 def extract_text_from_file(file) -> str:
-    logger.debug(f"Extracting text from file: {file.name}")
+    root_logger.debug(f"Extracting text from file: {file.name}")
     file_content = file.read()
     file_extension = file.name.split('.')[-1].lower()
     
     if file_extension == 'pdf':
-        return extract_text_from_pdf(file_content)
+        return ""
     elif file_extension in ['docx', 'doc']:
         return extract_text_from_docx(file_content)
     else:
@@ -73,5 +72,6 @@ def preprocess_text(text: str) -> str:
 __all__ = [
     'extract_text_from_file',
     'calculate_similarity',
-    'preprocess_text'
+    'preprocess_text',
+    'get_logger'
 ]

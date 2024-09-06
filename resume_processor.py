@@ -37,6 +37,7 @@ def get_db_connection():
 
 class ResumeProcessor:
     def __init__(self, api_key: str, backend: str):
+        logger.debug(f"Initializing ResumeProcessor with backend: {backend}")
         self.backend = backend
         if backend == "claude":
             self.analyzer = ClaudeAPI(api_key)
@@ -45,6 +46,7 @@ class ResumeProcessor:
         elif backend == "gpt4o_mini":
             self.analyzer = GPT4oMiniAPI(api_key)
         else:
+            logger.error(f"Unsupported backend: {backend}")
             raise ValueError(f"Unsupported backend: {backend}")
         
         self.token_limit = 10000
@@ -231,7 +233,11 @@ class ResumeProcessor:
 
 def create_resume_processor(api_key: str, backend: str = "claude") -> ResumeProcessor:
     logger.debug(f"Creating ResumeProcessor with backend: {backend}")
-    return ResumeProcessor(api_key, backend)
+    try:
+        return ResumeProcessor(api_key, backend)
+    except Exception as e:
+        logger.error(f"Failed to create ResumeProcessor: {str(e)}")
+        raise
 
 def init_resume_cache():
     conn = get_db_connection()
