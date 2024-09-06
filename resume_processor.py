@@ -38,11 +38,11 @@ def get_db_connection():
 class ResumeProcessor:
     def __init__(self, api_key: str, backend: str):
         self.backend = backend
-        if backend == "Claude":
+        if backend == "claude":
             self.analyzer = ClaudeAPI(api_key)
-        elif backend == "Llama":
+        elif backend == "llama":
             self.analyzer = LlamaAPI(api_key)
-        elif backend == "GPT4o_Mini":
+        elif backend == "gpt4o_mini":
             self.analyzer = GPT4oMiniAPI(api_key)
         else:
             raise ValueError(f"Unsupported backend: {backend}")
@@ -229,9 +229,15 @@ class ResumeProcessor:
         
         return ranked_results
 
-def create_resume_processor(api_key: str, backend: str = "Claude") -> ResumeProcessor:
+def create_resume_processor(api_key: str, backend: str = "claude") -> ResumeProcessor:
     logger.debug(f"Creating ResumeProcessor with backend: {backend}")
-    return ResumeProcessor(api_key, backend)
+    try:
+        processor = ResumeProcessor(api_key, backend)
+        logger.debug(f"Successfully created ResumeProcessor with backend: {backend}")
+        return processor
+    except Exception as e:
+        logger.error(f"Failed to create ResumeProcessor with backend {backend}: {str(e)}", exc_info=True)
+        raise
 
 def init_resume_cache():
     conn = get_db_connection()
