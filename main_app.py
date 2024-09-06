@@ -35,19 +35,22 @@ load_dotenv()
 ENV_TYPE = Config.ENV_TYPE
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG if Config.ENV_TYPE == 'development' else logging.INFO,
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
+# Create logger
 logger = logging.getLogger(__name__)
 
+# Create RotatingFileHandler
 os.makedirs(Config.LOG_DIR, exist_ok=True)
 log_file = os.path.join(Config.LOG_DIR, "resume_cupid.log")
 file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)
 file_handler.setLevel(logging.DEBUG)
+
+# Create formatter and add it to the handler
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
 
 # Initialize SpaCy
 nlp = spacy.load("en_core_web_md")
@@ -57,7 +60,7 @@ USER_CREDENTIALS = {
     "password": os.getenv('LOGIN_PASSWORD')
 }
 
-DB_PATH = os.getenv('SQLITE_DB_PATH')
+DB_PATH = Config.DB_PATH
 
 # Session State Initialization
 if 'importance_factors' not in st.session_state:
@@ -163,7 +166,6 @@ def login_page():
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-
 BATCH_SIZE = 3  # Number of resumes to process in each batch
 
 def split_into_batches(files: List, batch_size: int) -> List[List]:
@@ -207,14 +209,20 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         
         logger.debug(f"Arguments for analyze_match: resume_text={resume_text[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
         logger.debug(f"Number of arguments: {len([resume_text, job_description, candidate_data, job_title])}")
-        
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         logger.debug(f"Analysis result: {result}")
         
-        if result is None or 'error' in result:
-            raise ValueError(f"Failed to analyze resume: {result.get('error', 'Unknown error')}")
+        if 'error' in result:
+            logger.error(f"Error in resume analysis: {result['error']}")
         
         result['file_name'] = resume_file.name
+        result['brief_summary'] = result.get('brief_summary', 'No brief summary available')
+        result['match_score'] = result.get('match_score', 0)
+        result['recommendation'] = result.get('recommendation_for_interview', 'No recommendation available')
+        result['experience_and_project_relevance'] = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
+        result['skills_gap'] = result.get('skills_gap', [])
+        result['recruiter_questions'] = result.get('recruiter_questions', [])
+        
         return result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
@@ -223,11 +231,13 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             'error': str(e),
             'match_score': 0,
             'recommendation': 'Unable to provide a recommendation due to an error.',
-            'analysis': f'Unable to complete analysis: {str(e)}',
+            'analysis': 'Unable to complete analysis',
+            'brief_summary': 'Error occurred during processing',
+            'experience_and_project_relevance': 'Unable to assess due to an error',
             'strengths': [],
             'areas_for_improvement': [],
             'skills_gap': [],
-            'interview_questions': [],
+            'recruiter_questions': [],
             'project_relevance': ''
         }
 
@@ -252,10 +262,12 @@ def process_resumes_in_parallel(resume_files, resume_processor, job_description,
                 'match_score': 0,
                 'recommendation': 'Error occurred during processing',
                 'analysis': f'An error occurred: {str(e)}',
+                'brief_summary': 'Error occurred during processing',
+                'experience_and_project_relevance': 'Unable to assess due to an error',
                 'strengths': [],
                 'areas_for_improvement': [],
                 'skills_gap': [],
-                'interview_questions': [],
+                'recruiter_questions': [],
                 'project_relevance': ''
             }
 
@@ -304,7 +316,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
                 st.error(f"Error: {result['error']}")
             else:
                 st.markdown("### Brief Summary")
-                st.write(result.get('summary', 'No brief summary available'))
+                st.write(result.get('brief_summary', 'No brief summary available'))
 
                 st.markdown("### Match Score")
                 st.write(f"{result.get('match_score', 'N/A')}%")
@@ -313,7 +325,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
                 st.write(result.get('recommendation', 'No recommendation available'))
 
                 st.markdown("### Experience and Project Relevance")
-                st.write(result.get('analysis', 'No experience and project relevance data available'))
+                st.write(result.get('experience_and_project_relevance', 'No experience and project relevance data available'))
                 
                 st.markdown("### Skills Gap")
                 skills_gap = result.get('skills_gap', [])
@@ -324,7 +336,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
                     st.write("No skills gap identified" if isinstance(skills_gap, list) else skills_gap)
                 
                 st.markdown("### Recruiter Questions")
-                recruiter_questions = result.get('interview_questions', [])
+                recruiter_questions = result.get('recruiter_questions', [])
                 if isinstance(recruiter_questions, list) and recruiter_questions:
                     for question in recruiter_questions:
                         st.write(f"- {question}")

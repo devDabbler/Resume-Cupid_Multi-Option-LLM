@@ -1,7 +1,6 @@
 import logging
 import os
 import time
-from config import Config
 from functools import lru_cache
 import random
 from typing import List, Dict, Any
@@ -15,22 +14,27 @@ import json
 import hashlib
 import sqlite3
 import traceback
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 nlp = spacy.load("en_core_web_md")
 
-DB_PATH = Config.DB_PATH
-
 def get_db_connection():
+    db_path = Config.DB_PATH
+    
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(f"Database path: {db_path}")
+    
     try:
-        conn = sqlite3.connect(Config.DB_PATH)
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
+        logger.info("Database connection successful")
         return conn
-    except sqlite3.Error as e:
+    except Exception as e:
         logger.error(f"Error connecting to database: {e}")
         raise
-    
+
 class ResumeProcessor:
     def __init__(self, api_key: str, backend: str):
         self.backend = backend
@@ -96,18 +100,15 @@ class ResumeProcessor:
                     'file_name': '',
                     'match_score': analysis.get('match_score', 0),
                     'years_of_experience': years_of_experience,
-                    'summary': analysis.get('brief_summary', 'No summary available'),
-                    'analysis': analysis.get('experience_and_project_relevance', 'No analysis available'),
+                    'brief_summary': analysis.get('brief_summary', 'No summary available'),
+                    'experience_and_project_relevance': analysis.get('experience_and_project_relevance', 'No analysis available'),
                     'strengths': [],
                     'areas_for_improvement': [],
                     'skills_gap': analysis.get('skills_gap', []),
-                    'recommendation_for_interview': analysis.get('recommendation_for_interview', 'No recommendation available'),
-                    'interview_questions': analysis.get('recruiter_questions', []),
+                    'recommendation': analysis.get('recommendation_for_interview', 'No recommendation available'),
+                    'recruiter_questions': analysis.get('recruiter_questions', []),
                     'project_relevance': analysis.get('experience_and_project_relevance', 'No project relevance analysis available')
                 }
-
-                # Ensure 'recommendation' field is always set
-                result['recommendation'] = result['recommendation_for_interview']
 
                 logger.debug("Analysis result compiled successfully")
                 self._cache_result(cache_key, result)
@@ -144,13 +145,13 @@ class ResumeProcessor:
             'error': error_message,
             'match_score': 0,
             'years_of_experience': 0,
-            'summary': 'Error occurred during analysis',
-            'analysis': 'Unable to complete analysis due to an error',
+            'brief_summary': 'Error occurred during analysis',
+            'experience_and_project_relevance': 'Unable to complete analysis due to an error',
             'strengths': [],
             'areas_for_improvement': [],
             'skills_gap': [],
             'recommendation': 'Unable to provide a recommendation due to an error',
-            'interview_questions': [],
+            'recruiter_questions': [],
             'project_relevance': 'Unable to analyze project relevance due to an error'
         }
 
@@ -200,7 +201,7 @@ class ResumeProcessor:
         if row:
             result = json.loads(row[0])
             logger.debug(f"Retrieved cached result: {result}")
-            if 'error' in result or result.get('summary') == 'Unable to complete analysis':
+            if 'error' in result or result.get('brief_summary') == 'Unable to complete analysis':
                 logger.warning(f"Cached result contains an error. Invalidating cache.")
                 self._invalidate_cache(cache_key)
                 return None
