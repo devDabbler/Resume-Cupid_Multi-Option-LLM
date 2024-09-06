@@ -440,7 +440,7 @@ def main_app():
         st.session_state.saved_roles = get_saved_roles(st.session_state.get("current_user", ""))
 
     llm_descriptions = {
-        "claude_3.5_Sonnet": "Most recent moodel that is highly effective for natural language understanding and generation. Slightly pricey. Developed by Anthropic.",
+        "claude_3.5_sonnet": "Most recent model that is highly effective for natural language understanding and generation. Slightly pricey. Developed by Anthropic.",
         "llama-3.1-8b": "Large language model with strong performance on various NLP tasks. Created by Meta AI.",
         "gpt4o_mini": "Compact version of GPT-4 with impressive capabilities. Open-source alternative."
     }
@@ -452,18 +452,30 @@ def main_app():
         return
 
     available_backends = list(api_keys.keys())
+    backend_options = []
+    for backend in available_backends:
+        if backend in llm_descriptions:
+            backend_options.append(f"{backend}: {llm_descriptions[backend]}")
+        else:
+            backend_options.append(f"{backend}: No description available")
+
+    if not backend_options:
+        st.error("No compatible backends found. Please check your API key configuration.")
+        return
+
     selected_backend = st.selectbox(
         "Select AI backend:",
-        [f"{backend.capitalize()}: {llm_descriptions[backend]}" for backend in available_backends],
-        index=0 if "claude_3.5_Sonnet" in available_backends else 0
+        backend_options,
+        index=0
     )
-    selected_backend = selected_backend.split(":")[0].strip().lower()
+    selected_backend = selected_backend.split(":")[0].strip()
 
     # Check if the backend has changed and clear cache if necessary
     if selected_backend != st.session_state.get('last_backend'):
         selected_api_key = api_keys[selected_backend]
         st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
-        st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
+        if hasattr(st.session_state.resume_processor, 'clear_cache'):
+            st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
         st.session_state.last_backend = selected_backend
         logger.debug(f"Switched to {selected_backend} backend and cleared cache")
 
