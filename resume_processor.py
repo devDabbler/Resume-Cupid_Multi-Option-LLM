@@ -6,7 +6,7 @@ import random
 from typing import List, Dict, Any
 import tiktoken
 import spacy
-from utils import preprocess_text, calculate_similarity
+from utils import get_logger
 from claude_analyzer import ClaudeAPI
 from llama_analyzer import LlamaAPI
 from gpt4o_mini_analyzer import GPT4oMiniAPI
@@ -16,7 +16,7 @@ import sqlite3
 import traceback
 from config import Config
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 nlp = spacy.load("en_core_web_md")
 
@@ -37,13 +37,16 @@ def get_db_connection():
 
 class ResumeProcessor:
     def __init__(self, api_key: str, backend: str):
-        logger.debug(f"Initializing ResumeProcessor with backend: {backend}")
+        logger.info(f"Initializing ResumeProcessor with backend: {backend}")
         self.backend = backend
         if backend == "claude":
+            logger.info("Initializing ClaudeAPI")
             self.analyzer = ClaudeAPI(api_key)
         elif backend == "llama":
+            logger.info("Initializing LlamaAPI")
             self.analyzer = LlamaAPI(api_key)
         elif backend == "gpt4o_mini":
+            logger.info("Initializing GPT4oMiniAPI")
             self.analyzer = GPT4oMiniAPI(api_key)
         else:
             logger.error(f"Unsupported backend: {backend}")
@@ -232,7 +235,7 @@ class ResumeProcessor:
         return ranked_results
 
 def create_resume_processor(api_key: str, backend: str = "claude") -> ResumeProcessor:
-    logger.debug(f"Creating ResumeProcessor with backend: {backend}")
+    logger.info(f"Creating ResumeProcessor with backend: {backend}")
     try:
         return ResumeProcessor(api_key, backend)
     except Exception as e:
@@ -254,6 +257,8 @@ def init_resume_cache():
     
     conn.commit()
     conn.close()
+    logger.info("Initialized resume cache table")
 
 # Initialize the resume cache table when this module is imported
 init_resume_cache()
+

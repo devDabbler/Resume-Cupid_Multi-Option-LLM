@@ -484,7 +484,7 @@ def main_app():
                 if hasattr(st.session_state.resume_processor, 'clear_cache'):
                     st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
                 st.session_state.last_backend = selected_backend
-                logger.debug(f"Switched to {selected_backend} backend and cleared cache")
+                logger.info(f"Switched to {selected_backend} backend and cleared cache")
             except Exception as e:
                 logger.error(f"Failed to create ResumeProcessor: {str(e)}")
                 st.error(f"Failed to initialize resume processor. Error: {str(e)}")
