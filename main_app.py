@@ -2,6 +2,7 @@ import os
 from config import Config
 import re
 import sys
+import traceback
 import logging
 import uuid
 from typing import List, Dict, Any
@@ -443,7 +444,7 @@ def main_app():
     if 'roles_updated' not in st.session_state:
         st.session_state.roles_updated = False
 
-    for key in ['role_name_input', 'job_description', 'current_role_name', 'job_description_link', 'importance_factors', 'backend', 'resume_processor', 'last_backend']:
+    for key in ['role_name_input', 'job_description', 'current_role_name', 'job_description_link', 'importance_factors', 'backend', 'resume_processor', 'last_backend', 'job_title', 'client']:
         if key not in st.session_state:
             st.session_state[key] = '' if key != 'importance_factors' else {'education': 0.5, 'experience': 0.5, 'skills': 0.5}
 
@@ -476,17 +477,24 @@ def main_app():
         return
 
     def on_backend_change():
+        logger.debug("Backend change detected")
         selected_backend = st.session_state.selected_backend.split(":")[0].strip()
+        logger.info(f"Selected backend: {selected_backend}")
         if selected_backend != st.session_state.get('last_backend'):
             selected_api_key = api_keys[selected_backend]
+            logger.debug(f"API key for {selected_backend}: {selected_api_key[:5]}...")
             try:
+                logger.debug(f"Attempting to create ResumeProcessor for {selected_backend}")
                 st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend.lower())
+                logger.debug(f"ResumeProcessor created successfully for {selected_backend}")
                 if hasattr(st.session_state.resume_processor, 'clear_cache'):
-                    st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
+                    st.session_state.resume_processor.clear_cache()
+                    logger.debug(f"Cache cleared for {selected_backend}")
                 st.session_state.last_backend = selected_backend
                 logger.info(f"Switched to {selected_backend} backend and cleared cache")
             except Exception as e:
                 logger.error(f"Failed to create ResumeProcessor: {str(e)}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 st.error(f"Failed to initialize resume processor. Error: {str(e)}")
 
     selected_backend = st.selectbox(
@@ -518,23 +526,23 @@ def main_app():
         st.session_state.client = selected_role['client']
 
     # Add job title input field
-    st.session_state.job_title = st.text_input("Enter the job title:", value=st.session_state.get('job_title', ''))
+    st.session_state.job_title = st.text_input("Enter the job title:", value=st.session_state.job_title)
 
     jd_option = st.radio("Job Description Input Method:", ("Paste Job Description", "Provide Link to Fractal Job Posting"))
 
     if jd_option == "Paste Job Description":
         st.session_state.job_description = st.text_area(
             "Paste the Job Description here:", 
-            value=st.session_state.get('job_description', ''), 
+            value=st.session_state.job_description, 
             placeholder="Job description. This field is required."
         )
         st.session_state.job_description_link = ""
     else:
         st.session_state.job_description_link = st.text_input(
             "Enter the link to the Fractal job posting:", 
-            value=st.session_state.get('job_description_link', '')
+            value=st.session_state.job_description_link
         )
-    if 'job_description' not in st.session_state or not st.session_state.job_description:
+    if not st.session_state.job_description:
         if st.session_state.job_description_link and is_valid_fractal_job_link(st.session_state.job_description_link):
             with st.spinner('Extracting job description...'):
                 st.session_state.job_description = extract_job_description(st.session_state.job_description_link)
@@ -546,7 +554,7 @@ def main_app():
         st.text_area("Current Job Description:", value=st.session_state.job_description, height=200, key='current_jd', disabled=True)
 
     # Move the client name input field here
-    st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
+    st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.client)
 
     st.subheader("Customize Importance Factors")
     col1, col2, col3 = st.columns(3)
@@ -610,7 +618,7 @@ def main_app():
     if save_role_option:
         with st.form(key='save_role_form'):
             saved_role_name = st.text_input("Save role as (e.g., Job Title):", value=st.session_state.role_name_input)
-            client = st.text_input("Client (required):", value=st.session_state.get('client', ''))
+            client = st.text_input("Client (required):", value=st.session_state.client)
             save_button = st.form_submit_button('Save Role')
 
         if save_button:
