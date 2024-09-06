@@ -4,6 +4,8 @@ import os
 ENV_TYPE = os.getenv('ENV_TYPE', 'development')
 
 class Config:
+    ENV_TYPE = ENV_TYPE  
+
     if ENV_TYPE == 'production':
         LOG_DIR = "/home/rezcupid2024/Resume_Cupid_Multi_LLM/logs"
         CHROME_BINARY = "/usr/bin/chromium-browser"
