@@ -7,7 +7,6 @@ import logging
 import uuid
 from typing import List, Dict, Any
 from datetime import datetime
-import time
 import logging
 from logging.handlers import RotatingFileHandler
 import streamlit as st
@@ -221,12 +220,17 @@ def reset_password_page():
         st.write("Please enter your new password:")
         new_password = st.text_input("New Password", type="password")
         confirm_password = st.text_input("Confirm Password", type="password")
+        
         if st.button("Reset Password"):
             if new_password == confirm_password:
-                if reset_password(token, new_password):
-                    st.success("Password reset successful. Please login with your new password.")
-                else:
-                    st.error("Failed to reset password. Please try again or contact support.")
+                try:
+                    result = reset_password(token, new_password)
+                    if result:
+                        st.success("Password reset successful. Please login with your new password.")
+                    else:
+                        st.error("Failed to reset password. Please try again or contact support.")
+                except Exception as e:
+                    st.error(f"An error occurred: {str(e)}")
             else:
                 st.error("Passwords do not match. Please try again.")
     else:
@@ -727,3 +731,4 @@ if __name__ == "__main__":
         login_page()
     else:
         main_app()
+
