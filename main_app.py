@@ -17,7 +17,10 @@ import spacy
 import numpy as np
 import concurrent.futures
 from utils import extract_text_from_file, preprocess_text
-from database import init_db, insert_run_log, save_role, get_saved_roles, delete_saved_role, save_feedback
+from database import (
+    init_db, insert_run_log, save_role, get_saved_roles, delete_saved_role, save_feedback,
+    register_user, verify_user, authenticate_user, set_reset_token, reset_password, set_verification_token
+)
 from resume_processor import create_resume_processor
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 import asyncio
@@ -31,11 +34,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from candidate_data import get_candidate_data
-from utils import get_logger
 from utils import root_logger
-
-# Add this line to import the logger module
 from logging import getLogger
+from email_utils import send_verification_email, send_password_reset_email
 
 # Set up root logger
 root_logger = getLogger(__name__)
@@ -43,16 +44,10 @@ root_logger = getLogger(__name__)
 # Add this line to define a logger object
 logger = getLogger(__name__)
 
-# Set up root logger
-root_logger = getLogger(__name__)
-
 # Load environment variables
 load_dotenv()
 
 ENV_TYPE = Config.ENV_TYPE
-
-# Set up root logger
-root_logger = get_logger(__name__)
 
 # Create handlers
 console_handler = logging.StreamHandler(sys.stdout)
@@ -67,11 +62,6 @@ root_logger.addHandler(console_handler)
 
 # Initialize SpaCy
 nlp = spacy.load("en_core_web_md")
-
-USER_CREDENTIALS = {
-    "username": os.getenv('LOGIN_USERNAME'),
-    "password": os.getenv('LOGIN_PASSWORD')
-}
 
 DB_PATH = Config.DB_PATH
 
@@ -148,10 +138,6 @@ custom_css = """
 </style>
 """
 
-def check_login(username: str, password: str) -> bool:
-    """Check login credentials."""
-    return USER_CREDENTIALS.get("username") == username and USER_CREDENTIALS.get("password") == password
-
 def login_page():
     """Display the login form and manage user authentication."""
     st.markdown(custom_css, unsafe_allow_html=True)
@@ -161,23 +147,93 @@ def login_page():
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Login to access the resume evaluation tool.</p>", unsafe_allow_html=True)
 
-    with st.form(key='login_form', clear_on_submit=False):
-        username = st.text_input("Username", key="login_username")
-        password = st.text_input("Password", type="password", key="login_password")
-        submit_button = st.form_submit_button("Login")
+    tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
 
-        if submit_button:
-            if check_login(username, password):
-                st.session_state.logged_in = True
-                st.session_state.current_user = username
-                st.success("Login successful! Redirecting to main app...")
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
+    with tab1:
+        with st.form(key='login_form', clear_on_submit=False):
+            username = st.text_input("Username", key="login_username")
+            password = st.text_input("Password", type="password", key="login_password")
+            submit_button = st.form_submit_button("Login")
+
+            if submit_button:
+                user = authenticate_user(username, password)
+                if user:
+                    if user['is_verified']:
+                        st.session_state.logged_in = True
+                        st.session_state.current_user = username
+                        st.success("Login successful! Redirecting to main app...")
+                        st.rerun()
+                    else:
+                        st.error("Please verify your email before logging in.")
+                else:
+                    st.error("Invalid username or password")
+
+    with tab2:
+        with st.form(key='register_form'):
+            new_username = st.text_input("Username", key="register_username")
+            new_email = st.text_input("Email", key="register_email")
+            new_password = st.text_input("Password", type="password", key="register_password")
+            confirm_password = st.text_input("Confirm Password", type="password", key="confirm_password")
+            register_button = st.form_submit_button("Register")
+
+            if register_button:
+                if new_password != confirm_password:
+                    st.error("Passwords do not match")
+                elif register_user(new_username, new_email, new_password):
+                    verification_token = set_verification_token(new_email)
+                    if send_verification_email(new_email, verification_token):
+                        st.success("Registration successful! Please check your email for verification.")
+                    else:
+                        st.warning("Registration successful, but failed to send verification email. Please contact support.")
+                else:
+                    st.error("Registration failed. Username or email may already be in use.")
+
+    with tab3:
+        with st.form(key='reset_password_form'):
+            reset_email = st.text_input("Email", key="reset_email")
+            reset_button = st.form_submit_button("Reset Password")
+
+            if reset_button:
+                reset_token = set_reset_token(reset_email)
+                if reset_token:
+                    if send_password_reset_email(reset_email, reset_token):
+                        st.success("Password reset link sent to your email.")
+                    else:
+                        st.error("Failed to send password reset email. Please try again or contact support.")
+                else:
+                    st.error("Email not found.")
     
     st.markdown("<div class='footer-text'>Need access? <a href='mailto:hello@resumecupid.ai'>Contact us</a> to get started!</div>", unsafe_allow_html=True)
     
     st.markdown("</div>", unsafe_allow_html=True)
+
+def verify_email():
+    token = st.query_params.get("token", [""])[0]
+    if token:
+        if verify_user(token):
+            st.success("Email verified successfully! You can now log in.")
+        else:
+            st.error("Invalid or expired verification token.")
+    else:
+        st.error("No verification token provided.")
+
+def reset_password_page():
+    token = st.query_params.get("token", [""])[0]
+    if token:
+        with st.form(key='new_password_form'):
+            new_password = st.text_input("New Password", type="password")
+            confirm_new_password = st.text_input("Confirm New Password", type="password")
+            submit_button = st.form_submit_button("Set New Password")
+
+            if submit_button:
+                if new_password != confirm_new_password:
+                    st.error("Passwords do not match")
+                elif reset_password(token, new_password):
+                    st.success("Password reset successfully! You can now log in with your new password.")
+                else:
+                    st.error("Invalid or expired reset token.")
+    else:
+        st.error("No reset token provided.")
 
 BATCH_SIZE = 3  # Number of resumes to process in each batch
 
@@ -303,7 +359,9 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str):
     # Ensure all required keys exist in each result, with default values if missing
     for result in evaluation_results:
         result['match_score'] = result.get('match_score', 0)
-        result['recommendation'] = result.get('recommendation', result.get('recommendation_for_interview', 'No recommendation available'))
+        result['recommendation'] = result.get('recommendation_for_interview', 'No recommendation available')
+        
+        result['recommendation'] = result.get('recommendation_for_interview', 'No recommendation available')
     
     # Sort results by match_score
     evaluation_results.sort(key=lambda x: x['match_score'], reverse=True)
@@ -426,7 +484,7 @@ def get_available_api_keys() -> Dict[str, str]:
     for backend in ["claude", "llama", "gpt4o_mini"]:
         key = os.getenv(f'{backend.upper()}_API_KEY')
         if key:
-            api_keys[backend] = key  # This ensures the keys are lowercase
+            api_keys[backend] = key
     return api_keys
 
 def clear_cache():
@@ -445,21 +503,21 @@ def main_app():
     if 'roles_updated' not in st.session_state:
         st.session_state.roles_updated = False
 
-    for key in ['role_name_input', 'job_description', 'current_role_name', 'job_description_link', 'importance_factors', 'backend', 'resume_processor', 'last_backend', 'job_title', 'client']:
+    for key in ['role_name_input', 'job_description', 'current_role_name', 'job_description_link', 'importance_factors', 'backend', 'resume_processor', 'last_backend']:
         if key not in st.session_state:
             st.session_state[key] = '' if key != 'importance_factors' else {'education': 0.5, 'experience': 0.5, 'skills': 0.5}
 
     if 'saved_roles' not in st.session_state:
-        st.session_state.saved_roles = get_saved_roles(st.session_state.get("current_user", ""))
+        st.session_state.saved_roles = get_saved_roles()
 
     llm_descriptions = {
         "claude": "3.5 Sonnet is Anthropic's most recent model that is highly effective for natural language understanding and generation. It comes at a premium but very accurate.",
-        "llama": "Created by Meta AI, this is the llama-3.1, 8 billion parameter model. This is the latest and most capable large language model with strong performance on various NLP tasks. Created by Meta AI.",
+        "llama": "Created by Meta AI, this is the llama-3.1, 8 billion parameter model. This is the latest and most capable large language model with strong performance on various NLP tasks.",
         "gpt4o_mini": "This is the compact version of GPT-4 with impressive capabilities. Open-source alternative."
     }
 
     api_keys = get_available_api_keys()
-    
+
     if not api_keys:
         st.error("No API keys found. Please set at least one API key in the environment variables.")
         return
@@ -467,9 +525,8 @@ def main_app():
     available_backends = list(api_keys.keys())
     backend_options = []
     for backend in available_backends:
-        backend_lower = backend.lower()
-        if backend_lower in llm_descriptions:
-            backend_options.append(f"{backend}: {llm_descriptions[backend_lower]}")
+        if backend in llm_descriptions:
+            backend_options.append(f"{backend}: {llm_descriptions[backend]}")
         else:
             backend_options.append(f"{backend}: No description available")
 
@@ -477,34 +534,25 @@ def main_app():
         st.error("No compatible backends found. Please check your API key configuration.")
         return
 
-    def on_backend_change():
-        logger.debug("Backend change detected")
-        selected_backend = st.session_state.selected_backend.split(":")[0].strip()
-        logger.info(f"Selected backend: {selected_backend}")
-        if selected_backend != st.session_state.get('last_backend'):
-            selected_api_key = api_keys[selected_backend]
-            logger.debug(f"API key for {selected_backend}: {selected_api_key[:5]}...")
-            try:
-                logger.debug(f"Attempting to create ResumeProcessor for {selected_backend}")
-                st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend.lower())
-                logger.debug(f"ResumeProcessor created successfully for {selected_backend}")
-                if hasattr(st.session_state.resume_processor, 'clear_cache'):
-                    st.session_state.resume_processor.clear_cache()
-                    logger.debug(f"Cache cleared for {selected_backend}")
-                st.session_state.last_backend = selected_backend
-                logger.info(f"Switched to {selected_backend} backend and cleared cache")
-            except Exception as e:
-                logger.error(f"Failed to create ResumeProcessor: {str(e)}")
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                st.error(f"Failed to initialize resume processor. Error: {str(e)}")
-
     selected_backend = st.selectbox(
         "Select AI backend:",
         backend_options,
-        index=0,
-        key='selected_backend',
-        on_change=on_backend_change
+        index=0
     )
+    selected_backend = selected_backend.split(":")[0].strip()
+
+    # Check if the backend has changed and clear cache if necessary
+    if selected_backend != st.session_state.get('last_backend'):
+        selected_api_key = api_keys[selected_backend]
+        st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
+        if hasattr(st.session_state.resume_processor, 'clear_cache'):
+            st.session_state.resume_processor.clear_cache()  # Clear the cache when switching backends
+        st.session_state.last_backend = selected_backend
+        logger.debug(f"Switched to {selected_backend} backend and cleared cache")
+
+    st.session_state.backend = selected_backend
+
+    logger.debug(f"Using ResumeProcessor with backend: {selected_backend}")
 
     resume_processor = st.session_state.resume_processor
 
@@ -512,6 +560,7 @@ def main_app():
         st.error("Failed to initialize resume processor. Please check your configuration.")
         return
 
+    # Add this line to check if the analyze_match method exists
     if not hasattr(resume_processor, 'analyze_match'):
         raise AttributeError(f"ResumeProcessor for backend '{selected_backend}' does not have the 'analyze_match' method")
 
@@ -527,23 +576,24 @@ def main_app():
         st.session_state.client = selected_role['client']
 
     # Add job title input field
-    st.session_state.job_title = st.text_input("Enter the job title:", value=st.session_state.job_title)
+    st.session_state.job_title = st.text_input("Enter the job title:", value=st.session_state.get('job_title', ''))
 
     jd_option = st.radio("Job Description Input Method:", ("Paste Job Description", "Provide Link to Fractal Job Posting"))
 
     if jd_option == "Paste Job Description":
         st.session_state.job_description = st.text_area(
             "Paste the Job Description here:", 
-            value=st.session_state.job_description, 
+            value=st.session_state.get('job_description', ''), 
             placeholder="Job description. This field is required."
         )
         st.session_state.job_description_link = ""
     else:
         st.session_state.job_description_link = st.text_input(
             "Enter the link to the Fractal job posting:", 
-            value=st.session_state.job_description_link
+            value=st.session_state.get('job_description_link', '')
         )
-    if not st.session_state.job_description:
+
+    if 'job_description' not in st.session_state or not st.session_state.job_description:
         if st.session_state.job_description_link and is_valid_fractal_job_link(st.session_state.job_description_link):
             with st.spinner('Extracting job description...'):
                 st.session_state.job_description = extract_job_description(st.session_state.job_description_link)
@@ -555,7 +605,7 @@ def main_app():
         st.text_area("Current Job Description:", value=st.session_state.job_description, height=200, key='current_jd', disabled=True)
 
     # Move the client name input field here
-    st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.client)
+    st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
 
     st.subheader("Customize Importance Factors")
     col1, col2, col3 = st.columns(3)
@@ -585,18 +635,18 @@ def main_app():
             insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
             logger.info("Processing resumes...")
 
-            #Get candidate data
+            # Get candidate data
             candidates = get_candidate_data()
             candidate_data_list = []
             for file in resume_files:
                 matching_candidate = next((c for c in candidates if c['candidate'] == file.name), None)
                 candidate_data_list.append(matching_candidate or {})
-
+                
             with st.spinner('Processing resumes...'):
                 evaluation_results = process_resumes_in_parallel(resume_files, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data_list, st.session_state.job_title)
-            
-            logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
-            insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
+                
+                logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
+                insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
 
             if evaluation_results:
                 st.success("Evaluation complete!")
@@ -619,7 +669,7 @@ def main_app():
     if save_role_option:
         with st.form(key='save_role_form'):
             saved_role_name = st.text_input("Save role as (e.g., Job Title):", value=st.session_state.role_name_input)
-            client = st.text_input("Client (required):", value=st.session_state.client)
+            client = st.text_input("Client (required):", value=st.session_state.get('client', ''))
             save_button = st.form_submit_button('Save Role')
 
         if save_button:
@@ -630,9 +680,9 @@ def main_app():
             else:
                 full_role_name = f"{saved_role_name} - {client}"
                 try:
-                    if save_role(st.session_state.get("current_user", ""), full_role_name, client, st.session_state.job_description, st.session_state.job_description_link):
+                    if save_role(full_role_name, client, st.session_state.job_description, st.session_state.job_description_link):
                         st.success(f"Role '{full_role_name}' saved successfully!")
-                        st.session_state.saved_roles = get_saved_roles(st.session_state.get("current_user", ""))
+                        st.session_state.saved_roles = get_saved_roles()
                     else:
                         st.error("Failed to save the role. Please try again.")
                 except ValueError as e:
@@ -656,21 +706,32 @@ def main_app():
                 
                 # Call delete_saved_role with error handling
                 try:
-                    if delete_saved_role(st.session_state.get("current_user", ""), role_name_to_delete):
+                    if delete_saved_role(role_name_to_delete):
                         st.success(f"Role '{delete_role_name}' deleted successfully!")
-                        st.session_state.saved_roles = get_saved_roles(st.session_state.get("current_user", ""))
+                        st.session_state.saved_roles = get_saved_roles()
                     else:
                         raise Exception("Deletion failed")
                 except Exception as e:
                     st.error(f"Failed to delete role '{delete_role_name}'. Error: {str(e)}")
 
+    # Add a logout button
+    if st.button("Logout"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.experimental_rerun()
+
 if __name__ == "__main__":
-    logger.info("Application starting...")
     init_db()
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
 
-    if not st.session_state.logged_in:
+    # Check if we're on the verification page
+    if 'verify' in st.query_params:
+        verify_email()
+    # Check if we're on the password reset page
+    elif 'reset_password' in st.query_params:
+        reset_password_page()
+    elif not st.session_state.logged_in:
         login_page()
     else:
         main_app()
