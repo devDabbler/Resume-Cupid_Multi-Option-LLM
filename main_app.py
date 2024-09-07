@@ -146,6 +146,11 @@ def login_page():
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Login to access the resume evaluation tool.</p>", unsafe_allow_html=True)
 
+    # Check if we're on the password reset page
+    if 'reset_password' in st.query_params:
+        reset_password_page()
+        return
+
     tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
 
     with tab1:
@@ -206,33 +211,28 @@ def login_page():
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-def verify_email():
-    token = st.query_params.get('token', [None])[0]
-    if token:
-        # Your existing code to verify the email...
-        st.success("Email verification successful.")
-    else:
-        st.error("Invalid or missing token. Please try again or contact support.")
-
 def reset_password_page():
     token = st.query_params.get('token', [None])[0]
     if token:
         st.write("Please enter your new password:")
         new_password = st.text_input("New Password", type="password")
         confirm_password = st.text_input("Confirm Password", type="password")
-        
         if st.button("Reset Password"):
             if new_password == confirm_password:
-                try:
-                    result = reset_password(token, new_password)
-                    if result:
-                        st.success("Password reset successful. Please login with your new password.")
-                    else:
-                        st.error("Failed to reset password. Please try again or contact support.")
-                except Exception as e:
-                    st.error(f"An error occurred: {str(e)}")
+                if reset_password(token, new_password):
+                    st.success("Password reset successful. Please login with your new password.")
+                else:
+                    st.error("Failed to reset password. Please try again or contact support.")
             else:
                 st.error("Passwords do not match. Please try again.")
+    else:
+        st.error("Invalid or missing token. Please try again or contact support.")
+
+def verify_email():
+    token = st.query_params.get('token', [None])[0]
+    if token:
+        # Your existing code to verify the email...
+        st.success("Email verification successful.")
     else:
         st.error("Invalid or missing token. Please try again or contact support.")
 
