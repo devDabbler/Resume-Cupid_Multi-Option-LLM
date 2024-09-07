@@ -1,60 +1,46 @@
-import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
-import logging
+import os
 
 # Load environment variables
 load_dotenv()
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Email configuration
-SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-SMTP_USERNAME = os.getenv('SMTP_USERNAME')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
-FROM_EMAIL = os.getenv('FROM_EMAIL')
-
-def send_email(to_email, subject, body):
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = FROM_EMAIL
-        msg['To'] = to_email
-        msg['Subject'] = subject
-
-        msg.attach(MIMEText(body, 'plain'))
-
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.send_message(msg)
-
-        logger.info(f"Email sent successfully to {to_email}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send email to {to_email}. Error: {str(e)}")
-        return False
-
 def send_verification_email(to_email, verification_token):
-    subject = "Verify Your Email for Resume Cupid"
-    verification_link = f"http://localhost:8501/verify?token={verification_token}"
+    # Email configuration
+    smtp_server = os.getenv('SMTP_SERVER')
+    smtp_port = int(os.getenv('SMTP_PORT'))
+    smtp_username = os.getenv('SMTP_USERNAME')
+    smtp_password = os.getenv('SMTP_PASSWORD')
+    from_email = os.getenv('FROM_EMAIL')
+    subject = 'Email Verification'
+    production_url = os.getenv('PRODUCTION_URL')  # Add this environment variable to your .env file
+    
+    # Email content
+    message = MIMEMultipart()
+    message['From'] = from_email
+    message['To'] = to_email
+    message['Subject'] = subject
+    
     body = f"""
-    Hello,
-
-    Thank you for registering with Resume Cupid. Please click on the link below to verify your email address:
-
-    {verification_link}
-
-    If you didn't register for Resume Cupid, please ignore this email.
-
-    Best regards,
-    The Resume Cupid Team
+    Please verify your email by clicking the link below:
+    {production_url}/verify?token={verification_token}
     """
-    return send_email(to_email, subject, body)
+    message.attach(MIMEText(body, 'plain'))
+    
+    try:
+        # Connect to the SMTP server
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        
+        # Send the email
+        server.sendmail(from_email, to_email, message.as_string())
+        server.quit()
+        print("Verification email sent successfully")
+    except Exception as e:
+        print(f"Failed to send verification email: {e}")
 
 def send_password_reset_email(to_email, reset_token):
     subject = "Reset Your Password for Resume Cupid"
@@ -72,3 +58,8 @@ def send_password_reset_email(to_email, reset_token):
     The Resume Cupid Team
     """
     return send_email(to_email, subject, body)
+
+# Example usage
+to_email = 'user@example.com'
+verification_token = 'your_verification_token'
+send_verification_email(to_email, verification_token)
