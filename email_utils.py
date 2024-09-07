@@ -72,9 +72,7 @@ def send_password_reset_email(to_email, reset_token):
     Best regards,
     The Resume Cupid Team
     """
-<<<<<<< HEAD
-    return send_email(to_email, subject, body)
-=======
+
     return send_email(to_email, subject, body)
 
 # Example usage
