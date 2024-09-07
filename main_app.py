@@ -212,22 +212,23 @@ def login_page():
     st.markdown("</div>", unsafe_allow_html=True)
 
 def reset_password_page():
-    token = st.query_params.get('token', [None])[0]
+    token = st.experimental_get_query_params().get('token', [None])[0]
     if token:
-        st.write("Please enter your new password:")
-        new_password = st.text_input("New Password", type="password")
-        confirm_password = st.text_input("Confirm Password", type="password")
-        if st.button("Reset Password"):
-            if new_password == confirm_password:
-                if reset_password(token, new_password):
+        with st.form("reset_password_form"):
+            new_password = st.text_input("New Password", type="password")
+            confirm_password = st.text_input("Confirm Password", type="password")
+            submit_button = st.form_submit_button("Reset Password")
+            
+            if submit_button and new_password == confirm_password:
+                # Assuming reset_password is a function that handles the password update logic
+                if reset_password(token, new_password):  # Ensure this function exists and is imported
                     st.success("Password reset successful. Please login with your new password.")
                 else:
                     st.error("Failed to reset password. Please try again or contact support.")
-            else:
+            elif submit_button:
                 st.error("Passwords do not match. Please try again.")
     else:
         st.error("Invalid or missing token. Please try again or contact support.")
-
 def verify_email():
     token = st.query_params.get('token', [None])[0]
     if token:
@@ -722,13 +723,10 @@ def main_app():
         st.experimental_rerun()
 
 if __name__ == "__main__":
-    # Check for the presence of the 'token' parameter in the URL
-    if 'verify' in st.query_params:
-        verify_email()
-    elif 'reset_password' in st.query_params:
+    query_params = st.experimental_get_query_params()
+    if 'token' in query_params and 'reset_password' in query_params:
         reset_password_page()
-    elif not st.session_state.get('logged_in', False):
+    elif 'login' in query_params:
         login_page()
     else:
         main_app()
-
