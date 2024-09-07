@@ -728,7 +728,7 @@ if __name__ == "__main__":
     if 'verify' in st.query_params:
         verify_email()
     # Check if we're on the password reset page
-    elif 'reset_password' in st.query_params:
+    elif 'reset_password' in st.experimental_get_query_params():
         reset_password_page()
     elif not st.session_state.logged_in:
         login_page()
