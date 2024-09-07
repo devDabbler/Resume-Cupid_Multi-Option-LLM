@@ -208,7 +208,7 @@ def login_page():
     st.markdown("</div>", unsafe_allow_html=True)
 
 def verify_email():
-    token = st.experimental_get_query_params().get('token', [None])[0]
+    token = st.query_params.get('token', [None])[0]
     if token:
         # Your existing code to verify the email...
         st.success("Email verification successful.")
@@ -216,7 +216,7 @@ def verify_email():
         st.error("Invalid or missing token. Please try again or contact support.")
 
 def reset_password_page():
-    token = st.experimental_get_query_params().get('token', [None])[0]
+    token = st.query_params.get('token', [None])[0]
     if token:
         st.write("Please enter your new password:")
         new_password = st.text_input("New Password", type="password")
@@ -718,15 +718,10 @@ def main_app():
         st.experimental_rerun()
 
 if __name__ == "__main__":
-    init_db()
-    if 'logged_in' not in st.session_state:
-        st.session_state.logged_in = False
-
-if __name__ == "__main__":
     # Check for the presence of the 'token' parameter in the URL
-    if 'verify' in st.experimental_get_query_params():
+    if 'verify' in st.query_params:
         verify_email()
-    elif 'reset_password' in st.experimental_get_query_params():
+    elif 'reset_password' in st.query_params:
         reset_password_page()
     elif not st.session_state.get('logged_in', False):
         login_page()
