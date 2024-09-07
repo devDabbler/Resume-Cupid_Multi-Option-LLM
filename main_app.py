@@ -217,6 +217,7 @@ def verify_email():
     else:
         st.error("No verification token provided.")
 
+
 def reset_password_page():
     token = st.experimental_get_query_params().get('token', [None])[0]
     if token:
