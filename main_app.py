@@ -218,22 +218,21 @@ def verify_email():
         st.error("No verification token provided.")
 
 def reset_password_page():
-    token = st.query_params.get("token", [""])[0]
+    token = st.experimental_get_query_params().get('token', [None])[0]
     if token:
-        with st.form(key='new_password_form'):
-            new_password = st.text_input("New Password", type="password")
-            confirm_new_password = st.text_input("Confirm New Password", type="password")
-            submit_button = st.form_submit_button("Set New Password")
-
-            if submit_button:
-                if new_password != confirm_new_password:
-                    st.error("Passwords do not match")
-                elif reset_password(token, new_password):
-                    st.success("Password reset successfully! You can now log in with your new password.")
+        st.write("Please enter your new password:")
+        new_password = st.text_input("New Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
+        if st.button("Reset Password"):
+            if new_password == confirm_password:
+                if reset_password(token, new_password):
+                    st.success("Password reset successful. Please login with your new password.")
                 else:
-                    st.error("Invalid or expired reset token.")
+                    st.error("Failed to reset password. Please try again or contact support.")
+            else:
+                st.error("Passwords do not match. Please try again.")
     else:
-        st.error("No reset token provided.")
+        st.error("Invalid or missing token. Please try again or contact support.")
 
 BATCH_SIZE = 3  # Number of resumes to process in each batch
 
