@@ -4,18 +4,18 @@ from dotenv import load_dotenv
 import uuid
 from datetime import datetime
 from typing import Optional
-from config import Config
-from utils import get_logger
+from logger import get_logger  # Import get_logger from logger.py
 import bcrypt
+from config_settings import Config
 
 logger = get_logger(__name__)
-
-load_dotenv()
 
 DB_PATH = Config.DB_PATH
 
 def get_db_connection():
     try:
+        from config_settings import Config  # Import the config settings
+        DB_PATH = Config.DB_PATH
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         return conn
@@ -118,13 +118,31 @@ def verify_user(verification_token: str) -> bool:
         WHERE verification_token = ?
         ''', (verification_token,))
         conn.commit()
-        return cur.rowcount > 0
+        affected_rows = cur.rowcount
+        logger.debug(f"Rows affected by verify_user: {affected_rows}")
+        return affected_rows > 0
     except sqlite3.Error as e:
         logger.error(f"Error verifying user: {e}")
         return False
     finally:
         conn.close()
 
+
+def is_user_verified(username: str) -> bool:
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT is_verified FROM users WHERE username = ?', (username,))
+        result = cur.fetchone()
+        verified = bool(result['is_verified']) if result else False
+        logger.debug(f"User {username} verification status: {verified}")
+        return verified
+    except sqlite3.Error as e:
+        logger.error(f"Error checking user verification status: {e}")
+        return False
+    finally:
+        conn.close()
+        
 def authenticate_user(username: str, password: str) -> Optional[dict]:
     try:
         conn = get_db_connection()
@@ -137,7 +155,6 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
         else:
             logger.info("User not found")
         
-        # Remove the .encode('utf-8') on user['password_hash']
         if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash']):
             logger.info("Password match successful")
             return dict(user)
@@ -175,11 +192,14 @@ def reset_password(reset_token: str, new_password: str) -> bool:
         cur = conn.cursor()
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
         cur.execute('''
-        UPDATE users SET password_hash = ?, reset_token = NULL
+        UPDATE users 
+        SET password_hash = ?, reset_token = NULL, is_verified = 1
         WHERE reset_token = ?
         ''', (hashed_password, reset_token))
         conn.commit()
-        return cur.rowcount > 0
+        affected_rows = cur.rowcount
+        logger.debug(f"Rows affected by reset_password: {affected_rows}")
+        return affected_rows > 0
     except sqlite3.Error as e:
         logger.error(f"Error resetting password: {e}")
         return False
@@ -237,6 +257,7 @@ def delete_saved_role(role_name: str) -> bool:
         conn.close()
 
 def save_feedback(run_id: str, resume_id: str, accuracy_rating: int, content_rating: int, suggestions: str) -> bool:
+    logger = get_logger(__name__)
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -245,13 +266,15 @@ def save_feedback(run_id: str, resume_id: str, accuracy_rating: int, content_rat
         VALUES (?, ?, ?, ?, ?)
         ''', (run_id, resume_id, accuracy_rating, content_rating, suggestions))
         conn.commit()
+        logger.info(f"Feedback saved for run_id: {run_id}, resume_id: {resume_id}")
         return True
     except sqlite3.Error as e:
         logger.error(f"Error saving feedback: {e}")
         return False
     finally:
-        conn.close()
-    
+        if conn:
+            conn.close()
+            
 def insert_run_log(run_id: str, event: str, details: str = None) -> bool:
     try:
         conn = get_db_connection()
@@ -290,5 +313,6 @@ def set_verification_token(email: str) -> Optional[str]:
 
 if __name__ == "__main__":
     print(f"Initializing database at: {DB_PATH}")
-    init_db()
+    init_db()  # Ensure tables are created
     print("Database initialization complete.")
+

@@ -113,7 +113,7 @@ spacy-legacy==3.0.12
 spacy-loggers==1.0.5
 srsly==2.4.8
 streamlit==1.38.0
-streamli-authenticator
+streamlit-authenticator
 tenacity==8.5.0
 thinc==8.2.5
 tiktoken==0.7.0

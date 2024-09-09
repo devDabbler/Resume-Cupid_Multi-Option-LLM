@@ -10,8 +10,6 @@ logger = get_logger(__name__)
 
 class ClaudeClient:
     def __init__(self, api_key: str, api_url: str = "https://api.anthropic.com/v1/messages"):
-        if not api_key:
-            raise ValueError("API key cannot be empty")
         self.api_key = api_key
         self.api_url = api_url
         self.headers = {
@@ -19,7 +17,7 @@ class ClaudeClient:
             "anthropic-version": "2023-06-01",
             "Content-Type": "application/json"
         }
-        logger.info("ClaudeClient initialized")
+        logger.debug(f"ClaudeAPI initialized with headers: {self.headers}")
 
     def create_completion(self, messages: list, model: str = "claude-3-5-sonnet-20240620", max_tokens: int = 2000):
         data = {
@@ -28,7 +26,12 @@ class ClaudeClient:
             "max_tokens": max_tokens
         }
         try:
+            logger.debug(f"Sending request to {self.api_url}")
+            logger.debug(f"Headers: {self.headers}")
+            logger.debug(f"Data: {data}")
             response = requests.post(self.api_url, headers=self.headers, json=data)
+            logger.debug(f"Response status code: {response.status_code}")
+            logger.debug(f"Response content: {response.text[:100]}...")  # First 100 chars
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:

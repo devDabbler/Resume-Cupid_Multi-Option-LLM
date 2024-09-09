@@ -1,38 +1,46 @@
-import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
+from utils import get_logger
 import logging
-
-# Load environment variables
-load_dotenv()
+from config_settings import Config
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Email configuration
-SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-SMTP_USERNAME = os.getenv('SMTP_USERNAME')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
-FROM_EMAIL = os.getenv('FROM_EMAIL')
-PRODUCTION_URL = os.getenv('PRODUCTION_URL', 'http://localhost:8501')  # Default to localhost if not set
+logger.info(f"Using BASE_URL: {Config.BASE_URL}")
+
+# Get SMTP configuration
+smtp_config = Config.get_smtp_config()
+
+logger.debug(f"SMTP Configuration: SERVER={smtp_config['server']}, PORT={smtp_config['port']}, USERNAME={smtp_config['username']}, FROM_EMAIL={smtp_config['from_email']}")
 
 def send_email(to_email, subject, body):
+    if not all([smtp_config['server'], smtp_config['port'], smtp_config['username'], smtp_config['password'], smtp_config['from_email']]):
+        logger.error("SMTP configuration is incomplete. Please check your environment variables.")
+        return False
+
     try:
         msg = MIMEMultipart()
-        msg['From'] = FROM_EMAIL
+        msg['From'] = smtp_config['from_email']
         msg['To'] = to_email
         msg['Subject'] = subject
 
         msg.attach(MIMEText(body, 'plain'))
 
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with smtplib.SMTP(smtp_config['server'], smtp_config['port']) as server:
+            logger.info(f"Attempting to connect to SMTP server: {smtp_config['server']}:{smtp_config['port']}")
+            server.ehlo()
+            logger.info("EHLO sent")
             server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            logger.info("TLS started")
+            server.ehlo()
+            logger.info("Second EHLO sent")
+            server.login(smtp_config['username'], smtp_config['password'])
+            logger.info("Logged in successfully")
             server.send_message(msg)
+            logger.info("Email sent")
 
         logger.info(f"Email sent successfully to {to_email}")
         return True
@@ -40,36 +48,52 @@ def send_email(to_email, subject, body):
         logger.error(f"Failed to send email to {to_email}. Error: {str(e)}")
         return False
 
-def send_verification_email(to_email, verification_token):
-    subject = "Verify Your Email for Resume Cupid"
-    verification_link = f"{PRODUCTION_URL}/verify?token={verification_token}"
-    body = f"""
-    Hello,
+def send_verification_email(recipient_email, verification_token):
+    from config_settings import Config  # Import the config settings
 
-    Thank you for registering with Resume Cupid. Please click on the link below to verify your email address:
+    sender_email = Config.FROM_EMAIL
+    subject = "Verify Your Email"
+    verification_link = f"{Config.BASE_URL}?action=verify&token={verification_token}"
 
-    {verification_link}
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = recipient_email
+    message["Subject"] = subject
 
-    If you didn't register for Resume Cupid, please ignore this email.
+    body = f"Please verify your email by clicking the link: {verification_link}"
+    message.attach(MIMEText(body, "plain"))
 
-    Best regards,
-    The Resume Cupid Team
-    """
-    return send_email(to_email, subject, body)
+    try:
+        with smtplib.SMTP(Config.SMTP_SERVER, Config.SMTP_PORT) as server:
+            server.starttls()
+            server.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
+            server.sendmail(sender_email, recipient_email, message.as_string())
+        logger.info(f"Verification email sent to {recipient_email}")
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {recipient_email}: {e}")
 
-def send_password_reset_email(to_email, reset_token):
-    subject = "Reset Your Password for Resume Cupid"
-    reset_link = f"{PRODUCTION_URL}/reset_password?token={reset_token}"
-    body = f"""
-    Hello,
+def send_password_reset_email(recipient_email, reset_token):
+    from config_settings import Config  # Import the config settings
 
-    You have requested to reset your password for Resume Cupid. Please click on the link below to set a new password:
+    sender_email = Config.FROM_EMAIL
+    subject = "Reset Your Password"
+    reset_link = f"{Config.BASE_URL}?action=reset&token={reset_token}"
 
-    {reset_link}
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = recipient_email
+    message["Subject"] = subject
 
-    If you didn't request a password reset, please ignore this email.
+    body = f"Please reset your password by clicking the link: {reset_link}"
+    message.attach(MIMEText(body, "plain"))
 
-    Best regards,
-    The Resume Cupid Team
-    """
-    return send_email(to_email, subject, body)
+    try:
+        with smtplib.SMTP(Config.SMTP_SERVER, Config.SMTP_PORT) as server:
+            server.starttls()
+            server.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
+            server.sendmail(sender_email, recipient_email, message.as_string())
+        logger.info(f"Password reset email sent to {recipient_email}")
+        return True  # Return True if email is sent successfully
+    except Exception as e:
+        logger.error(f"Failed to send password reset email to {recipient_email}: {e}")
+        return False  # Return False if email sending fails
