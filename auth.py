@@ -4,7 +4,6 @@ import logging
 from database import register_user, authenticate_user, set_reset_token, reset_password, set_verification_token, verify_user, is_user_verified
 from email_utils import send_verification_email, send_password_reset_email
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Custom CSS for branding and UI enhancement
@@ -226,7 +225,7 @@ def handle_password_reset(token):
                 st.session_state.password_reset_complete = True
                 st.session_state.password_reset_mode = False
                 st.session_state.reset_token = None
-                st.experimental_rerun()  # Redirect to the main page
+                st.rerun()  # Redirect to the main page
                 return True
             else:
                 logger.error("Failed to reset password")
@@ -240,14 +239,14 @@ def handle_password_reset(token):
 def auth_main():
     logger.debug(f"Session state: {st.session_state}")
     
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params()
     logger.debug(f"Query parameters: {query_params}")
     
     # Handle password reset completion
     if 'password_reset_complete' in st.session_state:
         st.info("Your password has been reset. Please log in with your new password.")
         del st.session_state['password_reset_complete']
-        st.experimental_rerun()  # Redirect to the login page
+        st.rerun()  # Redirect to the login page
     
     # Handle email verification and password reset
     if 'action' in query_params and 'token' in query_params:
