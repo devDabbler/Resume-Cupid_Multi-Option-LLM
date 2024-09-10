@@ -2,9 +2,9 @@ import sqlite3
 import os
 from dotenv import load_dotenv
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
-from logger import get_logger  # Import get_logger from logger.py
+from logger import get_logger
 import bcrypt
 from config_settings import Config
 
@@ -14,8 +14,6 @@ DB_PATH = Config.DB_PATH
 
 def get_db_connection():
     try:
-        from config_settings import Config  # Import the config settings
-        DB_PATH = Config.DB_PATH
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         return conn
@@ -37,13 +35,22 @@ def init_db():
             password_hash TEXT NOT NULL,
             is_verified BOOLEAN DEFAULT 0,
             verification_token TEXT,
-            reset_token TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             is_admin INTEGER DEFAULT 0
         )
         ''')
         
-        # Modify saved_roles table (remove username column)
+        # Create reset_tokens table
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            expires_at TIMESTAMP NOT NULL
+        )
+        ''')
+        
+        # Create saved_roles table
         cur.execute('''
         CREATE TABLE IF NOT EXISTS saved_roles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,7 +134,6 @@ def verify_user(verification_token: str) -> bool:
     finally:
         conn.close()
 
-
 def is_user_verified(username: str) -> bool:
     try:
         conn = get_db_connection()
@@ -142,7 +148,7 @@ def is_user_verified(username: str) -> bool:
         return False
     finally:
         conn.close()
-        
+
 def authenticate_user(username: str, password: str) -> Optional[dict]:
     try:
         conn = get_db_connection()
@@ -172,23 +178,22 @@ def set_reset_token(email: str) -> Optional[str]:
         conn = get_db_connection()
         cur = conn.cursor()
         reset_token = str(uuid.uuid4())
+        expires_at = datetime.now() + timedelta(hours=1)  # Token expires in 1 hour
         cur.execute('''
-        UPDATE users SET reset_token = ?
-        WHERE email = ?
-        ''', (reset_token, email))
+        INSERT INTO reset_tokens (email, token, expires_at)
+        VALUES (?, ?, ?)
+        ''', (email, reset_token, expires_at))
         conn.commit()
-        if cur.rowcount > 0:
-            return reset_token
-        return None
+        return reset_token
     except sqlite3.Error as e:
         logger.error(f"Error setting reset token: {e}")
         return None
     finally:
         conn.close()
-        
-def reset_password(token, new_password):
+
+def reset_password(token: str, new_password: str) -> bool:
     try:
-        conn = sqlite3.connect('resume_cupid.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         # Verify the token
@@ -199,19 +204,18 @@ def reset_password(token, new_password):
             logger.error("Invalid or expired token")
             return False
 
-        email = result[0]
+        email = result['email']
 
         # Hash the new password
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
 
         # Update the user's password
-        cursor.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_password, email))
-        conn.commit()
-
+        cursor.execute("UPDATE users SET password_hash = ? WHERE email = ?", (hashed_password, email))
+        
         # Delete the used token
         cursor.execute("DELETE FROM reset_tokens WHERE token = ?", (token,))
+        
         conn.commit()
-
         logger.info(f"Password reset successful for email: {email}")
         return True
     except Exception as e:
@@ -271,7 +275,6 @@ def delete_saved_role(role_name: str) -> bool:
         conn.close()
 
 def save_feedback(run_id: str, resume_id: str, accuracy_rating: int, content_rating: int, suggestions: str) -> bool:
-    logger = get_logger(__name__)
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -288,7 +291,7 @@ def save_feedback(run_id: str, resume_id: str, accuracy_rating: int, content_rat
     finally:
         if conn:
             conn.close()
-            
+
 def insert_run_log(run_id: str, event: str, details: str = None) -> bool:
     try:
         conn = get_db_connection()
