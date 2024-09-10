@@ -195,6 +195,7 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
         conn.close()
 
 def set_reset_token(email: str) -> Optional[str]:
+    logger.debug(f"Setting reset token for email: {email}")
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -205,19 +206,19 @@ def set_reset_token(email: str) -> Optional[str]:
         VALUES (?, ?, ?)
         ''', (email, reset_token, expires_at))
         conn.commit()
+        logger.info(f"Reset token set successfully for email: {email}")
         return reset_token
     except sqlite3.Error as e:
-        logger.error(f"Error setting reset token: {e}")
+        logger.error(f"Error setting reset token: {e}", exc_info=True)
         return None
     finally:
         conn.close()
 
 def reset_password(token: str, new_password: str) -> bool:
+    logger.debug(f"Attempting to reset password with token: {token}")
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-
-        logger.debug(f"Attempting to reset password with token: {token}")
 
         # Verify the token
         cursor.execute("SELECT email FROM reset_tokens WHERE token = ? AND expires_at > datetime('now')", (token,))
@@ -246,17 +247,9 @@ def reset_password(token: str, new_password: str) -> bool:
         conn.commit()
         logger.info(f"Password reset successful for email: {email}")
 
-        # Verify the password was actually updated
-        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-        user = cursor.fetchone()
-        if user:
-            logger.debug(f"User found after password reset: {user['username']}")
-        else:
-            logger.error(f"User not found after password reset for email: {email}")
-
         return True
     except Exception as e:
-        logger.error(f"Failed to reset password: {str(e)}")
+        logger.error(f"Failed to reset password: {str(e)}", exc_info=True)
         return False
     finally:
         conn.close()

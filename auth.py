@@ -187,16 +187,6 @@ def reset_password_page():
                 st.error("Email not found.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-def verify_email(token):
-    logger.debug(f"Attempting to verify email with token: {token}")
-    if verify_user(token):
-        logger.info(f"Email verified successfully with token: {token}")
-        st.success("Your email has been successfully verified! You can now log in.")
-        return True
-    else:
-        logger.warning(f"Failed to verify email with token: {token}")
-        st.error("Invalid or expired verification token.")
-        return False
 
 def handle_password_reset(token):
     logger.debug(f"Handling password reset for token: {token}")
@@ -210,16 +200,16 @@ def handle_password_reset(token):
         submit_button = st.form_submit_button("Set New Password")
 
         if submit_button:
+            logger.debug("Password reset form submitted")
             if new_password != confirm_new_password:
-                st.error("Passwords do not match.")
                 logger.error("Passwords do not match")
+                st.error("Passwords do not match.")
                 return None
             elif reset_password(token, new_password):
                 logger.info("Password reset successful")
                 st.success("Password reset successful. You can now log in with your new password.")
                 st.session_state.password_reset_mode = False
                 st.session_state.reset_token = None
-                st.rerun()
                 return "SUCCESS"
             else:
                 logger.error("Failed to reset password")

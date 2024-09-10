@@ -10,8 +10,19 @@ import sys
 st.set_page_config(page_title="Resume Cupid", page_icon="💘", layout="centered")
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__) 
+log_directory = "/home/rezcupid2024/Resume_Cupid_Multi_LLM/logs"
+os.makedirs(log_directory, exist_ok=True)
+log_file = os.path.join(log_directory, "app.log")
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    filename=log_file,
+    filemode='a'
+)
+
+logger = logging.getLogger(__name__)
+logger.info("Application started")
 
 # Load the .env.development file
 try:
