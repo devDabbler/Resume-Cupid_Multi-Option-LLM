@@ -85,21 +85,26 @@ def main():
 
         if st.session_state.get('password_reset_mode', False):
             logger.debug("Handling password reset")
-            reset_successful = handle_password_reset(st.session_state.get('reset_token'))
-            if reset_successful:
+            reset_result = handle_password_reset(st.session_state.get('reset_token'))
+            if reset_result == "SUCCESS":
                 logger.debug("Password reset completed successfully")
                 st.session_state.password_reset_mode = False
                 st.session_state.reset_token = None
-                st.success("Password reset successful. You can now log in with your new password.")
+                st.session_state.show_login = True  # New flag to show login page
                 st.rerun()
-            elif reset_successful is False:  # Not None, which means the form was submitted
+            elif reset_result is False:  # Not None, which means the form was submitted
                 st.error("Failed to reset password. Please try again.")
+        elif st.session_state.get('show_login', False):
+            logger.debug("Showing login page after successful password reset")
+            st.session_state.show_login = False  # Reset the flag
+            login_page()  # Make sure this function is imported and available
         elif 'logged_in' not in st.session_state or not st.session_state['logged_in']:
             logger.debug("User not logged in, showing auth main")
             auth_main()
         else:
             logger.debug("User logged in, showing main app")
             main_app()
+
     except Exception as e:
         logger.error(f"An error occurred in the main function: {e}", exc_info=True)
         st.error(f"An unexpected error occurred. Please try again later. Error details: {str(e)}")

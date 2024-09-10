@@ -214,23 +214,22 @@ def handle_password_reset(token):
         confirm_new_password = st.text_input("Confirm New Password", type="password")
         submit_button = st.form_submit_button("Set New Password")
 
-        if submit_button:
-            if new_password != confirm_new_password:
-                st.error("Passwords do not match.")
-                logger.error("Passwords do not match")
-                return None
-            elif reset_password(token, new_password):
-                logger.info("Password reset successful and email verified")
-                st.success("Password reset successful. Your email has been verified. You can now log in with your new password.")
-                st.session_state.password_reset_complete = True
-                st.session_state.password_reset_mode = False
-                st.session_state.reset_token = None
-                st.rerun()  # Redirect to the main page
-                return True
-            else:
-                logger.error("Failed to reset password")
-                st.error("Failed to reset password. The token may be invalid or expired.")
-                return False
+    if submit_button:
+        if new_password != confirm_new_password:
+            st.error("Passwords do not match.")
+            logger.error("Passwords do not match")
+            return None
+        elif reset_password(token, new_password):
+            logger.info("Password reset successful and email verified")
+            st.success("Password reset successful. Your email has been verified. You can now log in with your new password.")
+            st.session_state.password_reset_complete = True
+            st.session_state.password_reset_mode = False
+            st.session_state.reset_token = None
+            return "SUCCESS"  # Return a specific value for success
+        else:
+            logger.error("Failed to reset password")
+            st.error("Failed to reset password. The token may be invalid or expired.")
+            return False
     st.markdown('</div>', unsafe_allow_html=True)
     
     logger.debug(f"Session state after handle_password_reset: {st.session_state}")
