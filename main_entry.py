@@ -13,12 +13,21 @@ st.set_page_config(page_title="Resume Cupid", page_icon="💘", layout="centered
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Load the .env.development file
+# Load the .env.production file
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+
+# Set the path for the .env file
+if ENVIRONMENT == 'production':
+    env_path = os.path.join(os.path.dirname(__file__), '.env.production')
+else:
+    env_path = os.path.join(os.path.dirname(__file__), '.env.development')
+
+# Load the appropriate .env file
 try:
-    load_dotenv(dotenv_path=r'C:\Users\SEAN COLLINS\Resume_Cupid_Multi_LLM\.env.development')
-    logger.info("Loaded environment variables from .env.development")
+    load_dotenv(dotenv_path=env_path)
+    logger.info(f"Loaded environment variables from {env_path}")
 except Exception as e:
-    logger.error(f"Failed to load .env.development file: {e}")
+    logger.error(f"Failed to load {env_path} file: {e}")
 
 # Now import Config after loading environment variables
 try:
