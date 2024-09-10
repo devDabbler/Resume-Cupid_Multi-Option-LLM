@@ -63,17 +63,17 @@ def main():
             # Clear the query parameters
             st.query_params.clear()
 
-            # Check for email verification token
-            verify_token = st.query_params.get("verify_token")
+        # Check for email verification token
+        verify_token = st.query_params.get("verify_token")
         if verify_token:
             logger.debug(f"Detected email verification token: {verify_token}")
             verification_result = verify_email(verify_token)
-        if verification_result:
-            logger.info(f"Email verified successfully with token: {verify_token}")
-            st.success("Your email has been successfully verified! You can now log in.")
-        else:
-            logger.warning(f"Email verification failed with token: {verify_token}")
-            st.error("Email verification failed. Please try again or contact support.")
+            if verification_result:
+                logger.info(f"Email verified successfully with token: {verify_token}")
+                st.success("Your email has been successfully verified! You can now log in.")
+            else:
+                logger.warning(f"Email verification failed with token: {verify_token}")
+                st.error("Email verification failed. Please try again or contact support.")
             st.query_params.clear()
 
         logger.debug(f"Session state: {st.session_state}")

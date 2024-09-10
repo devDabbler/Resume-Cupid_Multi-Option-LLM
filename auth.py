@@ -1,7 +1,7 @@
 import streamlit as st
 import bcrypt
 import logging
-from database import register_user, authenticate_user, set_reset_token, reset_password, set_verification_token, verify_user, is_user_verified
+from database import register_user, authenticate_user, set_reset_token, reset_password, set_verification_token, verify_user, is_user_verified, debug_user_status
 from email_utils import send_verification_email, send_password_reset_email
 
 logger = logging.getLogger(__name__)
@@ -192,10 +192,11 @@ def verify_email(token):
     if verify_user(token):
         logger.info(f"Email verified successfully with token: {token}")
         st.success("Your email has been successfully verified! You can now log in.")
-        st.session_state['email_verified'] = True
+        return True
     else:
         logger.warning(f"Failed to verify email with token: {token}")
         st.error("Invalid or expired verification token.")
+        return False
 
 def handle_password_reset(token):
     logger.debug(f"Handling password reset for token: {token}")
