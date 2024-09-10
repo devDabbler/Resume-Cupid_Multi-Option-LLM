@@ -239,7 +239,7 @@ def handle_password_reset(token):
 def auth_main():
     logger.debug(f"Session state: {st.session_state}")
     
-    query_params = st.query_params()
+    query_params = st.query_params
     logger.debug(f"Query parameters: {query_params}")
     
     # Handle password reset completion
@@ -268,3 +268,6 @@ def auth_main():
     
     # Always show the main auth page if no special conditions are met
     main_auth_page()
+ 
+        
+        
