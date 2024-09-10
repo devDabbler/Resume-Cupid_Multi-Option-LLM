@@ -2,16 +2,17 @@ import os
 from dotenv import load_dotenv
 import logging
 
-load_dotenv(dotenv_path=r'C:\Users\SEAN COLLINS\Resume_Cupid_Multi_LLM\.env.development')
+# Load environment variables from the .env.production file in the same directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env.production'))
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='a', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Load API keys
 claude_api_key = os.getenv('CLAUDE_API_KEY')
 llama_api_key = os.getenv('LLAMA_API_KEY')
 gpt4o_mini_api_key = os.getenv('GPT4O_MINI_API_KEY')
-
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 # Debugging: Log each variable individually
 smtp_server = os.getenv('SMTP_SERVER')
@@ -19,9 +20,6 @@ smtp_port = os.getenv('SMTP_PORT')
 smtp_username = os.getenv('SMTP_USERNAME')
 smtp_password = os.getenv('SMTP_PASSWORD')
 from_email = os.getenv('FROM_EMAIL')
-claude_api_key = os.getenv('CLAUDE_API_KEY')
-gpt4o_mini_api_key = os.getenv('GPT4O_MINI_API_KEY')
-llama_api_key = os.getenv('LLAMA_API_KEY')
 
 if smtp_server is None:
     logger.error("SMTP_SERVER not found in environment variables.")
@@ -77,9 +75,9 @@ class Config:
     LOG_FILE = os.getenv('LOG_FILE', './logs/app.log')
     BERT_MODEL_NAME = os.getenv('BERT_MODEL_NAME', 'all-MiniLM-L6-v2')
     ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
-    CLAUDE_API_KEY = claude_api_key if claude_api_key else 'default_claude_api_key'  # Add this line
-    GPT4O_MINI_API_KEY = gpt4o_mini_api_key if gpt4o_mini_api_key else 'default_gpt4o_mini_api_key'  # Add this line
-    LLAMA_API_KEY = llama_api_key if llama_api_key else 'default_llama_api_key'  # Add this line
+    CLAUDE_API_KEY = claude_api_key if claude_api_key else 'default_claude_api_key'
+    GPT4O_MINI_API_KEY = gpt4o_mini_api_key if gpt4o_mini_api_key else 'default_gpt4o_mini_api_key'
+    LLAMA_API_KEY = llama_api_key if llama_api_key else 'default_llama_api_key'
 
     @staticmethod
     def get_smtp_config():

@@ -83,14 +83,38 @@ def send_email(to_email, subject, body, max_retries=3, retry_delay=5):
     
     return False
 
-def send_verification_email(recipient_email, verification_token):
-    subject = "Verify Your Email"
-    verification_link = f"{Config.BASE_URL}?action=verify&token={verification_token}"
-    body = f"Please verify your email by clicking the link: {verification_link}"
-    return send_email(recipient_email, subject, body)
+def send_verification_email(to_email, verification_token):
+    subject = "Verify Your Email for Resume Cupid"
+    verification_link = f"{Config.BASE_URL}/verify?token={verification_token}"
+    body = f"""
+    Hello,
 
-def send_password_reset_email(recipient_email, reset_token):
-    subject = "Reset Your Password"
-    reset_link = f"{Config.BASE_URL}?action=reset&token={reset_token}"
-    body = f"Please reset your password by clicking the link: {reset_link}"
-    return send_email(recipient_email, subject, body)
+    Thank you for registering with Resume Cupid. Please click on the link below to verify your email address:
+
+    {verification_link}
+
+    If you didn't register for Resume Cupid, please ignore this email.
+
+    Best regards,
+    The Resume Cupid Team
+    """
+    logger.info(f"Sending verification email to {to_email}")
+    return send_email(to_email, subject, body)
+
+def send_password_reset_email(to_email, reset_token):
+    subject = "Reset Your Password for Resume Cupid"
+    reset_link = f"{Config.BASE_URL}/reset_password?token={reset_token}"
+    body = f"""
+    Hello,
+
+    You have requested to reset your password for Resume Cupid. Please click on the link below to set a new password:
+
+    {reset_link}
+
+    If you didn't request a password reset, please ignore this email.
+
+    Best regards,
+    The Resume Cupid Team
+    """
+    logger.info(f"Sending password reset email to {to_email}")
+    return send_email(to_email, subject, body)
