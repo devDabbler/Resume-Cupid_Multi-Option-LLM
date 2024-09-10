@@ -1,4 +1,5 @@
 import smtplib
+import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from utils import get_logger
@@ -21,12 +22,17 @@ logger.debug(f"SMTP Configuration: SERVER={smtp_config['server']}, PORT={smtp_co
 def verify_smtp_settings():
     try:
         logger.info(f"Verifying SMTP settings: {smtp_config['server']}:{smtp_config['port']}")
+        logger.info(f"Attempting DNS resolution of {smtp_config['server']}")
+        ip_address = socket.gethostbyname(smtp_config['server'])
+        logger.info(f"DNS resolution successful. IP: {ip_address}")
         socket.create_connection((smtp_config['server'], smtp_config['port']), timeout=10)
         logger.info("SMTP server is reachable")
         return True
+    except socket.gaierror as e:
+        logger.error(f"DNS resolution failed for {smtp_config['server']}: {e}")
     except Exception as e:
         logger.error(f"Failed to connect to SMTP server: {e}")
-        return False
+    return False
 
 def send_email(to_email, subject, body, max_retries=3, retry_delay=5):
     if not all([smtp_config['server'], smtp_config['port'], smtp_config['username'], smtp_config['password'], smtp_config['from_email']]):
@@ -46,11 +52,12 @@ def send_email(to_email, subject, body, max_retries=3, retry_delay=5):
 
             msg.attach(MIMEText(body, 'plain'))
 
+            context = ssl.create_default_context()
             with smtplib.SMTP(smtp_config['server'], smtp_config['port']) as server:
                 logger.info(f"Attempting to connect to SMTP server: {smtp_config['server']}:{smtp_config['port']}")
                 server.ehlo()
                 logger.info("EHLO sent")
-                server.starttls()
+                server.starttls(context=context)
                 logger.info("TLS started")
                 server.ehlo()
                 logger.info("Second EHLO sent")
@@ -61,29 +68,29 @@ def send_email(to_email, subject, body, max_retries=3, retry_delay=5):
 
             logger.info(f"Email sent successfully to {to_email}")
             return True
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"SMTP Authentication failed on attempt {attempt + 1}: {e}")
+        except smtplib.SMTPException as e:
+            logger.error(f"SMTP error on attempt {attempt + 1}: {e}")
         except Exception as e:
-            logger.error(f"Attempt {attempt + 1} failed to send email to {to_email}. Error: {str(e)}")
-            if attempt < max_retries - 1:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-            else:
-                logger.error(f"Failed to send email after {max_retries} attempts.")
-                return False
+            logger.error(f"Unexpected error on attempt {attempt + 1}: {e}")
+        
+        if attempt < max_retries - 1:
+            logger.info(f"Retrying in {retry_delay} seconds...")
+            time.sleep(retry_delay)
+        else:
+            logger.error(f"Failed to send email after {max_retries} attempts.")
+    
+    return False
 
 def send_verification_email(recipient_email, verification_token):
-    sender_email = Config.FROM_EMAIL
     subject = "Verify Your Email"
     verification_link = f"{Config.BASE_URL}?action=verify&token={verification_token}"
-
     body = f"Please verify your email by clicking the link: {verification_link}"
-    
     return send_email(recipient_email, subject, body)
 
 def send_password_reset_email(recipient_email, reset_token):
-    sender_email = Config.FROM_EMAIL
     subject = "Reset Your Password"
     reset_link = f"{Config.BASE_URL}?action=reset&token={reset_token}"
-
     body = f"Please reset your password by clicking the link: {reset_link}"
-    
     return send_email(recipient_email, subject, body)
