@@ -95,6 +95,8 @@ custom_css = """
 """
 
 def main_auth_page():
+    logger.debug(f"Auth main called. Session state: {st.session_state}")
+    
     st.markdown(custom_css, unsafe_allow_html=True)
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
@@ -217,6 +219,7 @@ def handle_password_reset(token):
                 st.success("Password reset successful. You can now log in with your new password.")
                 st.session_state.password_reset_mode = False
                 st.session_state.reset_token = None
+                st.rerun()
                 return "SUCCESS"
             else:
                 logger.error("Failed to reset password")

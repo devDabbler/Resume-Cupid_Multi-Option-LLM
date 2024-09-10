@@ -103,7 +103,7 @@ def send_verification_email(to_email, verification_token):
 
 def send_password_reset_email(to_email, reset_token):
     subject = "Reset Your Password for Resume Cupid"
-    reset_link = f"{Config.BASE_URL}/reset_password?token={reset_token}"
+    reset_link = f"{Config.BASE_URL}?reset_token={reset_token}"
     body = f"""
     Hello,
 

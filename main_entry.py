@@ -44,9 +44,6 @@ def main():
         logger.debug("Entering main function")
         logger.debug(f"Current working directory: {os.getcwd()}")
         
-        # Log the database path
-        logger.info(f"Attempting to connect to database at: {Config.DB_PATH}")
-        
         # Initialize the database
         try:
             init_db()
@@ -58,27 +55,21 @@ def main():
         logger.debug(f"Query parameters: {query_params}")
 
         # Check for password reset token
-        if 'token' in query_params:
-            token = query_params['token']
-            logger.debug(f"Detected password reset token: {token}")
+        if 'reset_token' in query_params:
+            reset_token = query_params['reset_token']
+            logger.debug(f"Detected password reset token: {reset_token}")
             st.session_state.password_reset_mode = True
-            st.session_state.reset_token = token
+            st.session_state.reset_token = reset_token
+            # Clear the query parameters to avoid showing the token in the URL
+            st.experimental_set_query_params()
 
         logger.debug(f"Session state: {st.session_state}")
 
         if st.session_state.get('password_reset_mode', False):
             logger.debug("Handling password reset")
-            reset_result = handle_password_reset(st.session_state.get('reset_token'))
-            if reset_result == "SUCCESS":
-                logger.debug("Password reset completed successfully")
-                st.session_state.password_reset_mode = False
-                st.session_state.reset_token = None
-                st.success("Password reset successful. You can now log in with your new password.")
-                st.session_state.show_login = True
-            elif reset_result is False:
-                st.error("Failed to reset password. Please try again.")
-        elif st.session_state.get('show_login', False) or 'logged_in' not in st.session_state or not st.session_state['logged_in']:
-            logger.debug("Showing auth main")
+            auth_main()  # This will now handle the password reset
+        elif 'logged_in' not in st.session_state or not st.session_state['logged_in']:
+            logger.debug("User not logged in, showing auth main")
             auth_main()
         else:
             logger.debug("User logged in, showing main app")
