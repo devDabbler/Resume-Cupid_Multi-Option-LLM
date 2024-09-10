@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from database import init_db
 import sys
 
+st.set_page_config(page_title="Resume Cupid", page_icon="💘", layout="centered")
+
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -36,6 +38,8 @@ try:
             logger.debug(f"{key}: {value}")
 except Exception as e:
     logger.error(f"Failed to import or use Config: {e}")
+    
+    st.set_page_config(page_title="Resume Cupid", page_icon="💘")
 
 def main():
     try:

@@ -16,6 +16,8 @@ custom_css = """
         background-color: #f0f2f6;
         margin: 0;
         padding: 0;
+        padding-top: 0 !important;
+        margin-top: 0 !important;
     }
     
     .main-title {
@@ -23,24 +25,24 @@ custom_css = """
         font-weight: 700;
         color: #2C3E50;
         text-align: center;
-        margin: 1.5rem 0; /* Adjust the margin to reduce spacing */
+        margin: 0.5rem 0 0.25rem;
     }
     
     .subtitle {
         font-size: 1.2em;
         color: #34495E;
         text-align: center;
-        margin: 1rem 0 2rem; /* Reduce top and bottom margin */
+        margin: 0 0 0.5rem;
     }
     
     .login-form {
         background-color: white;
-        padding: 2rem; /* Reduce padding inside form */
+        padding: 2rem;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         width: 100%;
         max-width: 350px;
-        margin: 0 auto;
+        margin: 0.5rem auto 0;
     }
     
     .login-button {
@@ -67,6 +69,36 @@ custom_css = """
     .stButton>button {
         width: 100%;
     }
+
+    /* Alternatively, reduce padding/margin of the tab panel */
+    
+    .stTabs [role="tabpanel"] {
+        padding: 0 !important; /* Remove padding from the tab panel */
+        margin: 0 !important; /* Remove margin from the tab panel */
+    }
+
+    /* Remove extra padding from the form container */
+    
+    .stForm {
+        margin-top: -1rem !important; /* Adjust margin to reduce space */
+    }
+    
+/* Optional: Adjust the login form padding if needed */
+
+    .login-form {
+        padding-top: 1rem !important; /* Adjust padding to reduce space */
+    }
+    
+    /* Target main Streamlit containers */
+    .main .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0 !important; /* Ensure no extra space at the bottom */
+    }
+
+    /* Reduce space between elements */
+    .element-container {
+        margin-bottom: 0.5rem !important;
+    }
 </style>
 """
 
@@ -74,6 +106,9 @@ def main_auth_page():
     st.markdown(custom_css, unsafe_allow_html=True)
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
+
+    # Remove any potential extra space
+    st.markdown('<div style="margin-top: -2rem;"></div>', unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
 
@@ -85,6 +120,9 @@ def main_auth_page():
     
     with tab3:
         reset_password_page()
+
+    # Add this line to remove extra space at the bottom
+    st.markdown('<style>footer {visibility: hidden;}</style>', unsafe_allow_html=True)
 
 def login_page():
     st.markdown('<div class="login-form">', unsafe_allow_html=True)
@@ -175,6 +213,7 @@ def handle_password_reset(token):
         if submit_button:
             if new_password != confirm_new_password:
                 st.error("Passwords do not match.")
+                logger.error("Passwords do not match")
                 return None
             elif reset_password(token, new_password):
                 logger.info("Password reset successful and email verified")

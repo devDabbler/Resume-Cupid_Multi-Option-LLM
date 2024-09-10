@@ -186,22 +186,36 @@ def set_reset_token(email: str) -> Optional[str]:
     finally:
         conn.close()
         
-def reset_password(reset_token: str, new_password: str) -> bool:
+def reset_password(token, new_password):
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
+        conn = sqlite3.connect('resume_cupid.db')
+        cursor = conn.cursor()
+
+        # Verify the token
+        cursor.execute("SELECT email FROM reset_tokens WHERE token = ? AND expires_at > datetime('now')", (token,))
+        result = cursor.fetchone()
+
+        if not result:
+            logger.error("Invalid or expired token")
+            return False
+
+        email = result[0]
+
+        # Hash the new password
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-        cur.execute('''
-        UPDATE users 
-        SET password_hash = ?, reset_token = NULL, is_verified = 1
-        WHERE reset_token = ?
-        ''', (hashed_password, reset_token))
+
+        # Update the user's password
+        cursor.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_password, email))
         conn.commit()
-        affected_rows = cur.rowcount
-        logger.debug(f"Rows affected by reset_password: {affected_rows}")
-        return affected_rows > 0
-    except sqlite3.Error as e:
-        logger.error(f"Error resetting password: {e}")
+
+        # Delete the used token
+        cursor.execute("DELETE FROM reset_tokens WHERE token = ?", (token,))
+        conn.commit()
+
+        logger.info(f"Password reset successful for email: {email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to reset password: {e}")
         return False
     finally:
         conn.close()
