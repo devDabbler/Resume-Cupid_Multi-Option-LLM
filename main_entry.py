@@ -1,9 +1,11 @@
 import streamlit as st
 import os
-from main_app_local import main_app
+from main_app import main_app
 from auth import auth_main, handle_password_reset, login_page, verify_email
 import logging
 from dotenv import load_dotenv
+from database import init_db
+import sys
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -39,6 +41,19 @@ def main():
     try:
         logger.debug("Entering main function")
         logger.debug(f"Current working directory: {os.getcwd()}")
+        
+        # Log the database path
+        logger.info(f"Attempting to connect to database at: {Config.DB_PATH}")
+        
+        # Initialize the database
+        try:
+            init_db()
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            # Optionally exit the application if database initialization fails
+            # st.error("Failed to initialize the database. Please contact support.")
+            # sys.exit(1)
         
         query_params = st.query_params
         logger.debug(f"Query parameters: {query_params}")
