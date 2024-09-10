@@ -94,28 +94,26 @@ custom_css = """
 </style>
 """
 
-def main_auth_page():
+def auth_main():
     logger.debug(f"Auth main called. Session state: {st.session_state}")
     
     st.markdown(custom_css, unsafe_allow_html=True)
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
 
-    st.markdown('<div style="margin-top: -2rem;"></div>', unsafe_allow_html=True)
-
     if st.session_state.get('password_reset_mode', False):
         handle_password_reset(st.session_state.get('reset_token'))
     else:
         tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
 
-    with tab1:
-        login_page()
-    
-    with tab2:
-        register_page()
-    
-    with tab3:
-        reset_password_page()
+        with tab1:
+            login_page()
+        
+        with tab2:
+            register_page()
+        
+        with tab3:
+            reset_password_page()
 
     st.markdown('<style>footer {visibility: hidden;}</style>', unsafe_allow_html=True)
 
@@ -169,7 +167,7 @@ def register_page():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def reset_password_page():
-    logger.debug(f"Session state: {st.session_state}")
+    logger.debug(f"Reset password page. Session state: {st.session_state}")
     
     st.markdown('<div class="login-form">', unsafe_allow_html=True)
     with st.form(key='reset_password_form'):
@@ -228,43 +226,3 @@ def handle_password_reset(token):
 
     st.markdown('</div>', unsafe_allow_html=True)
     return None
-
-def auth_main():
-    logger.debug(f"Auth main called. Session state: {st.session_state}")
-    
-    if st.session_state.get('password_reset_mode', False):
-        handle_password_reset(st.session_state.get('reset_token'))
-    else:
-        main_auth_page()
-    
-    query_params = st.query_params
-    logger.debug(f"Query parameters: {query_params}")
-    
-    if 'password_reset_complete' in st.session_state:
-        st.info("Your password has been reset. Please log in with your new password.")
-        del st.session_state['password_reset_complete']
-        st.rerun()
-    
-    if 'action' in query_params and 'token' in query_params:
-        action = query_params['action'][0]
-        token = query_params['token'][0]
-        
-        if action == 'verify':
-            verify_email(token)
-            return
-        elif action == 'reset':
-            st.session_state.password_reset_mode = True
-            st.session_state.reset_token = token
-            return
-
-    if st.session_state.get('password_reset_mode', False):
-        result = handle_password_reset(st.session_state.get('reset_token'))
-        if result == "SUCCESS":
-            st.success("Password reset successful. You can now log in with your new password.")
-            st.session_state.password_reset_mode = False
-            st.session_state.reset_token = None
-            st.session_state.show_login = True
-            st.rerun()
-        return
-    
-    main_auth_page()

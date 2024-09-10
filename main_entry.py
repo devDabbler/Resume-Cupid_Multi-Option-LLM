@@ -44,6 +44,9 @@ def main():
         logger.debug("Entering main function")
         logger.debug(f"Current working directory: {os.getcwd()}")
         
+        # Log the database path
+        logger.info(f"Attempting to connect to database at: {Config.DB_PATH}")
+        
         # Initialize the database
         try:
             init_db()
@@ -51,17 +54,21 @@ def main():
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
         
-        query_params = st.query_params
-        logger.debug(f"Query parameters: {query_params}")
-
         # Check for password reset token
-        if 'reset_token' in query_params:
-            reset_token = query_params['reset_token']
+        reset_token = st.query_params.get("reset_token")
+        if reset_token:
             logger.debug(f"Detected password reset token: {reset_token}")
             st.session_state.password_reset_mode = True
             st.session_state.reset_token = reset_token
-            # Clear the query parameters to avoid showing the token in the URL
-            st.query_params()
+            # Clear the query parameters
+            st.query_params.clear()
+
+        # Check for email verification token
+        verify_token = st.query_params.get("verify_token")
+        if verify_token:
+            logger.debug(f"Detected email verification token: {verify_token}")
+            verify_email(verify_token)
+            st.query_params.clear()
 
         logger.debug(f"Session state: {st.session_state}")
 
