@@ -202,6 +202,7 @@ def verify_email(token):
         st.error("Invalid or expired verification token.")
 
 def handle_password_reset(token):
+    logger.debug(f"Session state: {st.session_state}")
     st.markdown('<div class="login-form">', unsafe_allow_html=True)
     st.markdown("<h2>Set New Password</h2>", unsafe_allow_html=True)
 
@@ -218,6 +219,7 @@ def handle_password_reset(token):
             elif reset_password(token, new_password):
                 logger.info("Password reset successful and email verified")
                 st.success("Password reset successful. Your email has been verified. You can now log in with your new password.")
+                st.session_state.password_reset_complete = True
                 st.session_state.password_reset_mode = False
                 st.session_state.reset_token = None
                 st.experimental_rerun()  # Redirect to the main page
@@ -230,16 +232,20 @@ def handle_password_reset(token):
     return None
 
 def auth_main():
+    logger.debug(f"Session state: {st.session_state}")
+    query_params = st.experimental_get_query_params()
+    logger.debug(f"Query parameters: {query_params}")
+    
     # Handle password reset completion
     if 'password_reset_complete' in st.session_state:
         st.info("Your password has been reset. Please log in with your new password.")
         del st.session_state['password_reset_complete']
+        st.experimental_rerun()  # Redirect to the login page
     
     # Handle email verification and password reset
-    query_params = st.query_params
     if 'action' in query_params and 'token' in query_params:
-        action = query_params['action']
-        token = query_params['token']
+        action = query_params['action'][0]
+        token = query_params['token'][0]
         
         if action == 'verify':
             verify_email(token)
