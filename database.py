@@ -101,17 +101,28 @@ def register_user(username: str, email: str, password: str) -> bool:
         cur = conn.cursor()
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         verification_token = str(uuid.uuid4())
+        logger.debug(f"Attempting to register user: {username}, email: {email}")
         cur.execute('''
         INSERT INTO users (username, email, password_hash, verification_token)
         VALUES (?, ?, ?, ?)
         ''', (username, email, hashed_password, verification_token))
         conn.commit()
+        logger.info(f"User registered successfully: {username}")
+        
+        # Verify the user was actually inserted
+        cur.execute('SELECT * FROM users WHERE username = ?', (username,))
+        user = cur.fetchone()
+        if user:
+            logger.debug(f"User found in database after registration: {user['username']}")
+        else:
+            logger.error(f"User not found in database after registration: {username}")
+        
         return True
-    except sqlite3.IntegrityError:
-        logger.error(f"User with username {username} or email {email} already exists")
+    except sqlite3.IntegrityError as ie:
+        logger.error(f"IntegrityError registering user {username}: {str(ie)}")
         return False
     except sqlite3.Error as e:
-        logger.error(f"Error registering user: {e}")
+        logger.error(f"Error registering user {username}: {str(e)}")
         return False
     finally:
         conn.close()
@@ -196,15 +207,18 @@ def reset_password(token: str, new_password: str) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        logger.debug(f"Attempting to reset password with token: {token}")
+
         # Verify the token
         cursor.execute("SELECT email FROM reset_tokens WHERE token = ? AND expires_at > datetime('now')", (token,))
         result = cursor.fetchone()
 
         if not result:
-            logger.error("Invalid or expired token")
+            logger.error(f"Invalid or expired token: {token}")
             return False
 
         email = result['email']
+        logger.debug(f"Valid token found for email: {email}")
 
         # Hash the new password
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
@@ -212,14 +226,27 @@ def reset_password(token: str, new_password: str) -> bool:
         # Update the user's password
         cursor.execute("UPDATE users SET password_hash = ? WHERE email = ?", (hashed_password, email))
         
+        if cursor.rowcount == 0:
+            logger.error(f"No user found with email: {email}")
+            return False
+
         # Delete the used token
         cursor.execute("DELETE FROM reset_tokens WHERE token = ?", (token,))
         
         conn.commit()
         logger.info(f"Password reset successful for email: {email}")
+
+        # Verify the password was actually updated
+        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+        user = cursor.fetchone()
+        if user:
+            logger.debug(f"User found after password reset: {user['username']}")
+        else:
+            logger.error(f"User not found after password reset for email: {email}")
+
         return True
     except Exception as e:
-        logger.error(f"Failed to reset password: {e}")
+        logger.error(f"Failed to reset password: {str(e)}")
         return False
     finally:
         conn.close()
@@ -328,7 +355,33 @@ def set_verification_token(email: str) -> Optional[str]:
     finally:
         conn.close()
 
+def debug_db_contents():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Check users table
+        cur.execute("SELECT * FROM users")
+        users = cur.fetchall()
+        logger.debug(f"Users in database: {len(users)}")
+        for user in users:
+            logger.debug(f"User: {user['username']}, Email: {user['email']}, Verified: {user['is_verified']}")
+
+        # Check reset_tokens table
+        cur.execute("SELECT * FROM reset_tokens")
+        tokens = cur.fetchall()
+        logger.debug(f"Reset tokens in database: {len(tokens)}")
+        for token in tokens:
+            logger.debug(f"Token: {token['token']}, Email: {token['email']}, Expires: {token['expires_at']}")
+
+    except sqlite3.Error as e:
+        logger.error(f"Error checking database contents: {str(e)}")
+    finally:
+        conn.close()
+
+# Add this to the end of the file
 if __name__ == "__main__":
     print(f"Initializing database at: {DB_PATH}")
     init_db()  # Ensure tables are created
     print("Database initialization complete.")
+    debug_db_contents()  # Check database contents after initialization
