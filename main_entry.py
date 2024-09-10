@@ -61,7 +61,7 @@ def main():
             st.session_state.password_reset_mode = True
             st.session_state.reset_token = reset_token
             # Clear the query parameters to avoid showing the token in the URL
-            st.experimental_set_query_params()
+            st.query_params()
 
         logger.debug(f"Session state: {st.session_state}")
 
