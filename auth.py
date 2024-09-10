@@ -167,6 +167,17 @@ def register_page():
                 st.error("Registration failed. Username or email may already be in use.")
     st.markdown('</div>', unsafe_allow_html=True)
 
+def verify_email(token):
+    logger.debug(f"Attempting to verify email with token: {token}")
+    if verify_user(token):
+        logger.info(f"Email verified successfully with token: {token}")
+        st.success("Your email has been successfully verified! You can now log in.")
+        return True
+    else:
+        logger.warning(f"Failed to verify email with token: {token}")
+        st.error("Invalid or expired verification token.")
+        return False
+    
 def reset_password_page():
     logger.debug(f"Reset password page. Session state: {st.session_state}")
     

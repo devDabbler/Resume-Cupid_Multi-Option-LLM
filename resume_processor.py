@@ -14,7 +14,7 @@ import json
 import hashlib
 import sqlite3
 import traceback
-from config import Config
+from config_settings import Config  # Change this line
 from utils import get_logger
 from utils import root_logger
 
