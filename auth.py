@@ -14,6 +14,8 @@ custom_css = """
     body {
         font-family: 'Roboto', sans-serif;
         background-color: #f0f2f6;
+        margin: 0;
+        padding: 0;
     }
     
     .main-title {
@@ -21,20 +23,19 @@ custom_css = """
         font-weight: 700;
         color: #2C3E50;
         text-align: center;
-        margin-top: 2rem;
-        margin-bottom: 0.5rem;
+        margin: 1.5rem 0; /* Adjust the margin to reduce spacing */
     }
     
     .subtitle {
         font-size: 1.2em;
         color: #34495E;
         text-align: center;
-        margin-bottom: 3rem;
+        margin: 1rem 0 2rem; /* Reduce top and bottom margin */
     }
     
     .login-form {
         background-color: white;
-        padding: 2.5rem;
+        padding: 2rem; /* Reduce padding inside form */
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         width: 100%;
@@ -48,18 +49,21 @@ custom_css = """
         font-weight: bold;
         border-radius: 5px;
         padding: 0.5em 1em;
-        margin-top: 1.5rem;
+        margin-top: 1rem;
         width: 100%;
     }
+    
     .footer-text {
         text-align: center;
         width: 100%;
         max-width: 800px;
         margin: 1rem auto;
     }
+    
     h3 {
         margin-bottom: 1rem !important;
     }
+    
     .stButton>button {
         width: 100%;
     }
