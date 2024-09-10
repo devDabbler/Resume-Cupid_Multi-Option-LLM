@@ -70,32 +70,24 @@ custom_css = """
         width: 100%;
     }
 
-    /* Alternatively, reduce padding/margin of the tab panel */
-    
     .stTabs [role="tabpanel"] {
-        padding: 0 !important; /* Remove padding from the tab panel */
-        margin: 0 !important; /* Remove margin from the tab panel */
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
-    /* Remove extra padding from the form container */
-    
     .stForm {
-        margin-top: -1rem !important; /* Adjust margin to reduce space */
+        margin-top: -1rem !important;
     }
     
-/* Optional: Adjust the login form padding if needed */
-
     .login-form {
-        padding-top: 1rem !important; /* Adjust padding to reduce space */
+        padding-top: 1rem !important;
     }
     
-    /* Target main Streamlit containers */
     .main .block-container {
         padding-top: 1rem !important;
-        padding-bottom: 0 !important; /* Ensure no extra space at the bottom */
+        padding-bottom: 0 !important;
     }
 
-    /* Reduce space between elements */
     .element-container {
         margin-bottom: 0.5rem !important;
     }
@@ -107,7 +99,6 @@ def main_auth_page():
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
 
-    # Remove any potential extra space
     st.markdown('<div style="margin-top: -2rem;"></div>', unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
@@ -121,7 +112,6 @@ def main_auth_page():
     with tab3:
         reset_password_page()
 
-    # Add this line to remove extra space at the bottom
     st.markdown('<style>footer {visibility: hidden;}</style>', unsafe_allow_html=True)
 
 def login_page():
@@ -204,7 +194,7 @@ def verify_email(token):
         st.error("Invalid or expired verification token.")
 
 def handle_password_reset(token):
-    logger.debug(f"Session state: {st.session_state}")
+    logger.debug(f"Handling password reset for token: {token}")
     
     st.markdown('<div class="login-form">', unsafe_allow_html=True)
     st.markdown("<h2>Set New Password</h2>", unsafe_allow_html=True)
@@ -214,40 +204,33 @@ def handle_password_reset(token):
         confirm_new_password = st.text_input("Confirm New Password", type="password")
         submit_button = st.form_submit_button("Set New Password")
 
-    if submit_button:
-        if new_password != confirm_new_password:
-            st.error("Passwords do not match.")
-            logger.error("Passwords do not match")
-            return None
-        elif reset_password(token, new_password):
-            logger.info("Password reset successful and email verified")
-            st.success("Password reset successful. Your email has been verified. You can now log in with your new password.")
-            st.session_state.password_reset_complete = True
-            st.session_state.password_reset_mode = False
-            st.session_state.reset_token = None
-            return "SUCCESS"  # Return a specific value for success
-        else:
-            logger.error("Failed to reset password")
-            st.error("Failed to reset password. The token may be invalid or expired.")
-            return False
+        if submit_button:
+            if new_password != confirm_new_password:
+                st.error("Passwords do not match.")
+                logger.error("Passwords do not match")
+                return None
+            elif reset_password(token, new_password):
+                logger.info("Password reset successful")
+                return "SUCCESS"
+            else:
+                logger.error("Failed to reset password")
+                st.error("Failed to reset password. The token may be invalid or expired.")
+                return False
+
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    logger.debug(f"Session state after handle_password_reset: {st.session_state}")
     return None
 
 def auth_main():
-    logger.debug(f"Session state: {st.session_state}")
+    logger.debug(f"Auth main called. Session state: {st.session_state}")
     
     query_params = st.query_params
     logger.debug(f"Query parameters: {query_params}")
     
-    # Handle password reset completion
     if 'password_reset_complete' in st.session_state:
         st.info("Your password has been reset. Please log in with your new password.")
         del st.session_state['password_reset_complete']
-        st.rerun()  # Redirect to the login page
+        st.rerun()
     
-    # Handle email verification and password reset
     if 'action' in query_params and 'token' in query_params:
         action = query_params['action'][0]
         token = query_params['token'][0]
@@ -260,13 +243,14 @@ def auth_main():
             st.session_state.reset_token = token
             return
 
-    # Show password reset form if in password reset mode
     if st.session_state.get('password_reset_mode', False):
-        handle_password_reset(st.session_state.get('reset_token'))
+        result = handle_password_reset(st.session_state.get('reset_token'))
+        if result == "SUCCESS":
+            st.success("Password reset successful. You can now log in with your new password.")
+            st.session_state.password_reset_mode = False
+            st.session_state.reset_token = None
+            st.session_state.show_login = True
+            st.rerun()
         return
     
-    # Always show the main auth page if no special conditions are met
     main_auth_page()
- 
-        
-        
