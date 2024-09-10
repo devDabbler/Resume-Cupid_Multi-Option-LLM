@@ -128,6 +128,7 @@ def login_page():
         if submit_button:
             user = authenticate_user(username, password)
             if user:
+                debug_user_status(username)  # Add this line
                 verified = is_user_verified(username)
                 logger.debug(f"User {username} verification status: {verified}")
                 if verified:

@@ -138,6 +138,16 @@ def verify_user(verification_token: str) -> bool:
         conn.commit()
         affected_rows = cur.rowcount
         logger.debug(f"Rows affected by verify_user: {affected_rows}")
+        
+        if affected_rows > 0:
+            # Check if the update was successful
+            cur.execute('SELECT username FROM users WHERE is_verified = 1 AND verification_token IS NULL')
+            verified_user = cur.fetchone()
+            if verified_user:
+                logger.info(f"User {verified_user['username']} successfully verified")
+            else:
+                logger.error("User verification failed: No user found with updated status")
+        
         return affected_rows > 0
     except sqlite3.Error as e:
         logger.error(f"Error verifying user: {e}")
