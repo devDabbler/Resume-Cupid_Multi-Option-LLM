@@ -1,4 +1,4 @@
-import smtpliib
+import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from utils import get_logger
