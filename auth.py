@@ -4,6 +4,7 @@ import logging
 from database import register_user, authenticate_user, set_reset_token, reset_password, set_verification_token, verify_user, is_user_verified
 from email_utils import send_verification_email, send_password_reset_email
 
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Custom CSS for branding and UI enhancement
