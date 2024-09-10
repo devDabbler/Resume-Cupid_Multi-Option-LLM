@@ -220,6 +220,7 @@ def handle_password_reset(token):
                 st.success("Password reset successful. Your email has been verified. You can now log in with your new password.")
                 st.session_state.password_reset_mode = False
                 st.session_state.reset_token = None
+                st.experimental_rerun()  # Redirect to the main page
                 return True
             else:
                 logger.error("Failed to reset password")
