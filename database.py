@@ -389,6 +389,24 @@ def debug_db_contents():
     finally:
         conn.close()
 
+def debug_user_status(username: str):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM users WHERE username = ?', (username,))
+        user = cur.fetchone()
+        if user:
+            logger.debug(f"User found: {user['username']}")
+            logger.debug(f"Email: {user['email']}")
+            logger.debug(f"Is verified: {user['is_verified']}")
+            logger.debug(f"Verification token: {user['verification_token']}")
+        else:
+            logger.debug(f"No user found with username: {username}")
+    except sqlite3.Error as e:
+        logger.error(f"Error checking user status: {e}")
+    finally:
+        conn.close()
+
 # Add this to the end of the file
 if __name__ == "__main__":
     print(f"Initializing database at: {DB_PATH}")

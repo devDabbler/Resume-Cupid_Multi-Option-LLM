@@ -4,7 +4,7 @@ from main_app import main_app
 from auth import auth_main, handle_password_reset, login_page, verify_email
 import logging
 from dotenv import load_dotenv
-from database import init_db
+from database import init_db, debug_db_contents
 import sys
 
 st.set_page_config(page_title="Resume Cupid", page_icon="💘", layout="centered")
@@ -51,6 +51,7 @@ def main():
         try:
             init_db()
             logger.info("Database initialized successfully")
+            debug_db_contents()  # Add this line to check database contents after initialization
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
         
