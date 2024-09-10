@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from main_app_local import main_app
+from main_app import main_app
 from auth import auth_main, handle_password_reset, login_page, verify_email
 import logging
 from dotenv import load_dotenv
