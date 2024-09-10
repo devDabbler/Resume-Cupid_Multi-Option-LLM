@@ -63,9 +63,6 @@ def main():
             logger.debug(f"Detected password reset token: {token}")
             st.session_state.password_reset_mode = True
             st.session_state.reset_token = token
-            st.query_params.clear()
-            logger.debug("Cleared query parameters")
-            st.rerun()
 
         logger.debug(f"Session state: {st.session_state}")
 
@@ -76,17 +73,12 @@ def main():
                 logger.debug("Password reset completed successfully")
                 st.session_state.password_reset_mode = False
                 st.session_state.reset_token = None
-                st.session_state.show_login = True
                 st.success("Password reset successful. You can now log in with your new password.")
-                st.rerun()
+                st.session_state.show_login = True
             elif reset_result is False:
                 st.error("Failed to reset password. Please try again.")
-        elif st.session_state.get('show_login', False):
-            logger.debug("Showing login page after successful password reset")
-            st.session_state.show_login = False
-            login_page()
-        elif 'logged_in' not in st.session_state or not st.session_state['logged_in']:
-            logger.debug("User not logged in, showing auth main")
+        elif st.session_state.get('show_login', False) or 'logged_in' not in st.session_state or not st.session_state['logged_in']:
+            logger.debug("Showing auth main")
             auth_main()
         else:
             logger.debug("User logged in, showing main app")

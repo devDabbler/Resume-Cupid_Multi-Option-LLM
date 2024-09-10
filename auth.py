@@ -101,7 +101,10 @@ def main_auth_page():
 
     st.markdown('<div style="margin-top: -2rem;"></div>', unsafe_allow_html=True)
 
-    tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
+    if st.session_state.get('password_reset_mode', False):
+        handle_password_reset(st.session_state.get('reset_token'))
+    else:
+        tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
 
     with tab1:
         login_page()
@@ -211,6 +214,9 @@ def handle_password_reset(token):
                 return None
             elif reset_password(token, new_password):
                 logger.info("Password reset successful")
+                st.success("Password reset successful. You can now log in with your new password.")
+                st.session_state.password_reset_mode = False
+                st.session_state.reset_token = None
                 return "SUCCESS"
             else:
                 logger.error("Failed to reset password")
@@ -222,6 +228,11 @@ def handle_password_reset(token):
 
 def auth_main():
     logger.debug(f"Auth main called. Session state: {st.session_state}")
+    
+    if st.session_state.get('password_reset_mode', False):
+        handle_password_reset(st.session_state.get('reset_token'))
+    else:
+        main_auth_page()
     
     query_params = st.query_params
     logger.debug(f"Query parameters: {query_params}")
