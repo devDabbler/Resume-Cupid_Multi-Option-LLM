@@ -315,4 +315,3 @@ if __name__ == "__main__":
     print(f"Initializing database at: {DB_PATH}")
     init_db()  # Ensure tables are created
     print("Database initialization complete.")
-
