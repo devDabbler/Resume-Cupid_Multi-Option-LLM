@@ -175,6 +175,8 @@ def register_page():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def reset_password_page():
+    logger.debug(f"Session state: {st.session_state}")
+    
     st.markdown('<div class="login-form">', unsafe_allow_html=True)
     with st.form(key='reset_password_form'):
         st.markdown("<h2>Reset Password</h2>", unsafe_allow_html=True)
@@ -204,6 +206,7 @@ def verify_email(token):
 
 def handle_password_reset(token):
     logger.debug(f"Session state: {st.session_state}")
+    
     st.markdown('<div class="login-form">', unsafe_allow_html=True)
     st.markdown("<h2>Set New Password</h2>", unsafe_allow_html=True)
 
@@ -230,10 +233,13 @@ def handle_password_reset(token):
                 st.error("Failed to reset password. The token may be invalid or expired.")
                 return False
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    logger.debug(f"Session state after handle_password_reset: {st.session_state}")
     return None
 
 def auth_main():
     logger.debug(f"Session state: {st.session_state}")
+    
     query_params = st.experimental_get_query_params()
     logger.debug(f"Query parameters: {query_params}")
     
