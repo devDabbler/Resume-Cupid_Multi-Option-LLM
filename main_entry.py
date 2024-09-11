@@ -62,46 +62,56 @@ def main():
         try:
             init_db()
             logger.info("Database initialized successfully")
-            debug_db_contents()  # Add this line to check database contents after initialization
+            debug_db_contents()
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
         
-        # Check for password reset token
-        reset_token = st.query_params.get("reset_token")
-        if reset_token:
-            logger.debug(f"Detected password reset token: {reset_token}")
-            st.session_state.password_reset_mode = True
-            st.session_state.reset_token = reset_token
-            # Clear the query parameters
-            st.query_params.clear()
+        query_params = st.query_params
+        logger.debug(f"Query parameters: {query_params}")
 
-        # Check for email verification token
-        verify_token = st.query_params.get("verify_token")
-        if verify_token:
-            logger.debug(f"Detected email verification token: {verify_token}")
-            verification_result = verify_email(verify_token)
-            if verification_result:
-                logger.info(f"Email verified successfully with token: {verify_token}")
-                st.success("Your email has been successfully verified! You can now log in.")
-            else:
-                logger.warning(f"Email verification failed with token: {verify_token}")
-                st.error("Email verification failed. Please try again or contact support.")
-            st.query_params.clear()
+        if 'action' in query_params and 'token' in query_params:
+            action = query_params['action']
+            token = query_params['token']
+            logger.debug(f"Detected action: {action}, token: {token}")
+            
+            if action == 'reset':
+                logger.debug("Entering password reset mode")
+                st.session_state.password_reset_mode = True
+                st.session_state.reset_token = token
+                st.query_params.clear()
+                logger.debug("Cleared query parameters")
+            elif action == 'verify':
+                logger.debug("Handling email verification")
+                verify_email(token)
+                st.query_params.clear()
+                logger.debug("Cleared query parameters")
 
-        logger.debug(f"Session state: {st.session_state}")
+        logger.debug(f"Session state after query param processing: {st.session_state}")
 
         if st.session_state.get('password_reset_mode', False):
             logger.debug("Handling password reset")
-            auth_main()  # This will now handle the password reset
+            reset_successful = handle_password_reset(st.session_state.get('reset_token'))
+            if reset_successful:
+                logger.debug("Password reset completed successfully")
+                st.session_state.password_reset_mode = False
+                st.session_state.reset_token = None
+                st.success("Password reset successful. You can now log in with your new password.")
+                st.rerun()
+            elif reset_successful is False:  # Not None, which means the form was submitted
+                st.error("Failed to reset password. Please try again.")
         elif 'logged_in' not in st.session_state or not st.session_state['logged_in']:
             logger.debug("User not logged in, showing auth main")
             auth_main()
         else:
             logger.debug("User logged in, showing main app")
             main_app()
+
     except Exception as e:
-        logger.error(f"An error occurred in the main function: {e}", exc_info=True)
+        logger.error(f"An unexpected error occurred in main function: {str(e)}", exc_info=True)
         st.error(f"An unexpected error occurred. Please try again later. Error details: {str(e)}")
+    finally:
+        logger.debug("Exiting main function")
+        logger.debug(f"Final session state: {st.session_state}")
 
 if __name__ == "__main__":
     main()
