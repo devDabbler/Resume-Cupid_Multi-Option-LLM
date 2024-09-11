@@ -5,9 +5,11 @@ import logging
 # Load environment variables from the .env.production file in the same directory
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env.production'))
 
+import logging
+
 # Set up logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.ERROR,  # Change DEBUG to INFO or WARNING
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('app.log', mode='a'),  # Log to file
