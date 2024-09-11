@@ -224,7 +224,7 @@ def handle_password_reset(token):
                 st.session_state.password_reset_complete = True
                 st.session_state.password_reset_mode = False
                 st.session_state.reset_token = None
-                st.experimental_rerun()  # Redirect to the main page
+                st.rerun()  # Redirect to the main page
                 return True
             else:
                 logger.error("Failed to reset password")
@@ -238,14 +238,18 @@ def handle_password_reset(token):
 def auth_main():
     logger.debug(f"Session state: {st.session_state}")
     
-    query_params = st.experimental_get_query_params()
+    # Initialize query_params in session state if not already set
+    if 'query_params' not in st.session_state:
+        st.session_state['query_params'] = st.query_params
+
+    query_params = st.session_state['query_params']
     logger.debug(f"Query parameters: {query_params}")
     
     # Handle password reset completion
     if 'password_reset_complete' in st.session_state:
         st.info("Your password has been reset. Please log in with your new password.")
         del st.session_state['password_reset_complete']
-        st.experimental_rerun()  # Redirect to the login page
+        st.rerun()  # Redirect to the login page
     
     # Handle email verification and password reset
     if 'action' in query_params and 'token' in query_params:
