@@ -175,19 +175,25 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
         conn = get_db_connection()
         cur = conn.cursor()
         logger.info(f"Executing query to fetch user: {username}")
+        
+        # Fetch user from database
         cur.execute('SELECT * FROM users WHERE username = ?', (username,))
         user = cur.fetchone()
-        if user:
-            logger.info(f"User found: {user['username']}")
-        else:
-            logger.info("User not found")
         
-        if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash']):
+        if not user:
+            logger.info("User not found")
+            return None
+        
+        logger.info(f"User found: {user['username']}")
+        
+        # Verify password
+        stored_password_hash = user['password_hash']
+        if bcrypt.checkpw(password.encode('utf-8'), stored_password_hash.encode('utf-8')):
             logger.info("Password match successful")
             return dict(user)
         else:
             logger.info("Password match failed")
-        return None
+            return None
     except sqlite3.Error as e:
         logger.error(f"Error authenticating user: {e}")
         return None

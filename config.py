@@ -4,8 +4,7 @@ import logging
 from auth import auth_main, handle_password_reset, login_page, verify_email
 from config_settings import Config
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Use the logger from the existing configuration
 logger = logging.getLogger(__name__)
 
 # Log environment and configuration details
