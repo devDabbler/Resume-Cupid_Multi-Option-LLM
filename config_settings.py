@@ -6,7 +6,14 @@ import logging
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env.production'))
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='a', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log', mode='a'),  # Log to file
+        logging.StreamHandler()  # Log to console
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Load API keys
