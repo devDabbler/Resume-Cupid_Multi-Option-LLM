@@ -144,6 +144,7 @@ def login_page():
             if username in ALLOWED_USERS:
                 st.success("Login successful! Redirecting to the main app...")
                 st.session_state['logged_in'] = True
+                st.session_state['username'] = username
                 st.rerun()
             else:
                 st.error("Invalid username or password.")
@@ -271,3 +272,10 @@ def auth_main():
     
     # Always show the main auth page if no special conditions are met
     main_auth_page()
+
+# Check if the user is logged in and redirect to the main app if so
+if st.session_state.get('logged_in', False):
+    st.write(f"Welcome, {st.session_state['username']}! You are now logged in.")
+    # Add your main app code here
+else:
+    auth_main()
