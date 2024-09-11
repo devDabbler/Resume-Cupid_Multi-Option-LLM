@@ -85,7 +85,7 @@ def send_email(to_email, subject, body, max_retries=3, retry_delay=5):
 
 def send_verification_email(to_email, verification_token):
     subject = "Verify Your Email for Resume Cupid"
-    verification_link = f"{Config.BASE_URL}/verify?token={verification_token}"
+    verification_link = f"{Config.BASE_URL}?action=verify&token={verification_token}"
     body = f"""
     Hello,
 
@@ -103,7 +103,7 @@ def send_verification_email(to_email, verification_token):
 
 def send_password_reset_email(to_email, reset_token):
     subject = "Reset Your Password for Resume Cupid"
-    reset_link = f"{Config.BASE_URL}?reset_token={reset_token}"
+    reset_link = f"{Config.BASE_URL}?action=reset&token={reset_token}"
     body = f"""
     Hello,
 
