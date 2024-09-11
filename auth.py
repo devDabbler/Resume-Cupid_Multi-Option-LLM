@@ -107,8 +107,9 @@ custom_css = """
 </style>
 """
 
-# Define allowed users
-ALLOWED_USERS = ["user1", "user2", "user3"]
+# Define allowed users and shared password
+ALLOWED_USERS = ["shayla.holmes", "sean.kirk", "amar.singh", "sean.collins"]
+SHARED_PASSWORD = "your_shared_password"  # Replace with your shared password
 
 def main_auth_page():
     st.markdown(custom_css, unsafe_allow_html=True)
@@ -141,7 +142,7 @@ def login_page():
         submit_button = st.form_submit_button("Login")
 
         if submit_button:
-            if username in ALLOWED_USERS:
+            if username in ALLOWED_USERS and password == SHARED_PASSWORD:
                 st.success("Login successful! Redirecting to the main app...")
                 st.session_state['logged_in'] = True
                 st.session_state['username'] = username
