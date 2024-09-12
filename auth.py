@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import bcrypt
 from dotenv import load_dotenv
-from database import register_user, authenticate_user, set_reset_token, reset_password, set_verification_token, verify_user, is_user_verified
+from database import register_user, authenticate_user, set_reset_token, reset_password, set_verification_token, verify_user, is_user_verified, admin_reset_password
 from email_utils import send_verification_email, send_password_reset_email
 from logger import get_logger  # Import the get_logger function
 
@@ -126,10 +126,7 @@ def main_auth_page():
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
 
-    # Remove any potential extra space
-    st.markdown('<div style="margin-top: -2rem;"></div>', unsafe_allow_html=True)
-
-    tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Login", "Register", "Reset Password", "Admin Reset"])
 
     with tab1:
         login_page()
@@ -139,6 +136,9 @@ def main_auth_page():
     
     with tab3:
         reset_password_page()
+    
+    with tab4:
+        admin_reset_password_page()
 
     # Add this line to remove extra space at the bottom
     st.markdown('<style>footer {visibility: hidden;}</style>', unsafe_allow_html=True)
@@ -150,6 +150,7 @@ def login_page():
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         submit_button = st.form_submit_button("Login")
+        reset_button = st.form_submit_button("Reset Password")
 
         if submit_button:
             user = authenticate_user(username, password)
@@ -162,6 +163,40 @@ def login_page():
             else:
                 logger.warning(f"Authentication failed for user {username}")
                 st.error("Invalid username or password.")
+        
+        if reset_button:
+            logger.info(f"Initiating password reset for user {username}")
+            reset_token = set_reset_token(username)
+            if reset_token:
+                if send_password_reset_email(username, reset_token):
+                    st.success("Password reset link sent to your email.")
+                else:
+                    st.error("Failed to send password reset email.")
+            else:
+                st.error("User not found.")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+def admin_reset_password_page():
+    st.markdown('<div class="login-form">', unsafe_allow_html=True)
+    st.markdown("<h2>Admin Password Reset</h2>", unsafe_allow_html=True)
+
+    with st.form(key='admin_reset_form'):
+        username = st.text_input("Username")
+        new_password = st.text_input("New Password", type="password")
+        confirm_new_password = st.text_input("Confirm New Password", type="password")
+        submit_button = st.form_submit_button("Reset Password")
+
+        if submit_button:
+            if new_password != confirm_new_password:
+                st.error("Passwords do not match.")
+                logger.error("Passwords do not match")
+            elif admin_reset_password(username, new_password):
+                logger.info(f"Password reset successful for user: {username}")
+                st.success(f"Password reset successful for user: {username}")
+            else:
+                logger.error(f"Failed to reset password for user: {username}")
+                st.error("Failed to reset password. The user may not exist or there was an error.")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 def register_page():

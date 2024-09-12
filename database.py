@@ -273,6 +273,31 @@ def reset_password(token: str, new_password: str) -> bool:
         return False
     finally:
         conn.close()
+        
+def admin_reset_password(username: str, new_password: str) -> bool:
+    logger.debug(f"Attempting to reset password for user: {username}")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Hash the new password
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+
+        # Update the user's password
+        cursor.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hashed_password, username))
+        
+        if cursor.rowcount == 0:
+            logger.error(f"No user found with username: {username}")
+            return False
+
+        conn.commit()
+        logger.info(f"Password reset successful for user: {username}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to reset password: {str(e)}", exc_info=True)
+        return False
+    finally:
+        conn.close()
 
 def save_role(role_name: str, client: str, job_description: str, job_description_link: str) -> bool:
     if not job_description:
