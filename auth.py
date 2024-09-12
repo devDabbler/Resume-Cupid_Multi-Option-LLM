@@ -114,6 +114,11 @@ SHARED_PASSWORD = os.getenv('SHARED_PASSWORD')
 # Debugging: Log the shared password
 logger.debug(f"SHARED_PASSWORD: {SHARED_PASSWORD}")
 
+# Log all environment variables
+logger.debug("All environment variables:")
+for key, value in os.environ.items():
+    logger.debug(f"{key}: {value}")
+
 def main_auth_page():
     st.markdown(custom_css, unsafe_allow_html=True)
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
