@@ -22,3 +22,9 @@ docker-compose.override.yml
 .idea/
 .vscode/
 .aider*
+.env.development
+.env.production
+.venv/
+resume_cupid.db
+main_app_local.py
+resume_cupid.db

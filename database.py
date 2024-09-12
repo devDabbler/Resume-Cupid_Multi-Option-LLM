@@ -102,6 +102,7 @@ def register_user(username: str, email: str, password: str) -> bool:
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         verification_token = str(uuid.uuid4())
         logger.debug(f"Attempting to register user: {username}, email: {email}")
+        logger.debug(f"Hashed password length: {len(hashed_password)}")
         cur.execute('''
         INSERT INTO users (username, email, password_hash, verification_token)
         VALUES (?, ?, ?, ?)
@@ -114,6 +115,7 @@ def register_user(username: str, email: str, password: str) -> bool:
         user = cur.fetchone()
         if user:
             logger.debug(f"User found in database after registration: {user['username']}")
+            logger.debug(f"Stored password hash length: {len(user['password_hash'])}")
         else:
             logger.error(f"User not found in database after registration: {username}")
         
@@ -195,11 +197,16 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
         # Ensure stored_password_hash is bytes
         stored_password_hash_bytes = stored_password_hash.encode('utf-8') if isinstance(stored_password_hash, str) else stored_password_hash
         
+        logger.debug(f"Input password length: {len(password_bytes)}")
+        logger.debug(f"Stored hash length: {len(stored_password_hash_bytes)}")
+        
         if bcrypt.checkpw(password_bytes, stored_password_hash_bytes):
             logger.info("Password match successful")
             return dict(user)
         else:
-            logger.info("Password match failed")
+            logger.warning("Password match failed")
+            logger.debug(f"First 20 characters of input password hash: {bcrypt.hashpw(password_bytes, bcrypt.gensalt())[:20]}")
+            logger.debug(f"First 20 characters of stored password hash: {stored_password_hash_bytes[:20]}")
             return None
     except sqlite3.Error as e:
         logger.error(f"Error authenticating user: {e}")
