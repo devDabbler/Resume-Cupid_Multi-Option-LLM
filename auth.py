@@ -286,13 +286,4 @@ def auth_main():
     
     # Always show the main auth page if no special conditions are met
     main_auth_page()
-<<<<<<< HEAD
 
-# Check if the user is logged in and redirect to the main app if so
-if st.session_state.get('logged_in', False):
-    st.write(f"Welcome, {st.session_state['username']}! You are now logged in.")
-    # Add your main app code here
-else:
-    auth_main()
-=======
->>>>>>> 492db6565538d7d700879b058de09e25efa73403
