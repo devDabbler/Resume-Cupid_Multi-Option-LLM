@@ -109,7 +109,10 @@ custom_css = """
 
 # Define allowed users and shared password
 ALLOWED_USERS = ["shayla.holmes", "sean.kirk", "amar.singh", "sean.collins"]
-SHARED_PASSWORD = "your_shared_password"  # Replace with your shared password
+SHARED_PASSWORD = os.getenv('SHARED_PASSWORD')
+
+# Debugging: Log the shared password
+logger.debug(f"SHARED_PASSWORD: {SHARED_PASSWORD}")
 
 def main_auth_page():
     st.markdown(custom_css, unsafe_allow_html=True)
