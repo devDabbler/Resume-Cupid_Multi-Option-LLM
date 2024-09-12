@@ -100,25 +100,14 @@ def register_user(username: str, email: str, password: str) -> bool:
         conn = get_db_connection()
         cur = conn.cursor()
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        logger.debug(f"Hashed password for {username}: {hashed_password}")
         verification_token = str(uuid.uuid4())
-        logger.debug(f"Attempting to register user: {username}, email: {email}")
-        logger.debug(f"Hashed password length: {len(hashed_password)}")
         cur.execute('''
         INSERT INTO users (username, email, password_hash, verification_token)
         VALUES (?, ?, ?, ?)
         ''', (username, email, hashed_password, verification_token))
         conn.commit()
         logger.info(f"User registered successfully: {username}")
-        
-        # Verify the user was actually inserted
-        cur.execute('SELECT * FROM users WHERE username = ?', (username,))
-        user = cur.fetchone()
-        if user:
-            logger.debug(f"User found in database after registration: {user['username']}")
-            logger.debug(f"Stored password hash length: {len(user['password_hash'])}")
-        else:
-            logger.error(f"User not found in database after registration: {username}")
-        
         return True
     except sqlite3.IntegrityError as ie:
         logger.error(f"IntegrityError registering user {username}: {str(ie)}")
