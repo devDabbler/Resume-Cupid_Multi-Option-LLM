@@ -188,7 +188,14 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
         
         # Verify password
         stored_password_hash = user['password_hash']
-        if bcrypt.checkpw(password.encode('utf-8'), stored_password_hash.encode('utf-8')):
+        
+        # Ensure password is bytes
+        password_bytes = password.encode('utf-8') if isinstance(password, str) else password
+        
+        # Ensure stored_password_hash is bytes
+        stored_password_hash_bytes = stored_password_hash.encode('utf-8') if isinstance(stored_password_hash, str) else stored_password_hash
+        
+        if bcrypt.checkpw(password_bytes, stored_password_hash_bytes):
             logger.info("Password match successful")
             return dict(user)
         else:
