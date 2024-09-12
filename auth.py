@@ -152,12 +152,15 @@ def login_page():
         submit_button = st.form_submit_button("Login")
 
         if submit_button:
-            if username in ALLOWED_USERS and password == SHARED_PASSWORD:
+            user = authenticate_user(username, password)
+            if user:
+                logger.info(f"User {username} authenticated successfully")
                 st.success("Login successful! Redirecting to the main app...")
                 st.session_state['logged_in'] = True
                 st.session_state['username'] = username
                 st.rerun()
             else:
+                logger.warning(f"Authentication failed for user {username}")
                 st.error("Invalid username or password.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -283,10 +286,3 @@ def auth_main():
     
     # Always show the main auth page if no special conditions are met
     main_auth_page()
-
-# Check if the user is logged in and redirect to the main app if so
-if st.session_state.get('logged_in', False):
-    st.write(f"Welcome, {st.session_state['username']}! You are now logged in.")
-    # Add your main app code here
-else:
-    auth_main()
