@@ -1,15 +1,17 @@
 import os
 import streamlit as st
 import bcrypt
-import logging
 from dotenv import load_dotenv
 from database import register_user, authenticate_user, set_reset_token, reset_password, set_verification_token, verify_user, is_user_verified
 from email_utils import send_verification_email, send_password_reset_email
+from logger import get_logger  # Import the get_logger function
 
 # Load environment variables from the .env.production file in the same directory
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env.production'))
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env.production')
+logger = get_logger(__name__)  # Initialize the logger using get_logger
+logger.debug(f"Attempting to load environment variables from: {dotenv_path}")
 
-logger = logging.getLogger(__name__)
+load_dotenv(dotenv_path=dotenv_path)
 
 # Custom CSS for branding and UI enhancement
 custom_css = """
