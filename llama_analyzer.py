@@ -1,12 +1,11 @@
 import groq
 from groq import Groq
 import requests
-import logging
 import json
 import re
 import ast
 from typing import Dict, Any, List
-from utils import get_logger
+from logger import get_logger
 
 # Initialize logging
 logger = get_logger(__name__)

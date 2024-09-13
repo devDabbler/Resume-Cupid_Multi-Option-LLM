@@ -1,5 +1,6 @@
 import re
 import logging
+from logger import get_logger
 import io
 import PyPDF2
 from docx import Document
@@ -14,7 +15,6 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any
 import pandas as pd
-from llama_analyzer import process_resume
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -204,6 +204,53 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.write(f"{result.get('match_score', 'N/A')}%")
                 st.markdown("### Recommendation")
                 st.write(result.get('recommendation', 'No recommendation available'))
+                st.markdown("### Experience and Project Relevance")
+                st.write(result.get('experience_and_project_relevance', 'No data available'))
+                st.markdown("### Skills Gap")
+                skills_gap = result.get('skills_gap', [])
+                if skills_gap:
+                    for skill in skills_gap:
+                        st.write(f"- {skill}")
+                else:
+                    st.write("No specific skills gap identified")
+                st.markdown("### Recruiter Questions")
+                questions = result.get('recruiter_questions', [])
+                if questions:
+                    for question in questions:
+                        st.write(f"- {question}")
+                else:
+                    st.write("No specific recruiter questions generated")
+                st.markdown("### Strengths")
+                strengths = result.get('strengths', [])
+                if strengths:
+                    for strength in strengths:
+                        st.write(f"- {strength}")
+                else:
+                    st.write("No specific strengths identified")
+                st.markdown("### Areas for Improvement")
+                areas = result.get('areas_for_improvement', [])
+                if areas:
+                    for area in areas:
+                        st.write(f"- {area}")
+                else:
+                    st.write("No specific areas for improvement identified")
+
+            with st.form(key=f'feedback_form_{run_id}_{i}'):
+                st.subheader("Provide Feedback")
+                accuracy_rating = st.slider("Accuracy of the evaluation:", 1, 5, 3)
+                content_rating = st.slider("Quality of the report content:", 1, 5, 3)
+                suggestions = st.text_area("Please provide any suggestions for improvement:")
+                submit_feedback = st.form_submit_button("Submit Feedback")
+
+                if submit_feedback:
+                    if save_feedback_func(run_id, result['file_name'], accuracy_rating, content_rating, suggestions):
+                        st.success("Thank you for your feedback!")
+                    else:
+                        st.error("Failed to save feedback. Please try again.")
+
+    progress_bar = st.progress(0)
+    for i, result in enumerate(evaluation_results):
+        progress_bar.progress((i + 1) / len(evaluation_results))
 
 # Extract job description from Fractal's Workday job posting URL
 def extract_job_description(url):
@@ -232,3 +279,130 @@ def extract_job_description(url):
 def is_valid_fractal_job_link(url):
     pattern = r'^https?://fractal\.wd1\.myworkdayjobs\.com/.*Careers/.*'
     return re.match(pattern, url) is not None
+
+# Function to get available API keys
+def get_available_api_keys() -> Dict[str, str]:
+    api_keys = {}
+    backend = "llama"
+    key = os.getenv(f'{backend.upper()}_API_KEY')
+    if key:
+        api_keys[backend] = key
+    return api_keys
+
+# Function to clear cache
+def clear_cache():
+    if 'resume_processor' in st.session_state and hasattr(st.session_state.resume_processor, 'clear_cache'):
+        st.session_state.resume_processor.clear_cache()
+        logger.debug(f"Cleared resume analysis cache for backend: {st.session_state.backend}")
+    else:
+        logger.warning("Unable to clear cache: resume_processor not found or doesn't have clear_cache method")
+
+# Function to process a single resume
+def process_resume(resume_file, _resume_processor, job_description, importance_factors, candidate_data, job_title):
+    logger = get_logger(__name__)
+    logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
+    try:
+        logger.debug("Extracting text from file")
+        resume_text = extract_text_from_file(resume_file)
+        logger.debug(f"Extracted text length: {len(resume_text)}")
+        
+        result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
+        logger.debug(f"Analysis result: {result}")
+        
+        if 'error' in result:
+            logger.error(f"Error in resume analysis: {result['error']}")
+            return _generate_error_result(resume_file.name, result['error'])
+        
+        # Use the AI-generated match score if available, otherwise use 0
+        raw_score = result.get('match_score', 0)
+        
+        # Ensure raw_score is an integer
+        if isinstance(raw_score, str):
+            raw_score = int(raw_score)
+        
+        adjusted_score = _adjust_score(raw_score, result)
+        result['match_score'] = round(adjusted_score)
+        
+        result['file_name'] = resume_file.name
+        result['brief_summary'] = result.get('brief_summary', 'No brief summary available')
+        result['recommendation'] = _get_recommendation(result['match_score'])
+        result['experience_and_project_relevance'] = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
+        result['skills_gap'] = result.get('skills_gap', [])
+        result['recruiter_questions'] = result.get('recruiter_questions', [])
+        
+        # Calculate strengths and areas for improvement
+        result['strengths'] = _calculate_strengths(result)
+        result['areas_for_improvement'] = _calculate_areas_for_improvement(result)
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
+        return _generate_error_result(resume_file.name, str(e))
+
+# Function to adjust the score based on key phrases
+def _adjust_score(raw_score: int, result: dict) -> int:
+    key_phrases = [
+        "model governance", "risk management", "compliance", "financial services",
+        "model validation", "model monitoring", "documentation automation",
+        "nlp models", "nlp model governance"
+    ]
+    
+    experience_relevance = str(result.get('experience_and_project_relevance', ''))
+    present_phrases = sum(1 for phrase in key_phrases if phrase.lower() in experience_relevance.lower())
+    
+    adjustment_factor = 1 + (present_phrases / len(key_phrases))
+    adjusted_score = min(100, raw_score * adjustment_factor)
+    
+    return round(adjusted_score)
+
+# Function to get recommendation based on match score
+def _get_recommendation(match_score: int) -> str:
+    if match_score < 20:
+        return "Do not recommend for interview"
+    elif 20 <= match_score < 40:
+        return "Recommend for interview with significant reservations"
+    elif 40 <= match_score < 60:
+        return "Recommend for interview with minor reservations"
+    elif 60 <= match_score < 80:
+        return "Recommend for interview"
+    else:
+        return "Highly recommend for interview"
+
+# Function to calculate strengths
+def _calculate_strengths(result: dict) -> List[str]:
+    strengths = []
+    if result['match_score'] >= 80:
+        strengths.append("Excellent overall match to job requirements")
+    elif result['match_score'] >= 65:
+        strengths.append("Good overall match to job requirements")
+    if not result['skills_gap']:
+        strengths.append("No significant skills gaps identified")
+    if 'experience' in result['experience_and_project_relevance'].lower():
+        strengths.append("Relevant work experience")
+    if 'project' in result['experience_and_project_relevance'].lower():
+        strengths.append("Relevant project experience")
+    return strengths
+
+# Function to calculate areas for improvement
+def _calculate_areas_for_improvement(result: dict) -> List[str]:
+    areas_for_improvement = []
+    if result['skills_gap']:
+        areas_for_improvement.append("Address identified skills gaps")
+    if result['match_score'] < 65:
+        areas_for_improvement.append("Improve overall alignment with job requirements")
+    if 'lack' in result['experience_and_project_relevance'].lower() or 'missing' in result['experience_and_project_relevance'].lower():
+        areas_for_improvement.append("Gain more relevant experience")
+    return areas_for_improvement
+
+# Function to clean content
+def _clean_content(content):
+    if isinstance(content, str):
+        # Remove any ANSI escape sequences (terminal color codes)
+        content = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', content)
+        # Remove any other unwanted characters or formatting
+        content = re.sub(r'[^\w\s.,!?:;()\[\]{}\-]', '', content)
+    elif isinstance(content, dict):
+        return {k: _clean_content(v) for k, v in content.items()}
+    elif isinstance(content, list):
+        return [_clean_content(item) for item in content]
+    return content

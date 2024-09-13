@@ -6,10 +6,10 @@ from utils import (
     extract_text_from_file, preprocess_text,
     split_into_batches, process_all_batches, process_resumes_in_parallel,
     display_results, is_valid_fractal_job_link, extract_job_description,
-    get_available_api_keys, clear_cache
+    get_available_api_keys, clear_cache, process_resume
 )
 from database import (
-    init_db, insert_run_log, save_role, get_saved_roles, delete_saved_role, save_feedback, get_logger
+    init_db, insert_run_log, save_role, get_saved_roles, delete_saved_role, save_feedback
 )
 from resume_processor import create_resume_processor
 from candidate_data import get_candidate_data
@@ -17,6 +17,7 @@ import os
 from claude_analyzer import ClaudeAPI
 from gpt4o_mini_analyzer import GPT4oMiniAPI
 from llama_analyzer import LlamaAPI
+from logger import get_logger
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
