@@ -197,32 +197,81 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         
         if 'error' in result:
             logger.error(f"Error in resume analysis: {result['error']}")
+            return _generate_error_result(resume_file.name, result['error'])
+        
+        # Post-process the match score
+        raw_score = result.get('match_score', 0)
+        adjusted_score = max(0, min(100, raw_score * 0.9))  # Scales down scores by 10%
+        result['match_score'] = round(adjusted_score)
         
         result['file_name'] = resume_file.name
         result['brief_summary'] = result.get('brief_summary', 'No brief summary available')
-        result['match_score'] = result.get('match_score', 0)
         result['recommendation'] = result.get('recommendation_for_interview', 'No recommendation available')
         result['experience_and_project_relevance'] = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
         result['skills_gap'] = result.get('skills_gap', [])
         result['recruiter_questions'] = result.get('recruiter_questions', [])
         
+        # Update recommendation based on adjusted score
+        result['recommendation'] = _get_recommendation(result['match_score'])
+        
+        # Calculate strengths and areas for improvement
+        result['strengths'] = _calculate_strengths(result)
+        result['areas_for_improvement'] = _calculate_areas_for_improvement(result)
+        
         return result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
-        return {
-            'file_name': resume_file.name,
-            'error': str(e),
-            'match_score': 0,
-            'recommendation': 'Unable to provide a recommendation due to an error.',
-            'analysis': 'Unable to complete analysis',
-            'brief_summary': 'Error occurred during processing',
-            'experience_and_project_relevance': 'Unable to assess due to an error',
-            'strengths': [],
-            'areas_for_improvement': [],
-            'skills_gap': [],
-            'recruiter_questions': [],
-            'project_relevance': ''
-        }
+        return _generate_error_result(resume_file.name, str(e))
+
+def _generate_error_result(file_name: str, error_message: str) -> dict:
+    return {
+        'file_name': file_name,
+        'error': error_message,
+        'match_score': 0,
+        'recommendation': 'Unable to provide a recommendation due to an error.',
+        'analysis': 'Unable to complete analysis',
+        'brief_summary': 'Error occurred during processing',
+        'experience_and_project_relevance': 'Unable to assess due to an error',
+        'strengths': [],
+        'areas_for_improvement': [],
+        'skills_gap': [],
+        'recruiter_questions': [],
+        'project_relevance': ''
+    }
+
+def _get_recommendation(match_score: int) -> str:
+    if match_score < 20:
+        return "Do not recommend for interview"
+    elif 20 <= match_score < 40:
+        return "Do not recommend for interview (significant skill gaps)"
+    elif 40 <= match_score < 60:
+        return "Recommend for interview with significant reservations"
+    elif 60 <= match_score < 80:
+        return "Recommend for interview with minor reservations"
+    else:
+        return "Highly recommend for interview"
+
+def _calculate_strengths(result: dict) -> List[str]:
+    strengths = []
+    if result['match_score'] >= 60:
+        strengths.append("Good overall match to job requirements")
+    if not result['skills_gap']:
+        strengths.append("No significant skills gaps identified")
+    if 'experience' in result['experience_and_project_relevance'].lower():
+        strengths.append("Relevant work experience")
+    if 'project' in result['experience_and_project_relevance'].lower():
+        strengths.append("Relevant project experience")
+    return strengths
+
+def _calculate_areas_for_improvement(result: dict) -> List[str]:
+    areas_for_improvement = []
+    if result['skills_gap']:
+        areas_for_improvement.append("Address identified skills gaps")
+    if result['match_score'] < 60:
+        areas_for_improvement.append("Improve overall alignment with job requirements")
+    if 'lack' in result['experience_and_project_relevance'].lower() or 'missing' in result['experience_and_project_relevance'].lower():
+        areas_for_improvement.append("Gain more relevant experience")
+    return areas_for_improvement
 
 def process_resumes_in_parallel(resume_files, resume_processor, job_description, importance_factors, candidate_data_list, job_title):
     logger = get_logger(__name__)
@@ -240,20 +289,7 @@ def process_resumes_in_parallel(resume_files, resume_processor, job_description,
             return result
         except Exception as e:
             logger.error(f"Error processing resume {file.name}: {str(e)}", exc_info=True)
-            return {
-                'file_name': file.name,
-                'error': str(e),
-                'match_score': 0,
-                'recommendation': 'Error occurred during processing',
-                'analysis': f'An error occurred: {str(e)}',
-                'brief_summary': 'Error occurred during processing',
-                'experience_and_project_relevance': 'Unable to assess due to an error',
-                'strengths': [],
-                'areas_for_improvement': [],
-                'skills_gap': [],
-                'recruiter_questions': [],
-                'project_relevance': ''
-            }
+            return _generate_error_result(file.name, str(e))
 
     with ThreadPoolExecutor() as executor:
         futures = []
@@ -263,20 +299,18 @@ def process_resumes_in_parallel(resume_files, resume_processor, job_description,
             futures.append(future)
         
         results = []
-        for future in as_completed(futures):  # This is the corrected line
+        for future in as_completed(futures):
             results.append(future.result())
     
     return results
-        
+
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.subheader("Stack Ranking of Candidates")
 
     # Ensure all required keys exist in each result, with default values if missing
     for result in evaluation_results:
         result['match_score'] = result.get('match_score', 0)
-        result['recommendation'] = result.get('recommendation_for_interview', 'No recommendation available')
-        
-        result['recommendation'] = result.get('recommendation_for_interview', 'No recommendation available')
+        result['recommendation'] = result.get('recommendation', 'No recommendation available')
     
     # Sort results by match_score
     evaluation_results.sort(key=lambda x: x['match_score'], reverse=True)
@@ -328,6 +362,22 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                         st.write(f"- {question}")
                 else:
                     st.write("No recruiter questions available" if isinstance(recruiter_questions, list) else recruiter_questions)
+
+                st.markdown("### Strengths")
+                strengths = result.get('strengths', [])
+                if strengths:
+                    for strength in strengths:
+                        st.write(f"- {strength}")
+                else:
+                    st.write("No specific strengths identified")
+
+                st.markdown("### Areas for Improvement")
+                areas_for_improvement = result.get('areas_for_improvement', [])
+                if areas_for_improvement:
+                    for area in areas_for_improvement:
+                        st.write(f"- {area}")
+                else:
+                    st.write("No specific areas for improvement identified")
 
             # Feedback form with unique key for each result
             with st.form(key=f'feedback_form_{run_id}_{i}'):
@@ -403,14 +453,6 @@ def get_available_api_keys() -> Dict[str, str]:
         api_keys[backend] = key
     return api_keys
 
-#def get_available_api_keys() -> Dict[str, str]:
-    #api_keys = {}
-    #for backend in ["claude", "llama", "gpt4o_mini"]:
-        #key = os.getenv(f'{backend.upper()}_API_KEY')
-        #if key:
-            #api_keys[backend] = key
-    #eturn api_keys
-
 def clear_cache():
     if 'resume_processor' in st.session_state and hasattr(st.session_state.resume_processor, 'clear_cache'):
         st.session_state.resume_processor.clear_cache()
@@ -419,4 +461,3 @@ def clear_cache():
     else:
         logger = get_logger(__name__)
         logger.warning("Unable to clear cache: resume_processor not found or doesn't have clear_cache method")
-
