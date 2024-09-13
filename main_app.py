@@ -90,9 +90,10 @@ def main_app():
 
     api_keys = get_available_api_keys()
 
-    if not api_keys:
-        st.error("No API keys found. Please set at least one API key in the environment variables.")
+    if not api_keys or 'llama' not in api_keys:
+        st.error("No API key found for Llama. Please check your configuration.")
         return
+
 
     available_backends = ['llama']  # Only allow Llama
     backend_options = []
@@ -107,24 +108,32 @@ def main_app():
         return
 
     selected_backend = st.selectbox(
-    "Select AI backend:",
-    backend_options,
-    index=0
+        "Select AI backend:",
+        backend_options,
+        index=0
     )
     selected_backend = selected_backend.split(":")[0].strip()
 
     # Check if the backend has changed and clear cache if necessary
     if selected_backend != st.session_state.get('last_backend'):
         selected_api_key = api_keys.get(selected_backend, None)
-    if selected_api_key is None:
-        st.error(f"No API key found for {selected_backend}. Please check your configuration.")
-        return
+        if selected_api_key is None:
+            st.error(f"No API key found for {selected_backend}. Please check your configuration.")
+            return
     
-    st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
-    if hasattr(st.session_state.resume_processor, 'clear_cache'):
-        clear_cache()  # Clear the cache when switching backends
-    st.session_state.last_backend = selected_backend
-    logger.debug(f"Switched to {selected_backend} backend and cleared cache")
+        st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
+        if hasattr(st.session_state.resume_processor, 'clear_cache'):
+            clear_cache()  # Clear the cache when switching backends
+            st.session_state.last_backend = selected_backend
+        logger.debug(f"Switched to {selected_backend} backend and cleared cache")
+    else:
+        # If the backend hasn't changed, use the existing API key
+        selected_api_key = api_keys.get(selected_backend, None)
+        if selected_api_key is None:
+            st.error(f"No API key found for {selected_backend}. Please check your configuration.")
+            return
+
+    st.session_state.backend = selected_backend
 
     logger.debug(f"Using ResumeProcessor with backend: {selected_backend}")
 

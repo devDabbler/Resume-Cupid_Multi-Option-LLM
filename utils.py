@@ -397,11 +397,19 @@ def extract_job_description(url):
 
 def get_available_api_keys() -> Dict[str, str]:
     api_keys = {}
-    for backend in ["claude", "llama", "gpt4o_mini"]:
-        key = os.getenv(f'{backend.upper()}_API_KEY')
-        if key:
-            api_keys[backend] = key
+    backend = "llama"
+    key = os.getenv(f'{backend.upper()}_API_KEY')
+    if key:
+        api_keys[backend] = key
     return api_keys
+
+#def get_available_api_keys() -> Dict[str, str]:
+    #api_keys = {}
+    #for backend in ["claude", "llama", "gpt4o_mini"]:
+        #key = os.getenv(f'{backend.upper()}_API_KEY')
+        #if key:
+            #api_keys[backend] = key
+    #eturn api_keys
 
 def clear_cache():
     if 'resume_processor' in st.session_state and hasattr(st.session_state.resume_processor, 'clear_cache'):
