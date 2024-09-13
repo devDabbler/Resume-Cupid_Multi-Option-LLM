@@ -115,18 +115,21 @@ class LlamaAPI:
 
     def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
         required_fields = [
-            'brief_summary', 'match_score', 'recommendation_for_interview',
-            'experience_and_project_relevance', 'skills_gap', 'recruiter_questions'
+            'Brief Summary', 'Match Score', 'Recommendation for Interview',
+            'Experience and Project Relevance', 'Skills Gap', 'Recruiter Questions'
         ]
         for field in required_fields:
             if field not in parsed_content or not parsed_content[field]:
-                parsed_content[field] = self._generate_fallback_content(field, parsed_content)
+                parsed_content[field.lower()] = self._generate_fallback_content(field.lower(), parsed_content)
                 logger.warning(f"Field '{field}' was missing or empty in API response, generated fallback content")
-        
+            else:
+                # Clean the content
+                parsed_content[field.lower()] = self._clean_content(parsed_content[field])
+    
         try:
-            parsed_content['match_score'] = int(float(parsed_content['match_score']))
+            parsed_content['match_score'] = int(float(parsed_content.get('Match Score', 0)))
         except (ValueError, TypeError):
-            logger.error(f"Invalid match_score value: {parsed_content.get('match_score')}")
+            logger.error(f"Invalid match_score value: {parsed_content.get('Match Score')}")
             parsed_content['match_score'] = 0
 
         match_score = parsed_content['match_score']
@@ -145,6 +148,18 @@ class LlamaAPI:
 
         parsed_content['recommendation'] = recommendation
         return parsed_content
+
+    def _clean_content(self, content):
+        if isinstance(content, str):
+            # Remove any ANSI escape sequences (terminal color codes)
+            content = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', content)
+            # Remove any other unwanted characters or formatting
+            content = re.sub(r'[^\w\s.,!?:;()\[\]{}\-]', '', content)
+        elif isinstance(content, dict):
+            return {k: self._clean_content(v) for k, v in content.items()}
+        elif isinstance(content, list):
+            return [self._clean_content(item) for item in content]
+        return content
 
     def _generate_fallback_content(self, field: str, parsed_content: Dict[str, Any]) -> Any:
         if field == 'brief_summary':
