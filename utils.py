@@ -201,18 +201,15 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         
         # Post-process the match score
         raw_score = result.get('match_score', 0)
-        adjusted_score = max(0, min(100, raw_score * 0.9))  # Scales down scores by 10%
+        adjusted_score = max(0, min(100, raw_score * 1.2))  # Scales up scores by 20%
         result['match_score'] = round(adjusted_score)
         
         result['file_name'] = resume_file.name
         result['brief_summary'] = result.get('brief_summary', 'No brief summary available')
-        result['recommendation'] = result.get('recommendation_for_interview', 'No recommendation available')
+        result['recommendation'] = _get_recommendation(result['match_score'])
         result['experience_and_project_relevance'] = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
         result['skills_gap'] = result.get('skills_gap', [])
         result['recruiter_questions'] = result.get('recruiter_questions', [])
-        
-        # Update recommendation based on adjusted score
-        result['recommendation'] = _get_recommendation(result['match_score'])
         
         # Calculate strengths and areas for improvement
         result['strengths'] = _calculate_strengths(result)
@@ -240,20 +237,20 @@ def _generate_error_result(file_name: str, error_message: str) -> dict:
     }
 
 def _get_recommendation(match_score: int) -> str:
-    if match_score < 20:
+    if match_score < 50:
         return "Do not recommend for interview"
-    elif 20 <= match_score < 40:
-        return "Do not recommend for interview (significant skill gaps)"
-    elif 40 <= match_score < 60:
-        return "Recommend for interview with significant reservations"
-    elif 60 <= match_score < 80:
-        return "Recommend for interview with minor reservations"
+    elif 50 <= match_score < 65:
+        return "Recommend for interview with reservations"
+    elif 65 <= match_score < 80:
+        return "Recommend for interview"
     else:
         return "Highly recommend for interview"
 
 def _calculate_strengths(result: dict) -> List[str]:
     strengths = []
-    if result['match_score'] >= 60:
+    if result['match_score'] >= 80:
+        strengths.append("Excellent overall match to job requirements")
+    elif result['match_score'] >= 65:
         strengths.append("Good overall match to job requirements")
     if not result['skills_gap']:
         strengths.append("No significant skills gaps identified")
@@ -267,7 +264,7 @@ def _calculate_areas_for_improvement(result: dict) -> List[str]:
     areas_for_improvement = []
     if result['skills_gap']:
         areas_for_improvement.append("Address identified skills gaps")
-    if result['match_score'] < 60:
+    if result['match_score'] < 65:
         areas_for_improvement.append("Improve overall alignment with job requirements")
     if 'lack' in result['experience_and_project_relevance'].lower() or 'missing' in result['experience_and_project_relevance'].lower():
         areas_for_improvement.append("Gain more relevant experience")
