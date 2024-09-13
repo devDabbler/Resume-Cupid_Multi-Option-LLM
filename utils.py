@@ -22,6 +22,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 
+# Create a root logger
+root_logger = logging.getLogger(__name__)
+
 # Initialize logger with environment-based settings
 def setup_logger():
     environment = os.getenv('ENVIRONMENT', 'development')
@@ -33,9 +36,18 @@ def setup_logger():
 
 logger = setup_logger()
 
+# Set up the root_logger
+root_logger.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+root_logger.addHandler(console_handler)
+
 # Custom exception handler
 def exception_handler(exc_type, exc_value, exc_traceback):
     logger.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
+    root_logger.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
 
 sys.excepthook = exception_handler
 
