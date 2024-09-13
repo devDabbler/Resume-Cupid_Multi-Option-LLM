@@ -23,7 +23,7 @@ class LlamaAPI:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an AI assistant specialized in analyzing resumes and job descriptions. Always provide your responses in JSON format. Use the full range of scores from 0 to 100, and be very critical in your evaluations.",
+                        "content": "You are an AI assistant specialized in analyzing resumes and job descriptions for Machine Learning Operations Engineering roles. Always provide your responses in JSON format. Use the full range of scores from 0 to 100, and be very critical in your evaluations, especially regarding model governance, risk management, and compliance in financial services.",
                     },
                     {
                         "role": "user",
@@ -56,33 +56,23 @@ class LlamaAPI:
         try:
             logger.info("Starting resume analysis")
             prompt = f"""
-            You are a highly skilled AI recruiter. Your task is to analyze the fit between the following resume and job description with extreme accuracy. 
-            Focus specifically on how well the candidate's skills and experience match the job requirements for the role of {job_title}.
-    
+            You are a highly skilled AI recruiter specializing in Machine Learning Operations Engineering roles. Your task is to analyze the fit between the following resume and job description with extreme accuracy and specificity. 
+            Focus on how well the candidate's skills and experience match the job requirements for the role of {job_title}, particularly in areas of model governance, risk management, and compliance in financial services.
+
             Provide a detailed analysis for each of the following areas:
 
             1. Brief Summary: Provide a concise overview of the candidate's fit for the role of {job_title} in 2-3 sentences.
             2. Match Score: Provide a percentage between 0 and 100, where:
-               - 0-20%: The candidate has almost none of the required skills or experience
-               - 21-40%: The candidate has some relevant skills but is largely unqualified
-               - 41-60%: The candidate has several relevant skills but significant gaps remain
-               - 61-80%: The candidate is a good fit with some minor gaps
-               - 81-100%: The candidate is an excellent fit for the role
-               Be very critical and realistic in this scoring. Do not hesitate to give low scores for candidates who are clearly not a good fit.
-            3. Recommendation for Interview: Based on the match score and the candidate's fit for {job_title}, provide a recommendation (e.g., "Do not recommend", "Recommend with significant reservations", "Recommend with reservations", "Recommend", "Highly recommend").
-            4. Experience and Project Relevance: Provide a comprehensive analysis of the candidate's work experience and relevant projects, specifically relating them to the job requirements for {job_title}.
-            5. Skills Gap: List all important skills or qualifications mentioned in the job description for {job_title} that the candidate lacks.
-            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements for {job_title}.
-
-            Format your response as JSON with the following structure:
-            {{
-            "brief_summary": "Your brief summary here",
-            "match_score": The percentage match (0-100),
-            "recommendation_for_interview": "Your recommendation here",
-            "experience_and_project_relevance": "Your detailed analysis here",
-            "skills_gap": ["Skill 1", "Skill 2", ...],
-            "recruiter_questions": ["Question 1?", "Question 2?", ...]
-            }}
+               - 0-20%: The candidate has almost none of the required skills or experience in model governance, risk management, or compliance
+               - 21-40%: The candidate has some relevant skills but lacks significant experience in model governance or financial services
+               - 41-60%: The candidate has several relevant skills and some experience, but significant gaps remain in model governance or risk management
+               - 61-80%: The candidate is a good fit with minor gaps in specific areas of model governance or compliance
+               - 81-100%: The candidate is an excellent fit with strong experience in model governance, risk management, and compliance in financial services
+               Be very critical and realistic in this scoring. Do not hesitate to give low scores for candidates who lack specific experience in model governance and risk management in financial services.
+            3. Recommendation for Interview: Based on the match score and the candidate's fit for {job_title}, provide a recommendation.
+            4. Experience and Project Relevance: Provide a comprehensive analysis of the candidate's work experience and relevant projects, specifically relating them to model governance, risk management, and compliance in financial services.
+            5. Skills Gap: List all important skills or qualifications mentioned in the job description for {job_title} that the candidate lacks, particularly focusing on model governance, risk management, and compliance skills.
+            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements for {job_title}, focusing on model governance and risk management experience.
 
             Ensure that all fields are populated with relevant, detailed information. Do not include any text outside of the JSON structure.
 
@@ -127,14 +117,16 @@ class LlamaAPI:
             parsed_content['match_score'] = 0
 
         match_score = parsed_content['match_score']
-        if match_score < 20:
-            recommendation = "Do not recommend for interview"
-        elif 20 <= match_score < 40:
+        if match_score == 0:
+            recommendation = "Do not recommend for interview (not suitable for the role)"
+        elif match_score < 30:
             recommendation = "Do not recommend for interview (significant skill gaps)"
-        elif 40 <= match_score < 60:
+        elif 30 <= match_score < 50:
             recommendation = "Recommend for interview with significant reservations"
-        elif 60 <= match_score < 80:
+        elif 50 <= match_score < 70:
             recommendation = "Recommend for interview with minor reservations"
+        elif 70 <= match_score < 85:
+            recommendation = "Recommend for interview"
         else:
             recommendation = "Highly recommend for interview"
 
@@ -154,10 +146,10 @@ class LlamaAPI:
             return ["Unable to determine specific skills gap. A manual comparison against job requirements is needed."]
         elif field == 'recruiter_questions':
             return [
-                "Can you elaborate on your most relevant experience for this role?",
-                "What specific skills do you possess that align with our job requirements?",
-                "How do you address areas where your experience might not directly match our needs?",
-                "Can you provide examples of projects that demonstrate your ability to learn and adapt quickly?"
+                "Can you elaborate on your experience with model governance in financial services?",
+                "What specific risk management frameworks have you implemented in your previous roles?",
+                "How do you ensure compliance with regulatory requirements in ML model development and deployment?",
+                "Can you provide examples of projects where you've improved model monitoring and documentation processes?"
             ]
         else:
             return f"No {field.replace('_', ' ')} available due to incomplete analysis."

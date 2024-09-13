@@ -201,7 +201,7 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         
         # Post-process the match score
         raw_score = result.get('match_score', 0)
-        adjusted_score = max(0, min(100, raw_score * 1.2))  # Scales up scores by 20%
+        adjusted_score = _adjust_score(raw_score, result)
         result['match_score'] = round(adjusted_score)
         
         result['file_name'] = resume_file.name
@@ -220,28 +220,39 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
 
-def _generate_error_result(file_name: str, error_message: str) -> dict:
-    return {
-        'file_name': file_name,
-        'error': error_message,
-        'match_score': 0,
-        'recommendation': 'Unable to provide a recommendation due to an error.',
-        'analysis': 'Unable to complete analysis',
-        'brief_summary': 'Error occurred during processing',
-        'experience_and_project_relevance': 'Unable to assess due to an error',
-        'strengths': [],
-        'areas_for_improvement': [],
-        'skills_gap': [],
-        'recruiter_questions': [],
-        'project_relevance': ''
-    }
+def _adjust_score(raw_score: int, result: dict) -> int:
+    # Define key phrases that should be present for a high score
+    key_phrases = [
+        "model governance", "risk management", "compliance", "financial services",
+        "model validation", "model monitoring", "documentation automation",
+        "nlp models", "nlp model governance"
+    ]
+    
+    # Check for presence of key phrases in the resume
+    present_phrases = sum(1 for phrase in key_phrases if phrase in result.get('experience_and_project_relevance', '').lower())
+    
+    # Adjust score based on presence of key phrases
+    adjustment_factor = present_phrases / len(key_phrases)
+    adjusted_score = raw_score * adjustment_factor
+    
+    # Apply a more stringent scoring curve
+    if adjusted_score < 30:
+        return 0
+    elif adjusted_score < 50:
+        return max(0, adjusted_score - 20)
+    else:
+        return min(100, adjusted_score + 10)
 
 def _get_recommendation(match_score: int) -> str:
-    if match_score < 50:
-        return "Do not recommend for interview"
-    elif 50 <= match_score < 65:
-        return "Recommend for interview with reservations"
-    elif 65 <= match_score < 80:
+    if match_score == 0:
+        return "Do not recommend for interview (not suitable for the role)"
+    elif match_score < 30:
+        return "Do not recommend for interview (significant skill gaps)"
+    elif 30 <= match_score < 50:
+        return "Recommend for interview with significant reservations"
+    elif 50 <= match_score < 70:
+        return "Recommend for interview with minor reservations"
+    elif 70 <= match_score < 85:
         return "Recommend for interview"
     else:
         return "Highly recommend for interview"
@@ -269,6 +280,22 @@ def _calculate_areas_for_improvement(result: dict) -> List[str]:
     if 'lack' in result['experience_and_project_relevance'].lower() or 'missing' in result['experience_and_project_relevance'].lower():
         areas_for_improvement.append("Gain more relevant experience")
     return areas_for_improvement
+
+def _generate_error_result(file_name: str, error_message: str) -> dict:
+    return {
+        'file_name': file_name,
+        'error': error_message,
+        'match_score': 0,
+        'recommendation': 'Unable to provide a recommendation due to an error.',
+        'analysis': 'Unable to complete analysis',
+        'brief_summary': 'Error occurred during processing',
+        'experience_and_project_relevance': 'Unable to assess due to an error',
+        'strengths': [],
+        'areas_for_improvement': [],
+        'skills_gap': [],
+        'recruiter_questions': [],
+        'project_relevance': ''
+    }
 
 def process_resumes_in_parallel(resume_files, resume_processor, job_description, importance_factors, candidate_data_list, job_title):
     logger = get_logger(__name__)
