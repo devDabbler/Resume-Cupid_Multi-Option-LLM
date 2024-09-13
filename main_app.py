@@ -82,10 +82,11 @@ def main_app():
         st.session_state.saved_roles = get_saved_roles()
 
     llm_descriptions = {
-        "claude": "3.5 Sonnet is Anthropic's most recent model that is highly effective for natural language understanding and generation. It comes at a premium but very accurate.",
         "llama": "Created by Meta AI, this is the llama-3.1, 8 billion parameter model. This is the latest and most capable large language model with strong performance on various NLP tasks.",
-        "gpt4o_mini": "This is the compact version of GPT-4 with impressive capabilities. Open-source alternative."
     }
+    
+    #"claude": "3.5 Sonnet is Anthropic's most recent model that is highly effective for natural language understanding and generation. It comes at a premium but very accurate.",
+    #"gpt4o_mini": "This is the compact version of GPT-4 with impressive capabilities. Open-source alternative."
 
     api_keys = get_available_api_keys()
 
@@ -93,7 +94,7 @@ def main_app():
         st.error("No API keys found. Please set at least one API key in the environment variables.")
         return
 
-    available_backends = list(api_keys.keys())
+    available_backends = ['llama']  # Only allow Llama
     backend_options = []
     for backend in available_backends:
         if backend in llm_descriptions:
@@ -106,22 +107,24 @@ def main_app():
         return
 
     selected_backend = st.selectbox(
-        "Select AI backend:",
-        backend_options,
-        index=0
+    "Select AI backend:",
+    backend_options,
+    index=0
     )
     selected_backend = selected_backend.split(":")[0].strip()
 
     # Check if the backend has changed and clear cache if necessary
     if selected_backend != st.session_state.get('last_backend'):
-        selected_api_key = api_keys[selected_backend]
-        st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
-        if hasattr(st.session_state.resume_processor, 'clear_cache'):
-            clear_cache()  # Clear the cache when switching backends
-        st.session_state.last_backend = selected_backend
-        logger.debug(f"Switched to {selected_backend} backend and cleared cache")
-
-    st.session_state.backend = selected_backend
+        selected_api_key = api_keys.get(selected_backend, None)
+    if selected_api_key is None:
+        st.error(f"No API key found for {selected_backend}. Please check your configuration.")
+        return
+    
+    st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
+    if hasattr(st.session_state.resume_processor, 'clear_cache'):
+        clear_cache()  # Clear the cache when switching backends
+    st.session_state.last_backend = selected_backend
+    logger.debug(f"Switched to {selected_backend} backend and cleared cache")
 
     logger.debug(f"Using ResumeProcessor with backend: {selected_backend}")
 
