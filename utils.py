@@ -199,17 +199,22 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             logger.error(f"Error in resume analysis: {result['error']}")
             return _generate_error_result(resume_file.name, result['error'])
         
-        # Post-process the match score
-        raw_score = result.get('match_score', 0)
+        # Use the AI-generated match score if available, otherwise use 0
+        raw_score = result.get('Match Score', result.get('match_score', 0))
+        
+        # Ensure raw_score is an integer
+        if isinstance(raw_score, str):
+            raw_score = int(raw_score)
+        
         adjusted_score = _adjust_score(raw_score, result)
         result['match_score'] = round(adjusted_score)
         
         result['file_name'] = resume_file.name
-        result['brief_summary'] = result.get('brief_summary', 'No brief summary available')
+        result['brief_summary'] = result.get('Brief Summary', result.get('brief_summary', 'No brief summary available'))
         result['recommendation'] = _get_recommendation(result['match_score'])
-        result['experience_and_project_relevance'] = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
-        result['skills_gap'] = result.get('skills_gap', [])
-        result['recruiter_questions'] = result.get('recruiter_questions', [])
+        result['experience_and_project_relevance'] = result.get('Experience and Project Relevance', result.get('experience_and_project_relevance', 'No experience and project relevance data available'))
+        result['skills_gap'] = result.get('Skills Gap', result.get('skills_gap', []))
+        result['recruiter_questions'] = result.get('Recruiter Questions', result.get('recruiter_questions', []))
         
         # Calculate strengths and areas for improvement
         result['strengths'] = _calculate_strengths(result)
@@ -229,30 +234,23 @@ def _adjust_score(raw_score: int, result: dict) -> int:
     ]
     
     # Check for presence of key phrases in the resume
-    present_phrases = sum(1 for phrase in key_phrases if phrase in result.get('experience_and_project_relevance', '').lower())
+    experience_relevance = str(result.get('Experience and Project Relevance', ''))
+    present_phrases = sum(1 for phrase in key_phrases if phrase.lower() in experience_relevance.lower())
     
     # Adjust score based on presence of key phrases
-    adjustment_factor = present_phrases / len(key_phrases)
-    adjusted_score = raw_score * adjustment_factor
+    adjustment_factor = 1 + (present_phrases / len(key_phrases))
+    adjusted_score = min(100, raw_score * adjustment_factor)
     
-    # Apply a more stringent scoring curve
-    if adjusted_score < 30:
-        return 0
-    elif adjusted_score < 50:
-        return max(0, adjusted_score - 20)
-    else:
-        return min(100, adjusted_score + 10)
+    return round(adjusted_score)
 
 def _get_recommendation(match_score: int) -> str:
-    if match_score == 0:
-        return "Do not recommend for interview (not suitable for the role)"
-    elif match_score < 30:
-        return "Do not recommend for interview (significant skill gaps)"
-    elif 30 <= match_score < 50:
+    if match_score < 20:
+        return "Do not recommend for interview"
+    elif 20 <= match_score < 40:
         return "Recommend for interview with significant reservations"
-    elif 50 <= match_score < 70:
+    elif 40 <= match_score < 60:
         return "Recommend for interview with minor reservations"
-    elif 70 <= match_score < 85:
+    elif 60 <= match_score < 80:
         return "Recommend for interview"
     else:
         return "Highly recommend for interview"
