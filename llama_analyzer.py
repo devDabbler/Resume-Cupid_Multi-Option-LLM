@@ -37,10 +37,23 @@ class LlamaAPI:
             logger.debug(f"Received response from Llama: {completion}")
 
             result = completion.choices[0].message.content
-            logger.debug(f"Raw response from Llama: {result[:100]}...")  # Log first 100 characters
+            logger.debug(f"Raw response from Llama: {result}")  # Log the entire response for debugging
 
-            # Parse JSON response
-            parsed_content = json.loads(result)
+            try:
+                # Try to parse the JSON response
+                parsed_content = json.loads(result)
+            except json.JSONDecodeError as json_error:
+                logger.error(f"JSON parsing error: {str(json_error)}")
+                logger.debug(f"Problematic JSON: {result}")
+                
+                # Attempt to fix common JSON errors
+                try:
+                    # Remove any text before the first '{' and after the last '}'
+                    cleaned_json = re.search(r'\{.*\}', result, re.DOTALL).group()
+                    parsed_content = json.loads(cleaned_json)
+                except (AttributeError, json.JSONDecodeError):
+                    logger.error("Failed to parse JSON even after cleaning")
+                    return self._generate_error_response("Invalid JSON response from API")
 
             # Process the parsed content
             processed_content = self._process_parsed_content(parsed_content)
@@ -89,10 +102,10 @@ class LlamaAPI:
 
             JSON Response:
             """
+            logger.debug(f"Generated prompt: {prompt[:500]}...")  # Log first 500 characters of the prompt
             result = self.analyze(prompt)
         
-            logger.debug(f"Arguments for analyze_match: resume={resume[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
-            logger.debug(f"Number of arguments: {len([resume, job_description, candidate_data, job_title])}")
+            logger.debug(f"Analysis result: {result}")
         
             return result
 
@@ -111,9 +124,9 @@ class LlamaAPI:
                 logger.warning(f"Field '{field}' was missing or empty in API response, generated fallback content")
         
         try:
-            parsed_content['match_score'] = int(parsed_content['match_score'])
+            parsed_content['match_score'] = int(float(parsed_content['match_score']))
         except (ValueError, TypeError):
-            logger.error(f"Invalid match_score value: {parsed_content['match_score']}")
+            logger.error(f"Invalid match_score value: {parsed_content.get('match_score')}")
             parsed_content['match_score'] = 0
 
         match_score = parsed_content['match_score']
