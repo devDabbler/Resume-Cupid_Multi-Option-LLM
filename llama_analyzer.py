@@ -76,22 +76,22 @@ class LlamaAPI:
     def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
         logger.debug(f"Processing parsed content: {parsed_content}")
         processed_content = {}
-        
+    
         for key, value in parsed_content.items():
             processed_key = key.lower().replace(' ', '_')
             processed_content[processed_key] = value
             logger.debug(f"Processed key-value pair: {processed_key} = {value}")
-        
+    
         required_fields = [
-            'brief_summary', 'match_score', 'recommendation_for_interview',
-            'experience_and_project_relevance', 'skills_gap', 'recruiter_questions'
+        'brief_summary', 'match_score', 'recommendation_for_interview',
+        'experience_and_project_relevance', 'skills_gap', 'recruiter_questions'
         ]
-        
+    
         for field in required_fields:
             if field not in processed_content:
                 processed_content[field] = self._generate_fallback_content(field)
                 logger.warning(f"Generated fallback content for missing field: {field}")
-        
+    
         try:
             if isinstance(processed_content['match_score'], dict):
                 processed_content['match_score'] = processed_content['match_score'].get('Overall', 0)
@@ -100,10 +100,10 @@ class LlamaAPI:
         except (ValueError, TypeError) as e:
             logger.error(f"Invalid match_score value: {processed_content.get('match_score')}")
             processed_content['match_score'] = 0
-        
+    
         processed_content['recommendation'] = self._get_recommendation(processed_content['match_score'])
         logger.debug(f"Generated recommendation: {processed_content['recommendation']}")
-        
+    
         return processed_content
 
     def _generate_fallback_content(self, field: str) -> str:

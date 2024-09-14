@@ -231,7 +231,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 logger.error(f"Error in result for {result['file_name']}: {result['error']}")
             else:
                 st.markdown("### Brief Summary")
-                st.write(result.get('brief_summary', 'No brief summary available'))
+                display_nested_content(result.get('brief_summary', 'No brief summary available'))
                 logger.debug(f"Brief Summary for {result['file_name']}: {result.get('brief_summary', 'No brief summary available')}")
 
                 st.markdown("### Match Score")
@@ -243,23 +243,16 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 logger.debug(f"Recommendation for {result['file_name']}: {result.get('recommendation', 'No recommendation available')}")
 
                 st.markdown("### Experience and Project Relevance")
-                exp_relevance = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
-                st.write(exp_relevance)
-                logger.debug(f"Experience and Project Relevance for {result['file_name']}: {exp_relevance}")
+                display_nested_content(result.get('experience_and_project_relevance', 'No experience and project relevance data available'))
+                logger.debug(f"Experience and Project Relevance for {result['file_name']}: {result.get('experience_and_project_relevance', 'No experience and project relevance data available')}")
 
                 st.markdown("### Skills Gap")
-                skills_gap = result.get('skills_gap', 'No skills gap data available')
-                st.write(skills_gap)
-                logger.debug(f"Skills Gap for {result['file_name']}: {skills_gap}")
+                display_nested_content(result.get('skills_gap', 'No skills gap data available'))
+                logger.debug(f"Skills Gap for {result['file_name']}: {result.get('skills_gap', 'No skills gap data available')}")
 
                 st.markdown("### Recruiter Questions")
-                questions = result.get('recruiter_questions', [])
-                if isinstance(questions, list):
-                    for q in questions:
-                        st.write(f"- {q}")
-                else:
-                    st.write(questions)
-                logger.debug(f"Recruiter Questions for {result['file_name']}: {questions}")
+                display_nested_content(result.get('recruiter_questions', 'No recruiter questions available'))
+                logger.debug(f"Recruiter Questions for {result['file_name']}: {result.get('recruiter_questions', 'No recruiter questions available')}")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
                 st.subheader("Provide Feedback")
@@ -281,6 +274,20 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     for i, result in enumerate(evaluation_results):
         progress_bar.progress((i + 1) / len(evaluation_results))
     logger.debug("Finished displaying results")
+
+def display_nested_content(content):
+    if isinstance(content, dict):
+        for key, value in content.items():
+            st.write(f"**{key.capitalize()}:**")
+            display_nested_content(value)
+    elif isinstance(content, list):
+        for item in content:
+            if isinstance(item, dict):
+                display_nested_content(item)
+            else:
+                st.write(f"- {item}")
+    else:
+        st.write(content)
 
 # Extract job description from Fractal's Workday job posting URL
 def extract_job_description(url):
