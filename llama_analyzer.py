@@ -12,7 +12,13 @@ logger = get_logger(__name__)
 
 class LlamaAPI:
     def __init__(self, api_key: str):
-        self.client = groq.Groq(api_key=api_key)
+        self.api_key = api_key
+        self.client = Groq(api_key=api_key)
+        self.api_url = "https://api.groq.com/openai/v1/chat/completions"
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
         logger.info(f"Initialized LlamaAPI with API key: {api_key[:5]}...")
 
     def analyze(self, prompt: str) -> Dict[str, Any]:
@@ -85,23 +91,7 @@ class LlamaAPI:
         Provide your analysis in a structured JSON format.
         """
 
-        response = self._generate_response(prompt)
-    
-        try:
-            analysis = json.loads(response)
-            # Ensure all required fields are present
-            required_fields = ['brief_summary', 'match_score', 'recommendation_for_interview', 'experience_and_project_relevance', 'skills_gap', 'recruiter_questions']
-            for field in required_fields:
-                if field not in analysis:
-                    analysis[field] = f"No {field.replace('_', ' ')} provided"
-        
-            return analysis
-        except json.JSONDecodeError:
-            logger.error("Failed to parse JSON from LLM response")
-            return {
-                'error': 'Failed to parse analysis result',
-                'raw_response': response
-            }
+        return self.analyze(prompt)
 
     def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
         required_fields = [
@@ -185,3 +175,7 @@ class LlamaAPI:
                 "Due to an error in our system, we couldn't generate specific questions. Please review the resume and job description to formulate relevant questions."
             ]
         }
+
+    def clear_cache(self):
+        # Llama doesn't have a built-in cache, so this method can be empty
+        pass
