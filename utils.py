@@ -227,10 +227,10 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.error(f"Error: {result['error']}")
             else:
                 st.markdown("### Brief Summary")
-                brief_summary = result.get('brief_summary', {})
-                if isinstance(brief_summary, dict):
-                    for key, value in brief_summary.items():
-                        st.write(f"**{key.capitalize()}:** {value}")
+                brief_summary = result.get('brief_summary', 'No brief summary available')
+                if isinstance(brief_summary, list):
+                    for item in brief_summary:
+                        st.write(f"- {item}")
                 else:
                     st.write(brief_summary)
 
@@ -241,7 +241,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.write(result.get('recommendation', 'No recommendation available'))
 
                 st.markdown("### Experience and Project Relevance")
-                exp_relevance = result.get('experience_and_project_relevance', {})
+                exp_relevance = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
                 if isinstance(exp_relevance, dict):
                     for key, value in exp_relevance.items():
                         if isinstance(value, list):
@@ -255,24 +255,17 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
                 st.markdown("### Skills Gap")
                 skills_gap = result.get('skills_gap', [])
-                if isinstance(skills_gap, dict):
-                    for skill, details in skills_gap.items():
-                        st.write(f"- **{skill}:** {details}")
-                elif isinstance(skills_gap, list):
+                if isinstance(skills_gap, list):
                     for skill in skills_gap:
                         if isinstance(skill, dict):
-                            for k, v in skill.items():
-                                st.write(f"- **{k}:** {v}")
+                            st.write(f"- **{skill.get('skill', 'Skill')}:** {skill.get('level', 'N/A')}")
                         else:
                             st.write(f"- {skill}")
 
                 st.markdown("### Recruiter Questions")
                 questions = result.get('recruiter_questions', [])
                 for q in questions:
-                    if isinstance(q, dict):
-                        st.write(f"- {q.get('text', q.get('question', 'N/A'))}")
-                    else:
-                        st.write(f"- {q}")
+                    st.write(f"- {q}")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
                 st.subheader("Provide Feedback")
