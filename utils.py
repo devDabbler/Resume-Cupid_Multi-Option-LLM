@@ -166,16 +166,10 @@ def _generate_error_result(file_name: str, error_message: str) -> dict:
         'project_relevance': ''
     }
 
-# Process resumes in parallel using threading
 def process_resumes_in_parallel(resume_files, resume_processor, job_description, importance_factors, candidate_data_list, job_title):
     logger.debug("Starting parallel resume processing...")
     def process_with_context(file, candidate_data):
         try:
-            # Ensure each thread has its own Streamlit context
-            ctx = st.runtime.get_instance().scriptrunner.get_script_run_ctx()
-            if ctx is not None:
-                st.runtime.get_instance().scriptrunner.add_script_run_ctx(threading.current_thread(), ctx)
-
             resume_text = extract_text_from_file(file)
             result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
             result['file_name'] = file.name
@@ -198,7 +192,20 @@ def process_resumes_in_parallel(resume_files, resume_processor, job_description,
     
     return results
 
-# Display results in a sorted table
+def process_resumes_sequentially(resume_files, resume_processor, job_description, importance_factors, candidate_data_list, job_title):
+    logger.debug("Starting sequential resume processing...")
+    results = []
+    for file, candidate_data in zip(resume_files, candidate_data_list):
+        try:
+            resume_text = extract_text_from_file(file)
+            result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
+            result['file_name'] = file.name
+            results.append(result)
+        except Exception as e:
+            logger.error(f"Error processing resume {file.name}: {str(e)}", exc_info=True)
+            results.append(_generate_error_result(file.name, str(e)))
+    return results
+
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.subheader("Stack Ranking of Candidates")
     for result in evaluation_results:

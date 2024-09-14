@@ -4,7 +4,7 @@ import uuid
 import streamlit as st
 from utils import (
     extract_text_from_file, preprocess_text,
-    split_into_batches, process_all_batches, process_resumes_in_parallel,
+    split_into_batches, process_all_batches, process_resumes_sequentially,
     display_results, is_valid_fractal_job_link, extract_job_description,
     get_available_api_keys, clear_cache, process_resume
 )
@@ -227,7 +227,7 @@ def main_app():
                 candidate_data_list.append(matching_candidate or {})
                 
             with st.spinner('Processing resumes...'):
-                evaluation_results = process_resumes_in_parallel(resume_files, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data_list, st.session_state.job_title)
+                evaluation_results = process_resumes_sequentially(resume_files, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data_list, st.session_state.job_title)
                 
                 logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
                 insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
