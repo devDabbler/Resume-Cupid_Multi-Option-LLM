@@ -24,6 +24,7 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 # Create a root logger
 root_logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Initialize logger with environment-based settings
 def setup_logger():
@@ -207,6 +208,9 @@ def process_resumes_sequentially(resume_files, resume_processor, job_description
     return results
 
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
+    logger.debug(f"Displaying results for run_id: {run_id}")
+    logger.debug(f"Evaluation results: {evaluation_results}")
+
     st.subheader("Stack Ranking of Candidates")
     
     # Sort results by match_score in descending order
@@ -217,28 +221,36 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
     st.table(df)
+    logger.debug(f"Displayed table: {df.to_dict()}")
 
     for i, result in enumerate(evaluation_results, 1):
+        logger.debug(f"Processing result for candidate {i}: {result['file_name']}")
         with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis"):
             if 'error' in result:
                 st.error(f"Error: {result['error']}")
+                logger.error(f"Error in result for {result['file_name']}: {result['error']}")
             else:
                 st.markdown("### Brief Summary")
                 st.write(result.get('brief_summary', 'No brief summary available'))
+                logger.debug(f"Brief Summary for {result['file_name']}: {result.get('brief_summary', 'No brief summary available')}")
 
                 st.markdown("### Match Score")
                 st.write(f"{result.get('match_score', 'N/A')}%")
+                logger.debug(f"Match Score for {result['file_name']}: {result.get('match_score', 'N/A')}%")
 
                 st.markdown("### Recommendation")
                 st.write(result.get('recommendation', 'No recommendation available'))
+                logger.debug(f"Recommendation for {result['file_name']}: {result.get('recommendation', 'No recommendation available')}")
 
                 st.markdown("### Experience and Project Relevance")
                 exp_relevance = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
                 st.write(exp_relevance)
+                logger.debug(f"Experience and Project Relevance for {result['file_name']}: {exp_relevance}")
 
                 st.markdown("### Skills Gap")
                 skills_gap = result.get('skills_gap', 'No skills gap data available')
                 st.write(skills_gap)
+                logger.debug(f"Skills Gap for {result['file_name']}: {skills_gap}")
 
                 st.markdown("### Recruiter Questions")
                 questions = result.get('recruiter_questions', [])
@@ -247,6 +259,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                         st.write(f"- {q}")
                 else:
                     st.write(questions)
+                logger.debug(f"Recruiter Questions for {result['file_name']}: {questions}")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
                 st.subheader("Provide Feedback")
@@ -256,14 +269,18 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 submit_feedback = st.form_submit_button("Submit Feedback")
 
                 if submit_feedback:
-                    if save_feedback_func(run_id, result['file_name'], accuracy_rating, content_rating, suggestions):
+                    feedback_result = save_feedback_func(run_id, result['file_name'], accuracy_rating, content_rating, suggestions)
+                    if feedback_result:
                         st.success("Thank you for your feedback!")
+                        logger.info(f"Feedback submitted successfully for {result['file_name']}")
                     else:
                         st.error("Failed to save feedback. Please try again.")
+                        logger.error(f"Failed to save feedback for {result['file_name']}")
 
     progress_bar = st.progress(0)
     for i, result in enumerate(evaluation_results):
         progress_bar.progress((i + 1) / len(evaluation_results))
+    logger.debug("Finished displaying results")
 
 # Extract job description from Fractal's Workday job posting URL
 def extract_job_description(url):

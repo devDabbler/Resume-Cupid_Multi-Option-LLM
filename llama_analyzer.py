@@ -21,7 +21,7 @@ class LlamaAPI:
 
     def analyze(self, prompt: str) -> Dict[str, Any]:
         try:
-            logger.debug("Sending request to Llama API")
+            logger.debug(f"Sending request to Llama API with prompt: {prompt[:100]}...")
             completion = self.client.chat.completions.create(
                 messages=[
                     {
@@ -43,34 +43,44 @@ class LlamaAPI:
             logger.debug(f"Raw response from Llama: {result}")
 
             parsed_content = self._parse_json_response(result)
+            logger.debug(f"Parsed content: {parsed_content}")
+
             processed_content = self._process_parsed_content(parsed_content)
+            logger.debug(f"Processed content: {processed_content}")
 
             logger.info(f"Analysis completed successfully for prompt: {prompt[:50]}...")
             return processed_content
 
         except Exception as e:
-            logger.error(f"Llama API request failed: {str(e)}")
+            logger.error(f"Llama API request failed: {str(e)}", exc_info=True)
             return self._generate_error_response(str(e))
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
         try:
-            return json.loads(response)
+            parsed = json.loads(response)
+            logger.debug(f"Successfully parsed JSON response: {parsed}")
+            return parsed
         except json.JSONDecodeError as json_error:
             logger.error(f"JSON parsing error: {str(json_error)}")
             logger.debug(f"Problematic JSON: {response}")
             
             try:
                 cleaned_json = re.search(r'\{.*\}', response, re.DOTALL).group()
-                return json.loads(cleaned_json)
-            except (AttributeError, json.JSONDecodeError):
-                logger.error("Failed to parse JSON even after cleaning")
+                parsed = json.loads(cleaned_json)
+                logger.debug(f"Successfully parsed cleaned JSON: {parsed}")
+                return parsed
+            except (AttributeError, json.JSONDecodeError) as e:
+                logger.error(f"Failed to parse JSON even after cleaning: {str(e)}")
                 return {}
 
     def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
+        logger.debug(f"Processing parsed content: {parsed_content}")
         processed_content = {}
         
         for key, value in parsed_content.items():
-            processed_content[key.lower().replace(' ', '_')] = value
+            processed_key = key.lower().replace(' ', '_')
+            processed_content[processed_key] = value
+            logger.debug(f"Processed key-value pair: {processed_key} = {value}")
         
         required_fields = [
             'brief_summary', 'match_score', 'recommendation_for_interview',
@@ -80,19 +90,26 @@ class LlamaAPI:
         for field in required_fields:
             if field not in processed_content:
                 processed_content[field] = self._generate_fallback_content(field)
+                logger.warning(f"Generated fallback content for missing field: {field}")
         
         try:
-            processed_content['match_score'] = int(float(processed_content.get('match_score', 0)))
-        except (ValueError, TypeError):
+            if isinstance(processed_content['match_score'], dict):
+                processed_content['match_score'] = processed_content['match_score'].get('Overall', 0)
+            processed_content['match_score'] = int(float(processed_content['match_score']))
+            logger.debug(f"Processed match_score: {processed_content['match_score']}")
+        except (ValueError, TypeError) as e:
             logger.error(f"Invalid match_score value: {processed_content.get('match_score')}")
             processed_content['match_score'] = 0
         
         processed_content['recommendation'] = self._get_recommendation(processed_content['match_score'])
+        logger.debug(f"Generated recommendation: {processed_content['recommendation']}")
         
         return processed_content
 
     def _generate_fallback_content(self, field: str) -> str:
-        return f"No {field.replace('_', ' ')} available"
+        fallback = f"No {field.replace('_', ' ')} available"
+        logger.debug(f"Generated fallback content for {field}: {fallback}")
+        return fallback
 
     def _get_recommendation(self, match_score: int) -> str:
         if match_score < 20:
@@ -107,6 +124,7 @@ class LlamaAPI:
             return "Highly recommend for interview"
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
+        logger.debug(f"Analyzing match for candidate: {candidate_data.get('file_name', 'Unknown')}")
         prompt = f"""
         Analyze the fit between the following resume and job description for the role of {job_title}. 
         Provide a detailed evaluation covering these key areas:
@@ -129,6 +147,7 @@ class LlamaAPI:
 
         result = self.analyze(prompt)
         result['file_name'] = candidate_data.get('file_name', 'Unknown')
+        logger.debug(f"Analysis result for {result['file_name']}: {result}")
         return result
 
     def _generate_error_response(self, error_message: str) -> Dict[str, Any]:
