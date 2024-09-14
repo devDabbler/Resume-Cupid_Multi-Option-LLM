@@ -227,41 +227,52 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.error(f"Error: {result['error']}")
             else:
                 st.markdown("### Brief Summary")
-                st.write(result.get('brief_summary', 'No brief summary available'))
+                brief_summary = result.get('brief_summary', {})
+                if isinstance(brief_summary, dict):
+                    for key, value in brief_summary.items():
+                        st.write(f"**{key.capitalize()}:** {value}")
+                else:
+                    st.write(brief_summary)
+
                 st.markdown("### Match Score")
                 st.write(f"{result.get('match_score', 'N/A')}%")
+
                 st.markdown("### Recommendation")
                 st.write(result.get('recommendation', 'No recommendation available'))
+
                 st.markdown("### Experience and Project Relevance")
-                st.write(result.get('experience_and_project_relevance', 'No data available'))
+                exp_relevance = result.get('experience_and_project_relevance', {})
+                if isinstance(exp_relevance, dict):
+                    for key, value in exp_relevance.items():
+                        if isinstance(value, list):
+                            st.write(f"**{key.capitalize()}:**")
+                            for item in value:
+                                st.write(f"- {item}")
+                        else:
+                            st.write(f"**{key.capitalize()}:** {value}")
+                else:
+                    st.write(exp_relevance)
+
                 st.markdown("### Skills Gap")
                 skills_gap = result.get('skills_gap', [])
-                if skills_gap:
+                if isinstance(skills_gap, dict):
+                    for skill, details in skills_gap.items():
+                        st.write(f"- **{skill}:** {details}")
+                elif isinstance(skills_gap, list):
                     for skill in skills_gap:
-                        st.write(f"- {skill}")
-                else:
-                    st.write("No specific skills gap identified")
+                        if isinstance(skill, dict):
+                            for k, v in skill.items():
+                                st.write(f"- **{k}:** {v}")
+                        else:
+                            st.write(f"- {skill}")
+
                 st.markdown("### Recruiter Questions")
                 questions = result.get('recruiter_questions', [])
-                if questions:
-                    for question in questions:
-                        st.write(f"- {question}")
-                else:
-                    st.write("No specific recruiter questions generated")
-                st.markdown("### Strengths")
-                strengths = result.get('strengths', [])
-                if strengths:
-                    for strength in strengths:
-                        st.write(f"- {strength}")
-                else:
-                    st.write("No specific strengths identified")
-                st.markdown("### Areas for Improvement")
-                areas = result.get('areas_for_improvement', [])
-                if areas:
-                    for area in areas:
-                        st.write(f"- {area}")
-                else:
-                    st.write("No specific areas for improvement identified")
+                for q in questions:
+                    if isinstance(q, dict):
+                        st.write(f"- {q.get('text', q.get('question', 'N/A'))}")
+                    else:
+                        st.write(f"- {q}")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
                 st.subheader("Provide Feedback")
