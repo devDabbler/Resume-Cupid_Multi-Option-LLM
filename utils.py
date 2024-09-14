@@ -171,6 +171,11 @@ def process_resumes_in_parallel(resume_files, resume_processor, job_description,
     logger.debug("Starting parallel resume processing...")
     def process_with_context(file, candidate_data):
         try:
+            # Ensure each thread has its own Streamlit context
+            ctx = st.runtime.get_instance().scriptrunner.get_script_run_ctx()
+            if ctx is not None:
+                st.runtime.get_instance().scriptrunner.add_script_run_ctx(threading.current_thread(), ctx)
+
             resume_text = extract_text_from_file(file)
             result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
             result['file_name'] = file.name
@@ -184,8 +189,12 @@ def process_resumes_in_parallel(resume_files, resume_processor, job_description,
             executor.submit(process_with_context, file, candidate_data)
             for file, candidate_data in zip(resume_files, candidate_data_list)
         ]
-        add_script_run_ctx(futures)
-        results = [future.result() for future in as_completed(futures)]
+        results = []
+        for future in as_completed(futures):
+            try:
+                results.append(future.result())
+            except Exception as e:
+                logger.error(f"Error retrieving result from future: {str(e)}", exc_info=True)
     
     return results
 
