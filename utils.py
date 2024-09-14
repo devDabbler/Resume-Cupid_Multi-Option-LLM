@@ -208,16 +208,13 @@ def process_resumes_sequentially(resume_files, resume_processor, job_description
 
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.subheader("Stack Ranking of Candidates")
-    for result in evaluation_results:
-        result['match_score'] = result.get('match_score', 0)
-        result['recommendation'] = result.get('recommendation', 'No recommendation available')
     
+    # Sort results by match_score in descending order
     evaluation_results.sort(key=lambda x: x['match_score'], reverse=True)
     
     df = pd.DataFrame(evaluation_results)
     df['Rank'] = range(1, len(df) + 1)
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
-
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
     st.table(df)
 
@@ -227,12 +224,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.error(f"Error: {result['error']}")
             else:
                 st.markdown("### Brief Summary")
-                brief_summary = result.get('brief_summary', 'No brief summary available')
-                if isinstance(brief_summary, list):
-                    for item in brief_summary:
-                        st.write(f"- {item}")
-                else:
-                    st.write(brief_summary)
+                st.write(result.get('brief_summary', 'No brief summary available'))
 
                 st.markdown("### Match Score")
                 st.write(f"{result.get('match_score', 'N/A')}%")
@@ -242,30 +234,19 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
                 st.markdown("### Experience and Project Relevance")
                 exp_relevance = result.get('experience_and_project_relevance', 'No experience and project relevance data available')
-                if isinstance(exp_relevance, dict):
-                    for key, value in exp_relevance.items():
-                        if isinstance(value, list):
-                            st.write(f"**{key.capitalize()}:**")
-                            for item in value:
-                                st.write(f"- {item}")
-                        else:
-                            st.write(f"**{key.capitalize()}:** {value}")
-                else:
-                    st.write(exp_relevance)
+                st.write(exp_relevance)
 
                 st.markdown("### Skills Gap")
-                skills_gap = result.get('skills_gap', [])
-                if isinstance(skills_gap, list):
-                    for skill in skills_gap:
-                        if isinstance(skill, dict):
-                            st.write(f"- **{skill.get('skill', 'Skill')}:** {skill.get('level', 'N/A')}")
-                        else:
-                            st.write(f"- {skill}")
+                skills_gap = result.get('skills_gap', 'No skills gap data available')
+                st.write(skills_gap)
 
                 st.markdown("### Recruiter Questions")
                 questions = result.get('recruiter_questions', [])
-                for q in questions:
-                    st.write(f"- {q}")
+                if isinstance(questions, list):
+                    for q in questions:
+                        st.write(f"- {q}")
+                else:
+                    st.write(questions)
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
                 st.subheader("Provide Feedback")

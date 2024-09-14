@@ -2,12 +2,10 @@ import requests
 import logging
 import json
 import re
-import ast
 from typing import Dict, Any, List
 from logger import get_logger
 from groq import Groq
 
-# Initialize logging
 logger = get_logger(__name__)
 
 class LlamaAPI:
@@ -56,15 +54,12 @@ class LlamaAPI:
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
         try:
-            # Try to parse the JSON response
             return json.loads(response)
         except json.JSONDecodeError as json_error:
             logger.error(f"JSON parsing error: {str(json_error)}")
             logger.debug(f"Problematic JSON: {response}")
             
-            # Attempt to fix common JSON errors
             try:
-                # Remove any text before the first '{' and after the last '}'
                 cleaned_json = re.search(r'\{.*\}', response, re.DOTALL).group()
                 return json.loads(cleaned_json)
             except (AttributeError, json.JSONDecodeError):
@@ -74,17 +69,9 @@ class LlamaAPI:
     def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
         processed_content = {}
         
-        # Flatten nested structures and ensure all values are strings
         for key, value in parsed_content.items():
-            if isinstance(value, dict):
-                for sub_key, sub_value in value.items():
-                    processed_content[f"{key}_{sub_key}"] = self._ensure_string(sub_value)
-            elif isinstance(value, list):
-                processed_content[key] = [self._ensure_string(item) for item in value]
-            else:
-                processed_content[key] = self._ensure_string(value)
+            processed_content[key.lower().replace(' ', '_')] = value
         
-        # Ensure required fields are present
         required_fields = [
             'brief_summary', 'match_score', 'recommendation_for_interview',
             'experience_and_project_relevance', 'skills_gap', 'recruiter_questions'
@@ -94,22 +81,15 @@ class LlamaAPI:
             if field not in processed_content:
                 processed_content[field] = self._generate_fallback_content(field)
         
-        # Ensure match_score is an integer
         try:
             processed_content['match_score'] = int(float(processed_content.get('match_score', 0)))
         except (ValueError, TypeError):
             logger.error(f"Invalid match_score value: {processed_content.get('match_score')}")
             processed_content['match_score'] = 0
         
-        # Generate recommendation based on match_score
         processed_content['recommendation'] = self._get_recommendation(processed_content['match_score'])
         
         return processed_content
-
-    def _ensure_string(self, value: Any) -> str:
-        if isinstance(value, (dict, list)):
-            return json.dumps(value)
-        return str(value)
 
     def _generate_fallback_content(self, field: str) -> str:
         return f"No {field.replace('_', ' ')} available"
@@ -147,7 +127,9 @@ class LlamaAPI:
         Provide your analysis in a structured JSON format.
         """
 
-        return self.analyze(prompt)
+        result = self.analyze(prompt)
+        result['file_name'] = candidate_data.get('file_name', 'Unknown')
+        return result
 
     def _generate_error_response(self, error_message: str) -> Dict[str, Any]:
         logger.warning(f"Generating error response: {error_message}")
@@ -162,5 +144,4 @@ class LlamaAPI:
         }
 
     def clear_cache(self):
-        # Llama doesn't have a built-in cache, so this method can be empty
         pass
