@@ -99,7 +99,7 @@ class ResumeProcessor:
                 logger.debug(f"Calling {self.backend} API for analysis")
                 analysis = self.analyzer.analyze_match(resume_text, job_description, {}, job_title)
                 logger.debug(f"API analysis result: {analysis}")
-            
+        
                 years_of_experience = self._extract_years_of_experience(resume_text)
                 logger.debug(f"Extracted years of experience: {years_of_experience}")
 
@@ -133,7 +133,7 @@ class ResumeProcessor:
                     return self._generate_error_result(str(e))
 
         logger.error("Max retries reached. Unable to complete analysis.")
-        return self._generate_error_result("Max retries reached")    
+        return self._generate_error_result("Max retries reached")   
 
     def analyze_with_fallback(self, resume_text: str, job_description: str, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
         try:

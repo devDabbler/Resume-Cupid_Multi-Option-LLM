@@ -65,52 +65,43 @@ class LlamaAPI:
             return self._generate_error_response(str(e))
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
+        prompt = f"""
+        You are a highly skilled AI recruiter tasked with evaluating candidates for the role of {job_title}. Analyze the following resume against the provided job description. 
+        Provide a detailed evaluation covering these key areas:
+
+        1. Brief Summary: Provide a concise overview of the candidate's fit for the role in 2-3 sentences.
+        2. Match Score: Assign a percentage (0-100%) indicating how well the candidate matches the job requirements.
+        3. Recommendation for Interview: Based on the analysis, provide a clear recommendation (e.g., "Highly Recommend", "Recommend", "Recommend with Reservations", "Do Not Recommend").
+        4. Experience and Project Relevance: Analyze how the candidate's past experiences and projects align with the job requirements.
+        5. Skills Gap: Identify any important skills or qualifications mentioned in the job description that the candidate lacks.
+        6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements.
+
+        Resume:
+        {resume}
+
+        Job Description:
+        {job_description}
+
+        Provide your analysis in a structured JSON format.
+        """
+
+        response = self._generate_response(prompt)
+    
         try:
-            logger.info("Starting resume analysis")
-            prompt = f"""
-            You are a highly skilled AI recruiter specializing in Machine Learning Operations Engineering roles. Your task is to analyze the fit between the following resume and job description with extreme accuracy and specificity. 
-            Focus on how well the candidate's skills and experience match the job requirements for the role of {job_title}, particularly in areas of model governance, risk management, and compliance in financial services.
-
-            Provide a detailed analysis for each of the following areas:
-
-            1. Brief Summary: Provide a concise overview of the candidate's fit for the role of {job_title} in 2-3 sentences.
-            2. Match Score: Provide a percentage between 0 and 100, where:
-               - 0-20%: The candidate has almost none of the required skills or experience in model governance, risk management, or compliance
-               - 21-40%: The candidate has some relevant skills but lacks significant experience in model governance or financial services
-               - 41-60%: The candidate has several relevant skills and some experience, but significant gaps remain in model governance or risk management
-               - 61-80%: The candidate is a good fit with minor gaps in specific areas of model governance or compliance
-               - 81-100%: The candidate is an excellent fit with strong experience in model governance, risk management, and compliance in financial services
-               Be very critical and realistic in this scoring. Do not hesitate to give low scores for candidates who lack specific experience in model governance and risk management in financial services.
-            3. Recommendation for Interview: Based on the match score and the candidate's fit for {job_title}, provide a recommendation.
-            4. Experience and Project Relevance: Provide a comprehensive analysis of the candidate's work experience and relevant projects, specifically relating them to model governance, risk management, and compliance in financial services.
-            5. Skills Gap: List all important skills or qualifications mentioned in the job description for {job_title} that the candidate lacks, particularly focusing on model governance, risk management, and compliance skills.
-            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements for {job_title}, focusing on model governance and risk management experience.
-
-            Ensure that all fields are populated with relevant, detailed information. Do not include any text outside of the JSON structure.
-
-            Job Title: {job_title}
-
-            Candidate Data:
-            {json.dumps(candidate_data)}
-
-            Job Description:
-            {job_description}
-
-            Resume:
-            {resume}
-
-            JSON Response:
-            """
-            logger.debug(f"Generated prompt: {prompt[:500]}...")  # Log first 500 characters of the prompt
-            result = self.analyze(prompt)
+            analysis = json.loads(response)
+            # Ensure all required fields are present
+            required_fields = ['brief_summary', 'match_score', 'recommendation_for_interview', 'experience_and_project_relevance', 'skills_gap', 'recruiter_questions']
+            for field in required_fields:
+                if field not in analysis:
+                    analysis[field] = f"No {field.replace('_', ' ')} provided"
         
-            logger.debug(f"Analysis result: {result}")
-        
-            return result
-
-        except Exception as e:
-            logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
-            return self._generate_error_response(f"Error in analyze_match: {str(e)}")
+            return analysis
+        except json.JSONDecodeError:
+            logger.error("Failed to parse JSON from LLM response")
+            return {
+                'error': 'Failed to parse analysis result',
+                'raw_response': response
+            }
 
     def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
         required_fields = [
