@@ -98,21 +98,26 @@ class LlamaAPI:
             'Brief Summary', 'Match Score', 'Recommendation for Interview',
             'Experience and Project Relevance', 'Skills Gap', 'Recruiter Questions'
         ]
+        
+        processed_content = {}
+        
         for field in required_fields:
-            if field not in parsed_content or not parsed_content[field]:
-                parsed_content[field.lower()] = self._generate_fallback_content(field.lower(), parsed_content)
-                logger.warning(f"Field '{field}' was missing or empty in API response, generated fallback content")
+            lower_field = field.lower().replace(' ', '_')
+            if field in parsed_content:
+                processed_content[lower_field] = self._clean_content(parsed_content[field])
+            elif lower_field in parsed_content:
+                processed_content[lower_field] = self._clean_content(parsed_content[lower_field])
             else:
-                # Clean the content
-                parsed_content[field.lower()] = self._clean_content(parsed_content[field])
+                processed_content[lower_field] = self._generate_fallback_content(lower_field, parsed_content)
+                logger.warning(f"Field '{field}' was missing in API response, generated fallback content")
     
         try:
-            parsed_content['match_score'] = int(float(parsed_content.get('Match Score', 0)))
+            processed_content['match_score'] = int(float(processed_content.get('match_score', 0)))
         except (ValueError, TypeError):
-            logger.error(f"Invalid match_score value: {parsed_content.get('Match Score')}")
-            parsed_content['match_score'] = 0
+            logger.error(f"Invalid match_score value: {processed_content.get('match_score')}")
+            processed_content['match_score'] = 0
 
-        match_score = parsed_content['match_score']
+        match_score = processed_content['match_score']
         if match_score == 0:
             recommendation = "Do not recommend for interview (not suitable for the role)"
         elif match_score < 30:
@@ -126,8 +131,8 @@ class LlamaAPI:
         else:
             recommendation = "Highly recommend for interview"
 
-        parsed_content['recommendation'] = recommendation
-        return parsed_content
+        processed_content['recommendation'] = recommendation
+        return processed_content
 
     def _clean_content(self, content):
         if isinstance(content, str):
