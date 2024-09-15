@@ -383,14 +383,14 @@ def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
         "matched_phrases": len(relevant_experiences)
     }
 
-def _identify_skills_gap(resume_text: str, job_description: str) -> List[str]:
+def _identify_skills_gap(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     job_doc = nlp(job_description)
-    job_skills = [token.text for token in job_doc if token.pos_ == "NOUN" or token.pos_ == "PROPN"]
+    job_skills = set([token.text.lower() for token in job_doc if token.pos_ in ["NOUN", "PROPN"]] + key_skills)
     
-    missing_skills = []
-    for skill in job_skills:
-        if skill.lower() not in resume_text.lower():
-            missing_skills.append(skill)
+    resume_doc = nlp(resume_text)
+    resume_skills = set([token.text.lower() for token in resume_doc if token.pos_ in ["NOUN", "PROPN"]])
+    
+    missing_skills = list(job_skills - resume_skills)
     
     return missing_skills
 

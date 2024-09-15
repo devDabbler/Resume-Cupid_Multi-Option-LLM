@@ -193,17 +193,23 @@ def main_app():
 
     st.subheader("Customize Importance Factors")
 
-    # Create a list of importance factor names and their corresponding default values
-    importance_factors = {
-        'technical_skills': 0.5,
-        'experience': 0.5,
-        'education': 0.5,
-        'soft_skills': 0.5,
-        'industry_knowledge': 0.5
-    }
+    importance_factors = st.session_state.importance_factors
+    cols = st.columns(5)
 
-    # Create columns dynamically based on the number of factors
-    cols = st.columns(len(importance_factors))
+    with cols[0]:
+        importance_factors['technical_skills'] = st.slider("Technical Skills", 0.0, 1.0, 0.5, 0.1)
+    
+    with cols[1]:
+        importance_factors['experience'] = st.slider("Experience", 0.0, 1.0, 0.5, 0.1)
+    
+    with cols[2]:
+        importance_factors['education'] = st.slider("Education", 0.0, 1.0, 0.5, 0.1)
+    
+    with cols[3]:
+        importance_factors['soft_skills'] = st.slider("Soft Skills", 0.0, 1.0, 0.5, 0.1)
+    
+    with cols[4]:
+        importance_factors['industry_knowledge'] = st.slider("Industry Knowledge", 0.0, 1.0, 0.5, 0.1)
 
     # Loop over each importance factor and create a slider in its respective column
     for idx, (factor, default_value) in enumerate(importance_factors.items()):
@@ -214,13 +220,18 @@ def main_app():
     # Update the session state with the new importance factors
     st.session_state.importance_factors = importance_factors
 
-    # Key Skills/Requirements Section
     st.subheader("Key Skills/Requirements")
     key_skills = st.text_area("Enter key skills or requirements (one per line):", 
                           help="These will be used to assess the candidate's fit for the role.")
     if key_skills:
         # Clean up the input and split into a list, ignoring empty lines
         st.session_state.key_skills = [skill.strip() for skill in key_skills.split('\n') if skill.strip()]
+
+    # Display entered key skills for confirmation
+    if st.session_state.key_skills:
+        st.write("Key Skills/Requirements Entered:")
+        for skill in st.session_state.key_skills:
+            st.write(f"- {skill}")
     else:
         st.session_state.key_skills = []
 
@@ -228,7 +239,6 @@ def main_app():
     if st.session_state.key_skills:
         st.write("Key Skills/Requirements Entered:")
         st.write(st.session_state.key_skills)
-
 
     st.write("Upload your resume(s) (Maximum 3 files allowed):")
     resume_files = st.file_uploader("Upload resumes (max 3)", type=['pdf', 'docx'], accept_multiple_files=True)
