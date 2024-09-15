@@ -204,19 +204,15 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
     
-    # Custom color scale function
     def color_scale(val):
-        if val <= 39:
-            return 'background-color: #FFCCCB'  # Light red
-        elif val <= 54:
-            return 'background-color: #FFFF99'  # Light yellow
-        elif val <= 70:
-            return 'background-color: #FFFFCC'  # Pale yellow
-        elif val <= 81:
-            return 'background-color: #CCFFCC'  # Light green
+        if val > 80:
+            color = 'green'
+        elif val > 60:
+            color = 'yellow'
         else:
-            return 'background-color: #90EE90'  # Pale green
-
+            color = 'red'
+        return f'background-color: {color}'
+    
     st.dataframe(df.style.applymap(color_scale, subset=['Match Score (%)']))
 
     for i, result in enumerate(evaluation_results, 1):
@@ -231,13 +227,23 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             st.write(result['brief_summary'])
 
             st.subheader("Experience and Project Relevance")
-            display_nested_content(result['experience_and_project_relevance'])
+            st.write(result['experience_and_project_relevance'])
+
+            st.subheader("Key Strengths")
+            for strength in result['key_strengths']:
+                st.write(f"- {strength}")
+
+            st.subheader("Areas for Improvement")
+            for weakness in result['key_weaknesses']:
+                st.write(f"- {weakness}")
 
             st.subheader("Skills Gap")
-            display_nested_content(result['skills_gap'])
+            for skill in result['skills_gap']:
+                st.write(f"- {skill}")
 
             st.subheader("Recruiter Questions")
-            display_nested_content(result['recruiter_questions'])
+            for question in result['recruiter_questions']:
+                st.write(f"- {question}")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
                 st.subheader("Provide Feedback")
@@ -387,14 +393,15 @@ def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
 
 def _identify_skills_gap(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     job_doc = nlp(job_description)
-    job_skills = set([token.text.lower() for token in job_doc if token.pos_ in ["NOUN", "PROPN"]] + key_skills)
+    job_skills = set([token.text.lower() for token in job_doc if token.pos_ in ["NOUN", "PROPN"]] + [skill.lower() for skill in key_skills])
     
     resume_doc = nlp(resume_text)
     resume_skills = set([token.text.lower() for token in resume_doc if token.pos_ in ["NOUN", "PROPN"]])
     
     missing_skills = list(job_skills - resume_skills)
     
-    return missing_skills
+    # Return only the top 10 most relevant missing skills
+    return sorted(missing_skills, key=lambda x: job_description.lower().count(x), reverse=True)[:10]
 
 def _extract_key_points(resume_text: str, job_description: str, key_skills: List[str], is_strength: bool = True) -> List[str]:
     resume_doc = nlp(resume_text)
@@ -404,9 +411,11 @@ def _extract_key_points(resume_text: str, job_description: str, key_skills: List
     job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks]
     
     if is_strength:
-        return [phrase for phrase in resume_phrases if phrase in job_phrases or any(skill.lower() in phrase for skill in key_skills)]
+        strengths = [phrase for phrase in resume_phrases if phrase in job_phrases or any(skill.lower() in phrase for skill in key_skills)]
+        return list(set(strengths))[:5]  # Return only top 5 unique strengths
     else:
-        return [phrase for phrase in job_phrases if phrase not in resume_phrases and not any(skill.lower() in phrase for skill in key_skills)]
+        weaknesses = [phrase for phrase in job_phrases if phrase not in resume_phrases and not any(skill.lower() in phrase for skill in key_skills)]
+        return list(set(weaknesses))[:5]  # Return only top 5 unique weaknesses
 
 def _generate_questions(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
@@ -422,13 +431,13 @@ def _generate_questions(resume_text: str, job_description: str, key_skills: List
     return questions
 
 def _get_recommendation(match_score: int) -> str:
-    if match_score < 30:
+    if match_score < 40:
         return "Do not recommend for interview"
-    elif 30 <= match_score < 50:
-        return "Consider for interview with significant reservations"
-    elif 50 <= match_score < 70:
-        return "Recommend for interview with minor reservations"
-    elif 70 <= match_score < 85:
+    elif 40 <= match_score < 55:
+        return "Review profile again and/or conduct indepth recruiter screen focusing on the questions provided. Recommend for interview with significant reservations"
+    elif 55 <= match_score < 71:
+        return "Recommend for interview with minor reservations - be sure to focus on skill gaps etc."
+    elif 71 <= match_score < 82:
         return "Recommend for interview"
     else:
         return "Highly recommend for interview"
