@@ -193,29 +193,25 @@ def main_app():
 
     st.subheader("Customize Importance Factors")
 
-    importance_factors = st.session_state.importance_factors
-    cols = st.columns(5)
+    # Define importance factors
+    importance_factors = {
+        'technical_skills': 0.5,
+        'experience': 0.5,
+        'education': 0.5,
+        'soft_skills': 0.5,
+        'industry_knowledge': 0.5
+    }
 
-    with cols[0]:
-        importance_factors['technical_skills'] = st.slider("Technical Skills", 0.0, 1.0, 0.5, 0.1)
-    
-    with cols[1]:
-        importance_factors['experience'] = st.slider("Experience", 0.0, 1.0, 0.5, 0.1)
-    
-    with cols[2]:
-        importance_factors['education'] = st.slider("Education", 0.0, 1.0, 0.5, 0.1)
-    
-    with cols[3]:
-        importance_factors['soft_skills'] = st.slider("Soft Skills", 0.0, 1.0, 0.5, 0.1)
-    
-    with cols[4]:
-        importance_factors['industry_knowledge'] = st.slider("Industry Knowledge", 0.0, 1.0, 0.5, 0.1)
+    # Create columns for importance factors
+    cols = st.columns(len(importance_factors))
 
-    # Loop over each importance factor and create a slider in its respective column
-    for idx, (factor, default_value) in enumerate(importance_factors.items()):
-        with cols[idx]:
-            importance_factors[factor] = st.slider(f"{factor.replace('_', ' ').title()} Importance", 
-                                                0.0, 1.0, default_value, 0.1)
+    # Create sliders for each importance factor
+    for i, (factor, default_value) in enumerate(importance_factors.items()):
+        with cols[i]:
+            importance_factors[factor] = st.slider(
+                f"{factor.replace('_', ' ').title()}",
+                0.0, 1.0, default_value, 0.1
+            )
 
     # Update the session state with the new importance factors
     st.session_state.importance_factors = importance_factors
