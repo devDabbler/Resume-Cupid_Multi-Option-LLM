@@ -67,7 +67,7 @@ def main_app():
     init_db()
     """Main application interface that should only be accessible after login."""
     
-    st.markdown("",unsafe_allow_html=True)
+    st.markdown("", unsafe_allow_html=True)
     st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
     st.markdown("Resume Cupid is an intelligent resume evaluation tool designed to streamline the hiring process. Upload one or multiple resumes to evaluate and rank candidates for a specific role.")
 
@@ -78,11 +78,17 @@ def main_app():
     for key in ['role_name_input', 'job_description', 'current_role_name', 'job_description_link', 'importance_factors', 'backend', 'resume_processor', 'last_backend', 'key_skills']:
         if key not in st.session_state:
             if key == 'importance_factors':
-                st.session_state[key] = {'education': 0.5, 'experience': 0.5, 'skills': 0.5}
-        elif key == 'key_skills':
-            st.session_state[key] = []
-        else:
-            st.session_state[key] = ''
+                st.session_state[key] = {
+                    'technical_skills': 0.5,
+                    'experience': 0.5,
+                    'education': 0.5,
+                    'soft_skills': 0.5,
+                    'industry_knowledge': 0.5
+                }
+            elif key == 'key_skills':
+                st.session_state[key] = []
+            else:
+                st.session_state[key] = ''
 
     if 'saved_roles' not in st.session_state:
         st.session_state.saved_roles = get_saved_roles()
@@ -90,16 +96,12 @@ def main_app():
     llm_descriptions = {
         "llama": "Created by Meta AI, this is the llama-3.1, 8 billion parameter model. This is the latest and most capable large language model with strong performance on various NLP tasks.",
     }
-    
-    #"claude": "3.5 Sonnet is Anthropic's most recent model that is highly effective for natural language understanding and generation. It comes at a premium but very accurate.",
-    #"gpt4o_mini": "This is the compact version of GPT-4 with impressive capabilities. Open-source alternative."
 
     api_keys = get_available_api_keys()
 
     if not api_keys or 'llama' not in api_keys:
         st.error("No API key found for Llama. Please check your configuration.")
         return
-
 
     available_backends = ['llama']  # Only allow Llama
     backend_options = []
@@ -198,28 +200,16 @@ def main_app():
 
     st.subheader("Customize Importance Factors")
 
-    # Define importance factors
-    importance_factors = {
-        'technical_skills': 0.5,
-        'experience': 0.5,
-        'education': 0.5,
-        'soft_skills': 0.5,
-        'industry_knowledge': 0.5
-    }
-
     # Create columns for importance factors
-    cols = st.columns(len(importance_factors))
+    cols = st.columns(len(st.session_state.importance_factors))
 
     # Create sliders for each importance factor
-    for i, (factor, default_value) in enumerate(importance_factors.items()):
+    for i, (factor, default_value) in enumerate(st.session_state.importance_factors.items()):
         with cols[i]:
-            importance_factors[factor] = st.slider(
+            st.session_state.importance_factors[factor] = st.slider(
                 f"{factor.replace('_', ' ').title()}",
                 0.0, 1.0, default_value, 0.1
             )
-
-    # Update the session state with the new importance factors
-    st.session_state.importance_factors = importance_factors
 
     st.subheader("Key Skills/Requirements")
     key_skills = st.text_area("Enter key skills or requirements (one per line):", 
@@ -228,11 +218,11 @@ def main_app():
         # Clean up the input and split into a list, ignoring empty lines
         st.session_state.key_skills = [skill.strip() for skill in key_skills.split('\n') if skill.strip()]
 
-        # Display entered key skills for confirmation
+    # Display entered key skills for confirmation
     if st.session_state.key_skills:
         st.write("Key Skills/Requirements Entered:")
-    for skill in st.session_state.key_skills:
-        st.write(f"- {skill}")
+        for skill in st.session_state.key_skills:
+            st.write(f"- {skill}")
 
     st.write("Upload your resume(s) (Maximum 3 files allowed):")
     resume_files = st.file_uploader("Upload resumes (max 3)", type=['pdf', 'docx'], accept_multiple_files=True)
@@ -249,55 +239,52 @@ def main_app():
                 st.warning("You've uploaded more than 3 resumes. Only the first 3 will be processed.")
                 resume_files = resume_files[:3]
         
-        run_id = str(uuid.uuid4())
-        insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
-        logger.info("Processing resumes...")
+            run_id = str(uuid.uuid4())
+            insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
+            logger.info("Processing resumes...")
 
-        candidates = get_candidate_data()
-        candidate_data_list = []
-        for file in resume_files:
-            matching_candidate = next((c for c in candidates if c['candidate'] == file.name), None)
-            candidate_data_list.append(matching_candidate or {})
-        
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        evaluation_results = []
-        try:
-            with st.spinner('Processing resumes...'):
-                for i, (resume_file, candidate_data) in enumerate(zip(resume_files, candidate_data_list)):
-                    status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
-                    result = process_resume(resume_file, resume_processor, st.session_state.job_description, 
-                                            st.session_state.importance_factors, candidate_data, st.session_state.job_title,
-                                            st.session_state.key_skills)
-                    evaluation_results.append(result)
-                    progress_bar.progress((i + 1) / len(resume_files))
+            candidates = get_candidate_data()
+            candidate_data_list = []
+            for file in resume_files:
+                matching_candidate = next((c for c in candidates if c['candidate'] == file.name), None)
+                candidate_data_list.append(matching_candidate or {})
             
-            logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
-            insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            evaluation_results = []
+            try:
+                with st.spinner('Processing resumes...'):
+                    for i, (resume_file, candidate_data) in enumerate(zip(resume_files, candidate_data_list)):
+                        status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
+                        result = process_resume(resume_file, resume_processor, st.session_state.job_description, 
+                                                st.session_state.importance_factors, candidate_data, st.session_state.job_title,
+                                                st.session_state.key_skills)
+                        evaluation_results.append(result)
+                        progress_bar.progress((i + 1) / len(resume_files))
+                
+                logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
+                insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
 
-            if evaluation_results:
-                st.success("Evaluation complete!")
-                logger.info("Evaluation complete, displaying results.")
-                display_results(evaluation_results, run_id, save_feedback)
-            else:
-                st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
-        except Exception as e:
-            st.error(f"An error occurred during processing: {str(e)}")
-            logger.error(f"Error during resume processing: {str(e)}", exc_info=True)
-        finally:
-            progress_bar.empty()
-            status_text.empty()
-    else:
-        if not st.session_state.job_description:
-            st.error("Please ensure a job description is provided.")
-        if not st.session_state.job_title:
-            st.error("Please enter a job title.")
-        if not resume_files:
-            st.error("Please upload at least one resume.")
-
-    st.session_state.role_name_input = st.session_state.role_name_input
-    st.session_state.job_description_link = st.session_state.job_description_link
+                if evaluation_results:
+                    st.success("Evaluation complete!")
+                    logger.info("Evaluation complete, displaying results.")
+                    display_results(evaluation_results, run_id, save_feedback)
+                else:
+                    st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
+            except Exception as e:
+                st.error(f"An error occurred during processing: {str(e)}")
+                logger.error(f"Error during resume processing: {str(e)}", exc_info=True)
+            finally:
+                progress_bar.empty()
+                status_text.empty()
+        else:
+            if not st.session_state.job_description:
+                st.error("Please ensure a job description is provided.")
+            if not st.session_state.job_title:
+                st.error("Please enter a job title.")
+            if not resume_files:
+                st.error("Please upload at least one resume.")
 
     save_role_option = st.checkbox("Save this role for future use")
     if save_role_option:
@@ -355,4 +342,4 @@ def main_app():
         st.experimental_rerun()
 
 if __name__ == "__main__":
-     pass
+    pass
