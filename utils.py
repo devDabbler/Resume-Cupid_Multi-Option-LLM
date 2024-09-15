@@ -231,10 +231,22 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             display_nested_content(result['skills_gap'])
 
             st.subheader("Recruiter Questions")
-            for question, justification in result['recruiter_questions']:
-                st.write(f"- {question}")
-                if justification:
-                    st.write(f"  *Justification:* {justification}")
+            recruiter_questions = result.get('recruiter_questions', [])
+            if isinstance(recruiter_questions, list):
+                for item in recruiter_questions:
+                    if isinstance(item, tuple) and len(item) == 2:
+                        question, justification = item
+                        st.write(f"- {question}")
+                        if justification:
+                            st.write(f"  *Justification:* {justification}")
+                    elif isinstance(item, str):
+                        st.write(f"- {item}")
+                    elif isinstance(item, dict):
+                        st.write(f"- {item.get('question', item.get('text', ''))}")
+                        if 'justification' in item or 'reason' in item:
+                            st.write(f"  *Justification:* {item.get('justification', item.get('reason', ''))}")
+            else:
+                st.write("No recruiter questions available")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
                 st.subheader("Provide Feedback")
@@ -322,11 +334,12 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             'file_name': resume_file.name,
             'brief_summary': result.get('briefsummary') or result.get('brief_summary', 'No brief summary available'),
             'match_score': _adjust_score(result.get('matchscore') or result.get('match_score', 0), resume_file.name),
-            'recommendation': _get_recommendation(result.get('matchscore') or result.get('match_score', 0), resume_file.name),
             'experience_and_project_relevance': result.get('experienceandprojectrelevance') or result.get('experience_and_project_relevance', 'No experience and project relevance available'),
             'skills_gap': result.get('skillsgap') or result.get('skills_gap', 'No skills gap available'),
             'recruiter_questions': _process_recruiter_questions(result.get('recruiterquestions') or result.get('recruiter_questions', []))
         }
+        
+        processed_result['recommendation'] = _get_recommendation(processed_result['match_score'], resume_file.name)
         
         return processed_result
     except Exception as e:
@@ -337,7 +350,7 @@ def _adjust_score(raw_score, file_name):
     if isinstance(raw_score, dict):
         raw_score = raw_score.get('score', 0)
     try:
-        score = int(raw_score)
+        score = int(float(raw_score))
     except (ValueError, TypeError):
         score = 0
     
@@ -372,7 +385,7 @@ def _process_recruiter_questions(questions):
                 question = q.get('question', q.get('text', ''))
                 justification = q.get('justification', q.get('reason', ''))
                 processed_questions.append((question, justification))
-            else:
+            elif isinstance(q, str):
                 processed_questions.append((q, ''))
     elif isinstance(questions, str):
         processed_questions.append((questions, ''))
