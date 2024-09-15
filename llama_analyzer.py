@@ -83,8 +83,8 @@ class LlamaAPI:
             logger.debug(f"Processed key-value pair: {processed_key} = {value}")
     
         required_fields = [
-        'brief_summary', 'match_score', 'recommendation_for_interview',
-        'experience_and_project_relevance', 'skills_gap', 'recruiter_questions'
+            'brief_summary', 'match_score', 'recommendation_for_interview',
+            'experience_and_project_relevance', 'skills_gap', 'recruiter_questions'
         ]
     
         for field in required_fields:

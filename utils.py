@@ -289,6 +289,20 @@ def display_nested_content(content):
     else:
         st.write(content)
 
+def display_nested_content(content):
+    if isinstance(content, dict):
+        for key, value in content.items():
+            st.write(f"**{key.capitalize()}:**")
+            display_nested_content(value)
+    elif isinstance(content, list):
+        for item in content:
+            if isinstance(item, dict):
+                display_nested_content(item)
+            else:
+                st.write(f"- {item}")
+    else:
+        st.write(content)
+
 # Extract job description from Fractal's Workday job posting URL
 def extract_job_description(url):
     if not is_valid_fractal_job_link(url):
