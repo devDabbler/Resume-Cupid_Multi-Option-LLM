@@ -230,16 +230,13 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             st.write(result['experience_and_project_relevance'])
 
             st.subheader("Key Strengths")
-            for strength in result['key_strengths']:
-                st.write(f"- {strength}")
+            st.write(result['key_strengths'])
 
             st.subheader("Areas for Improvement")
-            for weakness in result['key_weaknesses']:
-                st.write(f"- {weakness}")
+            st.write(result['key_weaknesses'])
 
             st.subheader("Skills Gap")
-            for skill in result['skills_gap']:
-                st.write(f"- {skill}")
+            st.write(result['skills_gap'])
 
             st.subheader("Recruiter Questions")
             for question in result['recruiter_questions']:
@@ -327,15 +324,20 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         resume_text = extract_text_from_file(resume_file)
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         
+        match_score = _calculate_match_score(resume_text, job_description, importance_factors, key_skills)
+        skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
+        key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
+        key_weaknesses = _extract_key_points(resume_text, job_description, key_skills, is_strength=False)
+        
         processed_result = {
             'file_name': resume_file.name,
             'brief_summary': result.get('brief_summary', 'No brief summary available'),
-            'match_score': _calculate_match_score(resume_text, job_description, importance_factors, key_skills),
-            'experience_and_project_relevance': _assess_relevance(resume_text, job_description),
-            'skills_gap': _identify_skills_gap(resume_text, job_description, key_skills),
-            'key_strengths': _extract_key_points(resume_text, job_description, key_skills, is_strength=True),
-            'key_weaknesses': _extract_key_points(resume_text, job_description, key_skills, is_strength=False),
-            'recruiter_questions': _generate_questions(resume_text, job_description, key_skills)
+            'match_score': match_score,
+            'experience_and_project_relevance': _summarize_relevance(result.get('experience_and_project_relevance', {})),
+            'skills_gap': ", ".join(skills_gap),
+            'key_strengths': ", ".join(key_strengths),
+            'key_weaknesses': ", ".join(key_weaknesses),
+            'recruiter_questions': result.get('recruiter_questions', [])[:3]  # Limit to top 3 questions
         }
         
         processed_result['recommendation'] = _get_recommendation(processed_result['match_score'])
@@ -344,6 +346,12 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
+
+def _summarize_relevance(relevance_data):
+    if isinstance(relevance_data, dict):
+        return f"Relevance Score: {relevance_data.get('relevance_score', 'N/A')}%, " \
+               f"Matched Phrases: {relevance_data.get('matched_phrases', 'N/A')}"
+    return str(relevance_data)
 
 def _calculate_match_score(resume_text: str, job_description: str, importance_factors: Dict[str, float], key_skills: List[str]) -> int:
     vectorizer = TfidfVectorizer()
@@ -393,29 +401,38 @@ def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
 
 def _identify_skills_gap(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     job_doc = nlp(job_description)
-    job_skills = set([token.text.lower() for token in job_doc if token.pos_ in ["NOUN", "PROPN"]] + [skill.lower() for skill in key_skills])
-    
     resume_doc = nlp(resume_text)
-    resume_skills = set([token.text.lower() for token in resume_doc if token.pos_ in ["NOUN", "PROPN"]])
+    
+    stop_words = set(nlp.Defaults.stop_words).union({'experience', 'skill', 'ability'})
+    
+    def is_valid_skill(word):
+        return len(word) > 3 and word.lower() not in stop_words and word.isalpha()
+    
+    job_skills = set([token.text.lower() for token in job_doc if token.pos_ in ["NOUN", "PROPN"] and is_valid_skill(token.text)] + [skill.lower() for skill in key_skills])
+    resume_skills = set([token.text.lower() for token in resume_doc if token.pos_ in ["NOUN", "PROPN"] and is_valid_skill(token.text)])
     
     missing_skills = list(job_skills - resume_skills)
-    
-    # Return only the top 10 most relevant missing skills
     return sorted(missing_skills, key=lambda x: job_description.lower().count(x), reverse=True)[:10]
 
 def _extract_key_points(resume_text: str, job_description: str, key_skills: List[str], is_strength: bool = True) -> List[str]:
     resume_doc = nlp(resume_text)
     job_doc = nlp(job_description)
     
-    resume_phrases = [chunk.text.lower() for chunk in resume_doc.noun_chunks]
-    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks]
+    # Filter out common words and short words
+    stop_words = set(nlp.Defaults.stop_words).union({'experience', 'skill', 'ability'})
+    
+    def is_valid_word(word):
+        return len(word) > 3 and word.lower() not in stop_words and word.isalpha()
+    
+    resume_phrases = [chunk.text.lower() for chunk in resume_doc.noun_chunks if is_valid_word(chunk.root.text)]
+    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks if is_valid_word(chunk.root.text)]
     
     if is_strength:
-        strengths = [phrase for phrase in resume_phrases if phrase in job_phrases or any(skill.lower() in phrase for skill in key_skills)]
-        return list(set(strengths))[:5]  # Return only top 5 unique strengths
+        strengths = list(set([phrase for phrase in resume_phrases if phrase in job_phrases or any(skill.lower() in phrase for skill in key_skills)]))
+        return sorted(strengths, key=lambda x: job_description.lower().count(x), reverse=True)[:5]
     else:
-        weaknesses = [phrase for phrase in job_phrases if phrase not in resume_phrases and not any(skill.lower() in phrase for skill in key_skills)]
-        return list(set(weaknesses))[:5]  # Return only top 5 unique weaknesses
+        weaknesses = list(set([phrase for phrase in job_phrases if phrase not in resume_phrases and not any(skill.lower() in phrase for skill in key_skills)]))
+        return sorted(weaknesses, key=lambda x: job_description.lower().count(x), reverse=True)[:5]
 
 def _generate_questions(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
