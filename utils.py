@@ -396,21 +396,21 @@ def _identify_skills_gap(resume_text: str, job_description: str, key_skills: Lis
     
     return missing_skills
 
-def _extract_key_points(resume_text: str, job_description: str, is_strength: bool = True) -> List[str]:
+def _extract_key_points(resume_text: str, job_description: str, key_skills: List[str], is_strength: bool = True) -> List[str]:
     resume_doc = nlp(resume_text)
     job_doc = nlp(job_description)
     
-    resume_phrases = [chunk.text for chunk in resume_doc.noun_chunks]
-    job_phrases = [chunk.text for chunk in job_doc.noun_chunks]
+    resume_phrases = [chunk.text.lower() for chunk in resume_doc.noun_chunks]
+    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks]
     
     if is_strength:
-        return [phrase for phrase in resume_phrases if phrase.lower() in job_description.lower()]
+        return [phrase for phrase in resume_phrases if phrase in job_phrases or any(skill.lower() in phrase for skill in key_skills)]
     else:
-        return [phrase for phrase in job_phrases if phrase.lower() not in resume_text.lower()]
+        return [phrase for phrase in job_phrases if phrase not in resume_phrases and not any(skill.lower() in phrase for skill in key_skills)]
 
-def _generate_questions(resume_text: str, job_description: str) -> List[str]:
-    skills_gap = _identify_skills_gap(resume_text, job_description)
-    key_strengths = _extract_key_points(resume_text, job_description, is_strength=True)
+def _generate_questions(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
+    skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
+    key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
     
     questions = []
     for skill in skills_gap[:3]:  # Limit to top 3 missing skills
