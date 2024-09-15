@@ -315,18 +315,9 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
     try:
-        logger.debug("Extracting text from file")
         resume_text = extract_text_from_file(resume_file)
-        logger.debug(f"Extracted text length: {len(resume_text)}")
-        
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
-        logger.debug(f"Analysis result: {result}")
         
-        if 'error' in result:
-            logger.error(f"Error in resume analysis: {result['error']}")
-            return _generate_error_result(resume_file.name, result['error'])
-        
-        # Use the LLM-generated data if available, otherwise use fallback
         processed_result = {
             'file_name': resume_file.name,
             'brief_summary': result.get('briefsummary') or result.get('brief_summary', 'No brief summary available'),
@@ -378,8 +369,8 @@ def _process_recruiter_questions(questions):
     if isinstance(questions, list):
         for q in questions:
             if isinstance(q, dict):
-                question = q.get('question', '')
-                justification = q.get('justification', '')
+                question = q.get('question', q.get('text', ''))
+                justification = q.get('justification', q.get('reason', ''))
                 processed_questions.append((question, justification))
             else:
                 processed_questions.append((q, ''))
