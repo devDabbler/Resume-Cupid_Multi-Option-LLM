@@ -329,23 +329,43 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
         key_weaknesses = _extract_key_points(resume_text, job_description, key_skills, is_strength=False)
         
+        recommendation = _get_recommendation(match_score)
+        
+        # Generate a new brief summary based on the match score and recommendation
+        brief_summary = _generate_brief_summary(result.get('brief_summary', ''), match_score, recommendation)
+        
         processed_result = {
             'file_name': resume_file.name,
-            'brief_summary': result.get('brief_summary', 'No brief summary available'),
+            'brief_summary': brief_summary,
             'match_score': match_score,
             'experience_and_project_relevance': _summarize_relevance(result.get('experience_and_project_relevance', {})),
             'skills_gap': ", ".join(skills_gap),
             'key_strengths': ", ".join(key_strengths),
             'key_weaknesses': ", ".join(key_weaknesses),
-            'recruiter_questions': result.get('recruiter_questions', [])[:3]  # Limit to top 3 questions
+            'recruiter_questions': result.get('recruiter_questions', [])[:3],  # Limit to top 3 questions
+            'recommendation': recommendation
         }
-        
-        processed_result['recommendation'] = _get_recommendation(processed_result['match_score'])
         
         return processed_result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
+
+def _generate_brief_summary(original_summary, match_score, recommendation):
+    # Extract the candidate's name from the original summary
+    name_match = re.search(r'^(\w+(?:\s\w+)?)', original_summary)
+    name = name_match.group(1) if name_match else "The candidate"
+    
+    if match_score < 40:
+        return f"{name} does not appear to be a good fit for the ML Ops Engineer role. With a match score of {match_score}%, there are significant gaps in the required skills and experience."
+    elif match_score < 55:
+        return f"{name} may have some relevant skills, but with a match score of {match_score}%, there are considerable gaps in meeting the requirements for the ML Ops Engineer role. Further evaluation is needed."
+    elif match_score < 71:
+        return f"{name} shows potential for the ML Ops Engineer role with a match score of {match_score}%. While there are some areas that need improvement, the candidate has relevant skills and experience."
+    elif match_score < 82:
+        return f"{name} is a strong candidate for the ML Ops Engineer role, with a match score of {match_score}%. The candidate demonstrates most of the required skills and experience, with only minor gaps."
+    else:
+        return f"{name} is an excellent fit for the ML Ops Engineer role, with a match score of {match_score}%. The candidate exceeds expectations in terms of skills and experience for this position."
 
 def _summarize_relevance(relevance_data):
     if isinstance(relevance_data, dict):
