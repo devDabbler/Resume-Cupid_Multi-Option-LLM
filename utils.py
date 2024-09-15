@@ -353,12 +353,14 @@ def _calculate_match_score(resume_text: str, job_description: str, importance_fa
     # Calculate skills match
     skills_match = sum(1 for skill in key_skills if skill.lower() in resume_text.lower()) / len(key_skills) if key_skills else 0
 
-    # Apply importance factors
+    # Apply importance factors (use get() method with default value to avoid KeyError)
     weighted_score = (
-        base_score * importance_factors['technical_skills'] +
-        relevance_score * importance_factors['experience'] +
-        skills_match * 100 * importance_factors['industry_knowledge']
-    ) / sum(importance_factors.values())
+        base_score * importance_factors.get('technical_skills', 0.5) +
+        relevance_score * importance_factors.get('experience', 0.5) +
+        (skills_match * 100) * importance_factors.get('industry_knowledge', 0.5) +
+        base_score * importance_factors.get('soft_skills', 0.5) +
+        base_score * importance_factors.get('education', 0.5)
+    ) / sum(importance_factors.values() or [1])  # Use [1] as fallback if the dict is empty
 
     return int(min(max(weighted_score, 0), 100))
 

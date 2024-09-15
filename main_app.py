@@ -200,16 +200,35 @@ def main_app():
 
     st.subheader("Customize Importance Factors")
 
+    # Initialize importance_factors if not present in session state
+    if 'importance_factors' not in st.session_state:
+        st.session_state.importance_factors = {
+            'technical_skills': 0.5,
+            'experience': 0.5,
+            'education': 0.5,
+            'soft_skills': 0.5,
+            'industry_knowledge': 0.5
+        }
+
+    # Ensure all required factors are present
+    required_factors = ['technical_skills', 'experience', 'education', 'soft_skills', 'industry_knowledge']
+    for factor in required_factors:
+        if factor not in st.session_state.importance_factors:
+            st.session_state.importance_factors[factor] = 0.5
+
     # Create columns for importance factors
-    cols = st.columns(len(st.session_state.importance_factors))
+    cols = st.columns(len(required_factors))
 
     # Create sliders for each importance factor
-    for i, (factor, default_value) in enumerate(st.session_state.importance_factors.items()):
+    for i, factor in enumerate(required_factors):
         with cols[i]:
             st.session_state.importance_factors[factor] = st.slider(
                 f"{factor.replace('_', ' ').title()}",
-                0.0, 1.0, default_value, 0.1
+                0.0, 1.0, st.session_state.importance_factors[factor], 0.1
             )
+
+    # Optionally, display the current importance factors for debugging
+    st.write("Current Importance Factors:", st.session_state.importance_factors)
 
     st.subheader("Key Skills/Requirements")
     key_skills = st.text_area("Enter key skills or requirements (one per line):", 
