@@ -2,7 +2,7 @@ from config_settings import Config
 import logging
 import uuid
 import streamlit as st
-from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results, save_role, delete_saved_role, get_saved_roles, get_candidate_data, insert_run_log, initialize_llm
+from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results, initialize_llm
 from database import (
     init_db, insert_run_log, save_role, get_saved_roles, delete_saved_role, save_feedback
 )
@@ -303,7 +303,7 @@ def main_app():
             if not resume_files:
                 st.error("Please upload at least one resume.")
 
-    save_role_option = st.checkbox("Save this role for future use")
+        save_role_option = st.checkbox("Save this role for future use")
     if save_role_option:
         with st.form(key='save_role_form'):
             saved_role_name = st.text_input("Save role as (e.g., Job Title):", value=st.session_state.role_name_input)

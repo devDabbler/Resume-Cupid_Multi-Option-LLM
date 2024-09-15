@@ -606,3 +606,4 @@ def calculate_keyword_match(resume_text, job_description, key_skills):
     resume_skills = set([word.lower() for word in resume_text.split()])
     matched_skills = job_skills & resume_skills
     return len(matched_skills) / len(job_skills) if job_skills else 0
+
