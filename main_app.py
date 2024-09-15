@@ -3,7 +3,7 @@ import logging
 import uuid
 import streamlit as st
 from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results
-from database import init_db, save_role, delete_saved_role, get_saved_roles, save_feedback
+from database import init_db, insert_run_log, save_role, delete_saved_role, get_saved_roles, save_feedback
 from resume_processor import create_resume_processor
 from candidate_data import get_candidate_data
 import os
@@ -55,9 +55,6 @@ if 'resume_processor' not in st.session_state:
     st.session_state.resume_processor = None
 
 BATCH_SIZE = 3  # Number of resumes to process in each batch
-
-import uuid
-from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results, save_role, delete_saved_role, get_saved_roles, get_candidate_data, insert_run_log, initialize_llm
 
 def main_app():
     init_db()
