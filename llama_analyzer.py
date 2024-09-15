@@ -2,9 +2,10 @@ import requests
 import logging
 import json
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any
 from logger import get_logger
 from groq import Groq
+import os
 
 logger = get_logger(__name__)
 
@@ -172,3 +173,16 @@ class LlamaAPI:
 
     def clear_cache(self):
         pass
+
+
+def initialize_llm():
+    """
+    Initializes and returns the LlamaAPI instance.
+    
+    Returns:
+    - LlamaAPI: An instance of the LlamaAPI class.
+    """
+    llama_api_key = os.getenv("LLAMA_API_KEY")
+    if not llama_api_key:
+        raise ValueError("LLAMA_API_KEY is not set in the environment variables.")
+    return LlamaAPI(api_key=llama_api_key)
