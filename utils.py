@@ -200,13 +200,13 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     
     # Custom color scale function
     def color_scale(val):
-        if val <= 20:
+        if val <= 39:
             return 'background-color: #FFCCCB'  # Light red
-        elif val <= 40:
+        elif val <= 54:
             return 'background-color: #FFFF99'  # Light yellow
-        elif val <= 60:
+        elif val <= 70:
             return 'background-color: #FFFFCC'  # Pale yellow
-        elif val <= 80:
+        elif val <= 81:
             return 'background-color: #CCFFCC'  # Light green
         else:
             return 'background-color: #90EE90'  # Pale green
@@ -354,25 +354,21 @@ def _adjust_score(raw_score, file_name):
     except (ValueError, TypeError):
         score = 0
     
-    if "Artem" in file_name:
-        return max(20, min(30, score))  # Ensure Artem's score is between 20-30%
-    elif "Adrienne" in file_name:
-        return max(75, min(80, score))  # Ensure Adrienne's score is between 75-80%
+    # General adjustment logic
+    if score < 40:
+        return max(20, min(30, score))  # Ensure score is between 20-30% for low matches
+    elif score < 70:
+        return max(55, min(70, score))  # Ensure score is between 55-70% for moderate matches
     else:
         return score
-
-def _get_recommendation(match_score: int, file_name: str) -> str:
-    if "Artem" in file_name:
+def _get_recommendation(match_score: int) -> str:
+    if match_score < 40:
         return "Do not recommend for interview"
-    elif "Adrienne" in file_name:
-        return "Highly recommend for interview"
-    elif match_score < 20:
-        return "Do not recommend for interview"
-    elif 20 <= match_score < 40:
-        return "Recommend for interview with significant reservations"
-    elif 40 <= match_score < 60:
-        return "Recommend for interview with minor reservations"
-    elif 60 <= match_score < 80:
+    elif 40 <= match_score < 55:
+        return "Review profile again and/or conduct indepth recruiter screen focusing on the questions provided. Recommend for interview with significant reservations"
+    elif 55 <= match_score < 71:
+        return "Recommend for interview with minor reservations - be sure to focus on skill gaps etc."
+    elif 71 <= match_score < 82:
         return "Recommend for interview"
     else:
         return "Highly recommend for interview"
