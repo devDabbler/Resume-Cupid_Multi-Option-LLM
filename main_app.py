@@ -297,13 +297,14 @@ def main_app():
                 st.error("Please enter a job title.")
             if not resume_files:
                 st.error("Please upload at least one resume.")
-
+        save_role_option = False  # Initialize save_role_option with a default value
         save_role_option = st.checkbox("Save this role for future use")
-    if save_role_option:
-        with st.form(key='save_role_form'):
-            saved_role_name = st.text_input("Save role as (e.g., Job Title):", value=st.session_state.role_name_input)
-            client = st.text_input("Client (required):", value=st.session_state.get('client', ''))
-            save_button = st.form_submit_button('Save Role')
+
+        if save_role_option:
+            with st.form(key='save_role_form'):
+                saved_role_name = st.text_input("Save role as (e.g., Job Title):", value=st.session_state.role_name_input)
+                client = st.text_input("Client (required):", value=st.session_state.get('client', ''))
+                save_button = st.form_submit_button('Save Role')
 
         if save_button:
             if not saved_role_name or not client:
