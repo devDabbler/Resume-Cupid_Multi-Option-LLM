@@ -21,6 +21,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from streamlit.runtime.scriptrunner import add_script_run_ctx
+import spacy
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Load spaCy model
+nlp = spacy.load("en_core_web_md")
 
 # Create a root logger
 root_logger = logging.getLogger(__name__)
@@ -231,22 +237,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             display_nested_content(result['skills_gap'])
 
             st.subheader("Recruiter Questions")
-            recruiter_questions = result.get('recruiter_questions', [])
-            if isinstance(recruiter_questions, list):
-                for item in recruiter_questions:
-                    if isinstance(item, tuple) and len(item) == 2:
-                        question, justification = item
-                        st.write(f"- {question}")
-                        if justification:
-                            st.write(f"  *Justification:* {justification}")
-                    elif isinstance(item, str):
-                        st.write(f"- {item}")
-                    elif isinstance(item, dict):
-                        st.write(f"- {item.get('question', item.get('text', ''))}")
-                        if 'justification' in item or 'reason' in item:
-                            st.write(f"  *Justification:* {item.get('justification', item.get('reason', ''))}")
-            else:
-                st.write("No recruiter questions available")
+            display_nested_content(result['recruiter_questions'])
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
                 st.subheader("Provide Feedback")
@@ -332,84 +323,95 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         
         processed_result = {
             'file_name': resume_file.name,
-            'brief_summary': result.get('briefsummary') or result.get('brief_summary', 'No brief summary available'),
-            'match_score': _adjust_score(result.get('matchscore') or result.get('match_score', 0), resume_file.name),
-            'experience_and_project_relevance': result.get('experienceandprojectrelevance') or result.get('experience_and_project_relevance', 'No experience and project relevance available'),
-            'skills_gap': result.get('skillsgap') or result.get('skills_gap', 'No skills gap available'),
-            'recruiter_questions': _process_recruiter_questions(result.get('recruiterquestions') or result.get('recruiter_questions', []))
+            'brief_summary': result.get('brief_summary', 'No brief summary available'),
+            'match_score': _calculate_match_score(resume_text, job_description, importance_factors),
+            'experience_and_project_relevance': _assess_relevance(resume_text, job_description),
+            'skills_gap': _identify_skills_gap(resume_text, job_description),
+            'key_strengths': _extract_key_points(resume_text, job_description, is_strength=True),
+            'key_weaknesses': _extract_key_points(resume_text, job_description, is_strength=False),
+            'recruiter_questions': _generate_questions(resume_text, job_description)
         }
         
-        processed_result['recommendation'] = _get_recommendation(processed_result['match_score'], resume_file.name)
+        processed_result['recommendation'] = _get_recommendation(processed_result['match_score'])
         
         return processed_result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
 
-def _adjust_score(raw_score, file_name):
-    if isinstance(raw_score, dict):
-        raw_score = raw_score.get('score', 0)
-    try:
-        score = int(float(raw_score))
-    except (ValueError, TypeError):
-        score = 0
+def _calculate_match_score(resume_text: str, job_description: str, importance_factors: Dict[str, float]) -> int:
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform([resume_text, job_description])
+    cosine_sim = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
     
-    # General adjustment logic
-    if score < 40:
-        return max(20, min(30, score))  # Ensure score is between 20-30% for low matches
-    elif score < 70:
-        return max(55, min(70, score))  # Ensure score is between 55-70% for moderate matches
+    weighted_score = cosine_sim * 100  # Convert to percentage
+    for factor, weight in importance_factors.items():
+        if factor.lower() in resume_text.lower():
+            weighted_score *= (1 + weight)
+    
+    return int(min(max(weighted_score, 0), 100))  # Ensure score is between 0 and 100
+
+def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
+    job_doc = nlp(job_description)
+    job_phrases = [chunk.text for chunk in job_doc.noun_chunks]
+    
+    relevant_experiences = []
+    for phrase in job_phrases:
+        if phrase.lower() in resume_text.lower():
+            relevant_experiences.append(phrase)
+    
+    return {
+        "relevant_experiences": relevant_experiences,
+        "relevance_score": len(relevant_experiences) / len(job_phrases) * 100
+    }
+
+def _identify_skills_gap(resume_text: str, job_description: str) -> List[str]:
+    job_doc = nlp(job_description)
+    job_skills = [token.text for token in job_doc if token.pos_ == "NOUN" or token.pos_ == "PROPN"]
+    
+    missing_skills = []
+    for skill in job_skills:
+        if skill.lower() not in resume_text.lower():
+            missing_skills.append(skill)
+    
+    return missing_skills
+
+def _extract_key_points(resume_text: str, job_description: str, is_strength: bool = True) -> List[str]:
+    resume_doc = nlp(resume_text)
+    job_doc = nlp(job_description)
+    
+    resume_phrases = [chunk.text for chunk in resume_doc.noun_chunks]
+    job_phrases = [chunk.text for chunk in job_doc.noun_chunks]
+    
+    if is_strength:
+        return [phrase for phrase in resume_phrases if phrase.lower() in job_description.lower()]
     else:
-        return score
+        return [phrase for phrase in job_phrases if phrase.lower() not in resume_text.lower()]
+
+def _generate_questions(resume_text: str, job_description: str) -> List[str]:
+    skills_gap = _identify_skills_gap(resume_text, job_description)
+    key_strengths = _extract_key_points(resume_text, job_description, is_strength=True)
     
+    questions = []
+    for skill in skills_gap[:3]:  # Limit to top 3 missing skills
+        questions.append(f"Can you tell me about your experience with {skill}?")
+    
+    for strength in key_strengths[:2]:  # Limit to top 2 strengths
+        questions.append(f"Could you elaborate on your experience with {strength}?")
+    
+    return questions
+
 def _get_recommendation(match_score: int) -> str:
-    if match_score < 40:
+    if match_score < 30:
         return "Do not recommend for interview"
-    elif 40 <= match_score < 55:
-        return "Review profile again and/or conduct indepth recruiter screen focusing on the questions provided. Recommend for interview with significant reservations"
-    elif 55 <= match_score < 71:
-        return "Recommend for interview with minor reservations - be sure to focus on skill gaps etc."
-    elif 71 <= match_score < 82:
+    elif 30 <= match_score < 50:
+        return "Consider for interview with significant reservations"
+    elif 50 <= match_score < 70:
+        return "Recommend for interview with minor reservations"
+    elif 70 <= match_score < 85:
         return "Recommend for interview"
     else:
         return "Highly recommend for interview"
-
-def _process_recruiter_questions(questions):
-    processed_questions = []
-    if isinstance(questions, list):
-        for q in questions:
-            if isinstance(q, dict):
-                question = q.get('question', q.get('text', ''))
-                justification = q.get('justification', q.get('reason', ''))
-                processed_questions.append((question, justification))
-            elif isinstance(q, str):
-                processed_questions.append((q, ''))
-    elif isinstance(questions, str):
-        processed_questions.append((questions, ''))
-    else:
-        processed_questions.append(('No recruiter questions available', ''))
-    return processed_questions
-
-def _get_recruiter_questions(result: dict, file_name: str) -> List[str]:
-    default_questions = result.get('recruiter_questions', [])
-    
-    if "Adrienne" in file_name:
-        additional_questions = [
-            "Can you provide specific examples of model governance frameworks you've implemented in your previous roles?",
-            "How have you handled compliance and risk management in your machine learning projects, particularly in a healthcare setting?",
-            "Could you elaborate on your experience with model validation and monitoring processes?",
-            "What automation tools have you used or developed for model documentation?",
-            "How do you stay updated with industry regulations and compliance requirements in the field of machine learning and AI?"
-        ]
-        return additional_questions + default_questions[:2]  # Combine additional questions with top 2 default questions
-    elif "Artem" in file_name:
-        return [
-            "Can you describe any experience you have with machine learning operations or model risk management?",
-            "Have you worked on any projects involving financial services or insurance industries?",
-            "What is your familiarity with industry regulations and compliance requirements for AI/ML models?"
-        ]
-    else:
-        return default_questions
 
 def _generate_error_result(file_name: str, error_message: str) -> Dict[str, Any]:
     return {
@@ -422,7 +424,6 @@ def _generate_error_result(file_name: str, error_message: str) -> Dict[str, Any]
         'recruiter_questions': ['Unable to generate recruiter questions due to an error']
     }
 
-# Function to calculate strengths
 def _calculate_strengths(result: dict) -> List[str]:
     strengths = []
     if result['match_score'] >= 80:
@@ -437,7 +438,6 @@ def _calculate_strengths(result: dict) -> List[str]:
         strengths.append("Relevant project experience")
     return strengths
 
-# Function to calculate areas for improvement
 def _calculate_areas_for_improvement(result: dict) -> List[str]:
     areas_for_improvement = []
     if result['skills_gap']:
@@ -448,12 +448,9 @@ def _calculate_areas_for_improvement(result: dict) -> List[str]:
         areas_for_improvement.append("Gain more relevant experience")
     return areas_for_improvement
 
-# Function to clean content
 def _clean_content(content):
     if isinstance(content, str):
-        # Remove any ANSI escape sequences (terminal color codes)
         content = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', content)
-        # Remove any other unwanted characters or formatting
         content = re.sub(r'[^\w\s.,!?:;()\[\]{}\-]', '', content)
     elif isinstance(content, dict):
         return {k: _clean_content(v) for k, v in content.items()}
@@ -461,7 +458,6 @@ def _clean_content(content):
         return [_clean_content(item) for item in content]
     return content
 
-# Function to format nested content for display
 def format_nested_content(content, indent=0):
     formatted = ""
     if isinstance(content, dict):
@@ -478,7 +474,6 @@ def format_nested_content(content, indent=0):
         formatted += "  " * indent + f"{content}\n"
     return formatted
 
-# Function to ensure all required fields are present in the result
 def ensure_required_fields(result):
     required_fields = [
         'file_name', 'brief_summary', 'match_score', 'recommendation',
