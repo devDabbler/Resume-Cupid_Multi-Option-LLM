@@ -205,12 +205,16 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
     
     def color_scale(val):
-        if val > 80:
-            color = 'green'
-        elif val > 60:
-            color = 'yellow'
-        else:
+        if val < 40:
             color = 'red'
+        elif val < 55:
+            color = 'orange'
+        elif val < 71:
+            color = 'yellow'
+        elif val < 82:
+            color = 'lightgreen'
+        else:
+            color = 'green'
         return f'background-color: {color}'
     
     st.dataframe(df.style.applymap(color_scale, subset=['Match Score (%)']))
@@ -224,22 +228,22 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.info(f"Recommendation: {result['recommendation']}")
 
             st.subheader("Brief Summary")
-            st.write(result['brief_summary'])
+            st.write(result.get('brief_summary', 'No brief summary available'))
 
             st.subheader("Experience and Project Relevance")
-            st.write(result['experience_and_project_relevance'])
+            st.write(result.get('experience_and_project_relevance', 'No relevance information available'))
 
             st.subheader("Key Strengths")
-            st.write(result['key_strengths'])
+            st.write(result.get('key_strengths', 'No key strengths identified'))
 
             st.subheader("Areas for Improvement")
-            st.write(result['key_weaknesses'])
+            st.write(result.get('key_weaknesses', 'No areas for improvement identified'))
 
             st.subheader("Skills Gap")
-            st.write(result['skills_gap'])
+            st.write(result.get('skills_gap', 'No skills gap identified'))
 
             st.subheader("Recruiter Questions")
-            for question in result['recruiter_questions']:
+            for question in result.get('recruiter_questions', ['No recruiter questions generated']):
                 st.write(f"- {question}")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
@@ -322,16 +326,21 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
     logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
     try:
         resume_text = extract_text_from_file(resume_file)
+        if not isinstance(resume_text, str):
+            raise ValueError(f"Invalid resume text type: {type(resume_text)}")
+        
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         
-        match_score = _calculate_match_score(resume_text, job_description, importance_factors, key_skills)
+        # Use the match score from the LLM result if available, otherwise calculate it
+        match_score = result.get('match_score') or _calculate_match_score(resume_text, job_description, importance_factors, key_skills)
+        match_score = int(match_score)  # Ensure it's an integer
+        
         skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
         key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
         key_weaknesses = _extract_key_points(resume_text, job_description, key_skills, is_strength=False)
         
         recommendation = _get_recommendation(match_score)
         
-        # Generate a new brief summary based on the match score and recommendation
         brief_summary = _generate_brief_summary(result.get('brief_summary', ''), match_score, recommendation)
         
         processed_result = {
@@ -339,9 +348,9 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             'brief_summary': brief_summary,
             'match_score': match_score,
             'experience_and_project_relevance': _summarize_relevance(result.get('experience_and_project_relevance', {})),
-            'skills_gap': ", ".join(skills_gap),
-            'key_strengths': ", ".join(key_strengths),
-            'key_weaknesses': ", ".join(key_weaknesses),
+            'skills_gap': ", ".join(skills_gap) if skills_gap else "No significant skills gap identified",
+            'key_strengths': ", ".join(key_strengths) if key_strengths else "No key strengths identified",
+            'key_weaknesses': ", ".join(key_weaknesses) if key_weaknesses else "No key weaknesses identified",
             'recruiter_questions': result.get('recruiter_questions', [])[:3],  # Limit to top 3 questions
             'recommendation': recommendation
         }
@@ -487,6 +496,8 @@ def _generate_error_result(file_name: str, error_message: str) -> Dict[str, Any]
         'recommendation': 'Unable to provide a recommendation due to an error',
         'experience_and_project_relevance': 'Unable to assess due to an error',
         'skills_gap': 'Unable to determine skills gap due to an error',
+        'key_strengths': 'Unable to identify key strengths due to an error',
+        'key_weaknesses': 'Unable to identify key weaknesses due to an error',
         'recruiter_questions': ['Unable to generate recruiter questions due to an error']
     }
 
