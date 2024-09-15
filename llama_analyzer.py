@@ -95,6 +95,13 @@ class LlamaAPI:
         try:
             if isinstance(processed_content['match_score'], dict):
                 processed_content['match_score'] = processed_content['match_score'].get('Overall', 0)
+            elif isinstance(processed_content['match_score'], str):
+                # Try to extract a number from the string
+                match = re.search(r'\d+', processed_content['match_score'])
+                if match:
+                    processed_content['match_score'] = int(match.group())
+                else:
+                    processed_content['match_score'] = 0
             processed_content['match_score'] = int(float(processed_content['match_score']))
             logger.debug(f"Processed match_score: {processed_content['match_score']}")
         except (ValueError, TypeError) as e:
@@ -142,7 +149,8 @@ class LlamaAPI:
         Job Description:
         {job_description}
 
-        Provide your analysis in a structured JSON format.
+        Provide your analysis in a structured JSON format with the following keys:
+        "brief_summary", "match_score", "recommendation_for_interview", "experience_and_project_relevance", "skills_gap", "recruiter_questions"
         """
 
         result = self.analyze(prompt)
