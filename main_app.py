@@ -192,13 +192,43 @@ def main_app():
     st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
 
     st.subheader("Customize Importance Factors")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.session_state.importance_factors['education'] = st.slider("Education Importance", 0.0, 1.0, st.session_state.importance_factors['education'], 0.1)
-    with col2:
-        st.session_state.importance_factors['experience'] = st.slider("Experience Importance", 0.0, 1.0, st.session_state.importance_factors['experience'], 0.1)
-    with col3:
-        st.session_state.importance_factors['skills'] = st.slider("Skills Importance", 0.0, 1.0, st.session_state.importance_factors['skills'], 0.1)
+
+    # Create a list of importance factor names and their corresponding default values
+    importance_factors = {
+        'technical_skills': 0.5,
+        'experience': 0.5,
+        'education': 0.5,
+        'soft_skills': 0.5,
+        'industry_knowledge': 0.5
+    }
+
+    # Create columns dynamically based on the number of factors
+    cols = st.columns(len(importance_factors))
+
+    # Loop over each importance factor and create a slider in its respective column
+    for idx, (factor, default_value) in enumerate(importance_factors.items()):
+        with cols[idx]:
+            importance_factors[factor] = st.slider(f"{factor.replace('_', ' ').title()} Importance", 
+                                                0.0, 1.0, default_value, 0.1)
+
+    # Update the session state with the new importance factors
+    st.session_state.importance_factors = importance_factors
+
+    # Key Skills/Requirements Section
+    st.subheader("Key Skills/Requirements")
+    key_skills = st.text_area("Enter key skills or requirements (one per line):", 
+                          help="These will be used to assess the candidate's fit for the role.")
+    if key_skills:
+        # Clean up the input and split into a list, ignoring empty lines
+        st.session_state.key_skills = [skill.strip() for skill in key_skills.split('\n') if skill.strip()]
+    else:
+        st.session_state.key_skills = []
+
+    # Display entered key skills for confirmation
+    if st.session_state.key_skills:
+        st.write("Key Skills/Requirements Entered:")
+        st.write(st.session_state.key_skills)
+
 
     st.write("Upload your resume(s) (Maximum 3 files allowed):")
     resume_files = st.file_uploader("Upload resumes (max 3)", type=['pdf', 'docx'], accept_multiple_files=True)
@@ -215,22 +245,32 @@ def main_app():
                 st.warning("You've uploaded more than 3 resumes. Only the first 3 will be processed.")
                 resume_files = resume_files[:3]
         
-            run_id = str(uuid.uuid4())
-            insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
-            logger.info("Processing resumes...")
+        run_id = str(uuid.uuid4())
+        insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
+        logger.info("Processing resumes...")
 
-            # Get candidate data
-            candidates = get_candidate_data()
-            candidate_data_list = []
-            for file in resume_files:
-                matching_candidate = next((c for c in candidates if c['candidate'] == file.name), None)
-                candidate_data_list.append(matching_candidate or {})
-                
+        candidates = get_candidate_data()
+        candidate_data_list = []
+        for file in resume_files:
+            matching_candidate = next((c for c in candidates if c['candidate'] == file.name), None)
+            candidate_data_list.append(matching_candidate or {})
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        evaluation_results = []
+        try:
             with st.spinner('Processing resumes...'):
-                evaluation_results = process_resumes_sequentially(resume_files, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data_list, st.session_state.job_title)
-                
-                logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
-                insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
+                for i, (resume_file, candidate_data) in enumerate(zip(resume_files, candidate_data_list)):
+                    status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
+                    result = process_resume(resume_file, resume_processor, st.session_state.job_description, 
+                                            st.session_state.importance_factors, candidate_data, st.session_state.job_title,
+                                            st.session_state.key_skills)
+                    evaluation_results.append(result)
+                    progress_bar.progress((i + 1) / len(resume_files))
+            
+            logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
+            insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
 
             if evaluation_results:
                 st.success("Evaluation complete!")
@@ -238,13 +278,19 @@ def main_app():
                 display_results(evaluation_results, run_id, save_feedback)
             else:
                 st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
-        else:
-            if not st.session_state.job_description:
-                st.error("Please ensure a job description is provided.")
-            if not st.session_state.job_title:
-                st.error("Please enter a job title.")
-            if not resume_files:
-                st.error("Please upload at least one resume.")
+        except Exception as e:
+            st.error(f"An error occurred during processing: {str(e)}")
+            logger.error(f"Error during resume processing: {str(e)}", exc_info=True)
+        finally:
+            progress_bar.empty()
+            status_text.empty()
+    else:
+        if not st.session_state.job_description:
+            st.error("Please ensure a job description is provided.")
+        if not st.session_state.job_title:
+            st.error("Please enter a job title.")
+        if not resume_files:
+            st.error("Please upload at least one resume.")
 
     st.session_state.role_name_input = st.session_state.role_name_input
     st.session_state.job_description_link = st.session_state.job_description_link

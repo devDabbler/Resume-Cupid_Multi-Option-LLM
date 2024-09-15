@@ -314,7 +314,7 @@ def clear_cache():
     else:
         logger.warning("Unable to clear cache: resume_processor not found or doesn't have clear_cache method")
 
-def process_resume(resume_file, _resume_processor, job_description, importance_factors, candidate_data, job_title):
+def process_resume(resume_file, _resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills):
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
     try:
@@ -324,12 +324,12 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         processed_result = {
             'file_name': resume_file.name,
             'brief_summary': result.get('brief_summary', 'No brief summary available'),
-            'match_score': _calculate_match_score(resume_text, job_description, importance_factors),
+            'match_score': _calculate_match_score(resume_text, job_description, importance_factors, key_skills),
             'experience_and_project_relevance': _assess_relevance(resume_text, job_description),
-            'skills_gap': _identify_skills_gap(resume_text, job_description),
-            'key_strengths': _extract_key_points(resume_text, job_description, is_strength=True),
-            'key_weaknesses': _extract_key_points(resume_text, job_description, is_strength=False),
-            'recruiter_questions': _generate_questions(resume_text, job_description)
+            'skills_gap': _identify_skills_gap(resume_text, job_description, key_skills),
+            'key_strengths': _extract_key_points(resume_text, job_description, key_skills, is_strength=True),
+            'key_weaknesses': _extract_key_points(resume_text, job_description, key_skills, is_strength=False),
+            'recruiter_questions': _generate_questions(resume_text, job_description, key_skills)
         }
         
         processed_result['recommendation'] = _get_recommendation(processed_result['match_score'])
@@ -339,30 +339,48 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
 
-def _calculate_match_score(resume_text: str, job_description: str, importance_factors: Dict[str, float]) -> int:
+def _calculate_match_score(resume_text: str, job_description: str, importance_factors: Dict[str, float], key_skills: List[str]) -> int:
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform([resume_text, job_description])
     cosine_sim = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
     
-    weighted_score = cosine_sim * 100  # Convert to percentage
-    for factor, weight in importance_factors.items():
-        if factor.lower() in resume_text.lower():
-            weighted_score *= (1 + weight)
-    
-    return int(min(max(weighted_score, 0), 100))  # Ensure score is between 0 and 100
+    base_score = cosine_sim * 100
+
+    # Calculate relevance score
+    relevance_data = _assess_relevance(resume_text, job_description)
+    relevance_score = relevance_data["relevance_score"]
+
+    # Calculate skills match
+    skills_match = sum(1 for skill in key_skills if skill.lower() in resume_text.lower()) / len(key_skills) if key_skills else 0
+
+    # Apply importance factors
+    weighted_score = (
+        base_score * importance_factors['technical_skills'] +
+        relevance_score * importance_factors['experience'] +
+        skills_match * 100 * importance_factors['industry_knowledge']
+    ) / sum(importance_factors.values())
+
+    return int(min(max(weighted_score, 0), 100))
 
 def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
     job_doc = nlp(job_description)
-    job_phrases = [chunk.text for chunk in job_doc.noun_chunks]
+    resume_doc = nlp(resume_text)
+    
+    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks]
+    resume_phrases = [chunk.text.lower() for chunk in resume_doc.noun_chunks]
     
     relevant_experiences = []
     for phrase in job_phrases:
-        if phrase.lower() in resume_text.lower():
+        if phrase in resume_phrases:
             relevant_experiences.append(phrase)
+    
+    relevance_score = len(relevant_experiences) / len(job_phrases) * 100
     
     return {
         "relevant_experiences": relevant_experiences,
-        "relevance_score": len(relevant_experiences) / len(job_phrases) * 100
+        "relevance_score": relevance_score,
+        "total_job_phrases": len(job_phrases),
+        "matched_phrases": len(relevant_experiences)
     }
 
 def _identify_skills_gap(resume_text: str, job_description: str) -> List[str]:
