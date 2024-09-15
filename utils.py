@@ -361,6 +361,7 @@ def _adjust_score(raw_score, file_name):
         return max(55, min(70, score))  # Ensure score is between 55-70% for moderate matches
     else:
         return score
+    
 def _get_recommendation(match_score: int) -> str:
     if match_score < 40:
         return "Do not recommend for interview"
