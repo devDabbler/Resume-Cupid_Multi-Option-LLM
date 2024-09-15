@@ -75,9 +75,14 @@ def main_app():
     if 'roles_updated' not in st.session_state:
         st.session_state.roles_updated = False
 
-    for key in ['role_name_input', 'job_description', 'current_role_name', 'job_description_link', 'importance_factors', 'backend', 'resume_processor', 'last_backend']:
+    for key in ['role_name_input', 'job_description', 'current_role_name', 'job_description_link', 'importance_factors', 'backend', 'resume_processor', 'last_backend', 'key_skills']:
         if key not in st.session_state:
-            st.session_state[key] = '' if key != 'importance_factors' else {'education': 0.5, 'experience': 0.5, 'skills': 0.5}
+            if key == 'importance_factors':
+                st.session_state[key] = {'education': 0.5, 'experience': 0.5, 'skills': 0.5}
+        elif key == 'key_skills':
+            st.session_state[key] = []
+        else:
+            st.session_state[key] = ''
 
     if 'saved_roles' not in st.session_state:
         st.session_state.saved_roles = get_saved_roles()
@@ -223,18 +228,11 @@ def main_app():
         # Clean up the input and split into a list, ignoring empty lines
         st.session_state.key_skills = [skill.strip() for skill in key_skills.split('\n') if skill.strip()]
 
-    # Display entered key skills for confirmation
+        # Display entered key skills for confirmation
     if st.session_state.key_skills:
         st.write("Key Skills/Requirements Entered:")
-        for skill in st.session_state.key_skills:
-            st.write(f"- {skill}")
-    else:
-        st.session_state.key_skills = []
-
-    # Display entered key skills for confirmation
-    if st.session_state.key_skills:
-        st.write("Key Skills/Requirements Entered:")
-        st.write(st.session_state.key_skills)
+    for skill in st.session_state.key_skills:
+        st.write(f"- {skill}")
 
     st.write("Upload your resume(s) (Maximum 3 files allowed):")
     resume_files = st.file_uploader("Upload resumes (max 3)", type=['pdf', 'docx'], accept_multiple_files=True)
