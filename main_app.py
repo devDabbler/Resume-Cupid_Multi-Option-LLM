@@ -2,7 +2,7 @@ from config_settings import Config
 import logging
 import uuid
 import streamlit as st
-from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results, initialize_llm
+from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results
 from database import (
     init_db, insert_run_log, save_role, get_saved_roles, delete_saved_role, save_feedback
 )
@@ -11,7 +11,7 @@ from candidate_data import get_candidate_data
 import os
 from claude_analyzer import ClaudeAPI
 from gpt4o_mini_analyzer import GPT4oMiniAPI
-from llama_analyzer import LlamaAPI
+from llama_analyzer import LlamaAPI, initialize_llm
 from logger import get_logger
 
 # Set up logging
