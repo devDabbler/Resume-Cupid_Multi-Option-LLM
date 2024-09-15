@@ -321,7 +321,7 @@ def clear_cache():
     else:
         logger.warning("Unable to clear cache: resume_processor not found or doesn't have clear_cache method")
 
-def process_resume(resume_file, _resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills):
+def process_resume(resume_file, _resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm):
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
     try:
@@ -331,22 +331,21 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         
-        # Use the match score from the LLM result if available, otherwise calculate it
-        match_score = result.get('match_score') or _calculate_match_score(resume_text, job_description, importance_factors, key_skills)
-        match_score = int(match_score)  # Ensure it's an integer
+        # Calculate combined score using multiple techniques
+        combined_score = calculate_combined_score(resume_text, job_description, importance_factors, key_skills, llm)
         
         skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
         key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
         key_weaknesses = _extract_key_points(resume_text, job_description, key_skills, is_strength=False)
         
-        recommendation = _get_recommendation(match_score)
+        recommendation = _get_recommendation(combined_score)
         
-        brief_summary = _generate_brief_summary(result.get('brief_summary', ''), match_score, recommendation)
+        brief_summary = _generate_brief_summary(result.get('brief_summary', ''), combined_score, recommendation)
         
         processed_result = {
             'file_name': resume_file.name,
             'brief_summary': brief_summary,
-            'match_score': match_score,
+            'match_score': combined_score,
             'experience_and_project_relevance': _summarize_relevance(result.get('experience_and_project_relevance', {})),
             'skills_gap': ", ".join(skills_gap) if skills_gap else "No significant skills gap identified",
             'key_strengths': ", ".join(key_strengths) if key_strengths else "No key strengths identified",
@@ -560,3 +559,50 @@ def ensure_required_fields(result):
         if field not in result:
             result[field] = f"No {field.replace('_', ' ')} available"
     return result
+
+# Assuming you have an LLM class or function to interact with your LLM
+# Replace `llm.generate` with the actual method you use to interact with your LLM
+
+def extract_key_features(text, llm):
+    # Prompt the LLM to extract key features from the text
+    prompt = f"Extract key features from the following text:\n{text}"
+    response = llm.generate(prompt)
+    return response
+
+def compare_features(features1, features2, llm):
+    # Prompt the LLM to compare the extracted features
+    prompt = f"Compare the following features and provide a similarity score (0-100):\nFeatures 1: {features1}\nFeatures 2: {features2}"
+    response = llm.generate(prompt)
+    similarity_score = int(response.strip())
+    return similarity_score
+
+def calculate_combined_score(resume_text, job_description, importance_factors, key_skills, llm):
+    tfidf_score = calculate_tfidf_score(resume_text, job_description)
+    keyword_match = calculate_keyword_match(resume_text, job_description, key_skills)
+    
+    # Extract key features using LLM
+    resume_features = extract_key_features(resume_text, llm)
+    job_features = extract_key_features(job_description, llm)
+    
+    # Compare features using LLM
+    llm_similarity_score = compare_features(resume_features, job_features, llm)
+    
+    combined_score = (
+        tfidf_score * importance_factors.get('technical_skills', 0.5) +
+        keyword_match * importance_factors.get('industry_knowledge', 0.5) +
+        llm_similarity_score * importance_factors.get('experience', 0.5)
+    ) / sum(importance_factors.values() or [1])
+    
+    return int(min(max(combined_score, 0), 100))
+
+def calculate_tfidf_score(resume_text, job_description):
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform([resume_text, job_description])
+    cosine_sim = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+    return cosine_sim
+
+def calculate_keyword_match(resume_text, job_description, key_skills):
+    job_skills = set([skill.lower() for skill in key_skills])
+    resume_skills = set([word.lower() for word in resume_text.split()])
+    matched_skills = job_skills & resume_skills
+    return len(matched_skills) / len(job_skills) if job_skills else 0

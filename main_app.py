@@ -63,6 +63,9 @@ if 'resume_processor' not in st.session_state:
 
 BATCH_SIZE = 3  # Number of resumes to process in each batch
 
+import uuid
+from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results, save_role, delete_saved_role, get_saved_roles, get_candidate_data, insert_run_log, initialize_llm
+
 def main_app():
     init_db()
     """Main application interface that should only be accessible after login."""
@@ -278,7 +281,7 @@ def main_app():
                         status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
                         result = process_resume(resume_file, resume_processor, st.session_state.job_description, 
                                                 st.session_state.importance_factors, candidate_data, st.session_state.job_title,
-                                                st.session_state.key_skills)
+                                                st.session_state.key_skills, selected_backend)
                         evaluation_results.append(result)
                         progress_bar.progress((i + 1) / len(resume_files))
                 
@@ -361,4 +364,4 @@ def main_app():
         st.experimental_rerun()
 
 if __name__ == "__main__":
-    pass
+    main_app()
