@@ -6,6 +6,7 @@ import PyPDF2
 from docx import Document
 import numpy as np
 import nltk
+import ssl
 import streamlit as st
 import sys
 import threading
@@ -452,7 +453,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
 
-def _process_experience_relevance(experience_data):
+def process_experience_relevance(experience_data):
     try:
         if isinstance(experience_data, list):
             return "\n".join([f"{exp['project']}: {exp['description']} (Relevance: {exp['relevance']}%)" for exp in experience_data])
@@ -588,30 +589,55 @@ def _identify_skills_gap(resume_text: str, job_description: str, key_skills: Lis
     missing_skills = list(job_skills - resume_skills)
     return sorted(missing_skills, key=lambda x: job_description.lower().count(x), reverse=True)[:10]
 
-def _extract_key_points(resume_text, job_description, key_skills, is_strength=True):
-    # Combine resume text and job description
-    combined_text = resume_text + " " + job_description
-    
-    # Create a set of words to ignore
-    ignore_words = set(['work', 'learning', 'learn', 'role', 'company', 'business', 'data', 'set', 'machine'])
-    ignore_words.update(nltk.corpus.stopwords.words('english'))
-    
-    # Tokenize and process the text
-    words = nltk.word_tokenize(combined_text.lower())
-    words = [word for word in words if word.isalnum() and word not in ignore_words]
-    
-    # Get word frequencies
-    freq_dist = nltk.FreqDist(words)
-    
-    # Filter words based on whether we're looking for strengths or areas for improvement
-    if is_strength:
-        relevant_words = [word for word in freq_dist.keys() if word in resume_text.lower()]
+# Add this function to download NLTK data
+def download_nltk_data():
+    try:
+        _create_unverified_https_context = ssl._create_unverified_context
+    except AttributeError:
+        pass
     else:
-        relevant_words = [word for word in freq_dist.keys() if word in job_description.lower() and word not in resume_text.lower()]
+        ssl._create_default_https_context = _create_unverified_https_context
     
-    # Sort by frequency and return top 5
-    sorted_words = sorted(relevant_words, key=freq_dist.get, reverse=True)
-    return sorted_words[:5]
+    try:
+        nltk.download('punkt', quiet=True)
+        nltk.download('stopwords', quiet=True)
+    except Exception as e:
+        logger.error(f"Failed to download NLTK data: {str(e)}")
+
+# Call this function at the beginning of your script or in the main function
+download_nltk_data()
+
+def _extract_key_points(resume_text, job_description, key_skills, is_strength=True):
+    try:
+        # Combine resume text and job description
+        combined_text = resume_text + " " + job_description
+        
+        # Create a set of words to ignore
+        ignore_words = set(['work', 'learning', 'learn', 'role', 'company', 'business', 'data', 'set', 'machine'])
+        try:
+            ignore_words.update(nltk.corpus.stopwords.words('english'))
+        except LookupError:
+            logger.warning("NLTK stopwords not available. Proceeding without them.")
+        
+        # Tokenize and process the text
+        words = nltk.word_tokenize(combined_text.lower())
+        words = [word for word in words if word.isalnum() and word not in ignore_words]
+        
+        # Get word frequencies
+        freq_dist = nltk.FreqDist(words)
+        
+        # Filter words based on whether we're looking for strengths or areas for improvement
+        if is_strength:
+            relevant_words = [word for word in freq_dist.keys() if word in resume_text.lower()]
+        else:
+            relevant_words = [word for word in freq_dist.keys() if word in job_description.lower() and word not in resume_text.lower()]
+        
+        # Sort by frequency and return top 5
+        sorted_words = sorted(relevant_words, key=freq_dist.get, reverse=True)
+        return sorted_words[:5]
+    except Exception as e:
+        logger.error(f"Error in _extract_key_points: {str(e)}")
+        return ["Unable to extract key points"]
 
 def generate_questions(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
