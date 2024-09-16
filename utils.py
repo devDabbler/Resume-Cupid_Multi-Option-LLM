@@ -68,16 +68,6 @@ class ThreadSafeLogger(logging.Logger):
 
 logging.setLoggerClass(ThreadSafeLogger)
 
-def get_available_api_keys():
-    api_keys = {}
-    if Config.CLAUDE_API_KEY:
-        api_keys['claude'] = Config.CLAUDE_API_KEY
-    if Config.GPT4O_MINI_API_KEY:
-        api_keys['gpt4o_mini'] = Config.GPT4O_MINI_API_KEY
-    if Config.LLAMA_API_KEY:
-        api_keys['llama'] = Config.LLAMA_API_KEY
-    return api_keys
-
 @st.cache_data
 def extract_text_from_pdf(file_content: bytes) -> str:
     logger.debug("Extracting text from PDF...")
@@ -135,6 +125,129 @@ def extract_text_from_file(file) -> str:
     except Exception as e:
         logger.error(f"Error extracting text from file {file.name}: {str(e)}", exc_info=True)
         raise ValueError(f"Failed to extract text from {file.name}: {str(e)}")
+
+def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
+    st.header("Stack Ranking of Candidates")
+    
+    # Sort results by match score in descending order
+    sorted_results = sorted(evaluation_results, key=lambda x: x['match_score'], reverse=True)
+
+    df = pd.DataFrame(sorted_results)
+    df['Rank'] = range(1, len(df) + 1)
+    df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
+    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
+    
+    def color_scale(val):
+        if val < 30:
+            color = 'red'
+        elif val < 50:
+            color = 'orange'
+        elif val < 70:
+            color = 'yellow'
+        elif val < 85:
+            color = 'lightgreen'
+        else:
+            color = 'green'
+        return f'background-color: {color}'
+    
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}).applymap(color_scale, subset=['Match Score (%)']))
+
+    st.download_button(
+        label="Download PDF Report",
+        data=generate_pdf_report(evaluation_results, run_id),
+        file_name=f"evaluation_report_{run_id}.pdf",
+        mime="application/pdf"
+    )
+
+    for i, result in enumerate(sorted_results, 1):
+        with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Match Score", f"{result['match_score']}%")
+            with col2:
+                st.info(f"Recommendation: {result['recommendation']}")
+
+            st.subheader("Brief Summary")
+            st.write(result['brief_summary'])
+
+            st.subheader("Experience and Project Relevance")
+            if isinstance(result['experience_and_project_relevance'], dict):
+                for key, value in result['experience_and_project_relevance'].items():
+                    if isinstance(value, dict):
+                        st.write(f"**{key.replace('_', ' ').title()}:**")
+                        for sub_key, sub_value in value.items():
+                            st.write(f"- {sub_key.replace('_', ' ').title()}: {sub_value}")
+                    else:
+                        st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+            else:
+                st.write(result['experience_and_project_relevance'])
+
+            st.subheader("Skills Gap")
+            if isinstance(result['skills_gap'], dict):
+                for category, skills in result['skills_gap'].items():
+                    st.write(f"**{category.replace('_', ' ').title()}:**")
+                    if isinstance(skills, dict):
+                        for skill_type, skill_list in skills.items():
+                            st.write(f"- {skill_type.replace('_', ' ').title()}:")
+                            for skill in skill_list:
+                                st.write(f"  - {skill}")
+                    else:
+                        for skill in skills:
+                            st.write(f"- {skill}")
+            else:
+                st.write(result['skills_gap'])
+
+            st.subheader("Key Strengths")
+            for strength in result.get('key_strengths', []):
+                st.write(f"- {strength}")
+
+            st.subheader("Areas for Improvement")
+            for weakness in result.get('key_weaknesses', []):
+                st.write(f"- {weakness}")
+
+            st.subheader("Recruiter Questions")
+            for question in result['recruiter_questions']:
+                st.write(f"- {question}")
+
+            with st.form(key=f'feedback_form_{run_id}_{i}'):
+                st.subheader("Provide Feedback")
+                accuracy_rating = st.slider("Accuracy of the evaluation:", 1, 5, 3)
+                content_rating = st.slider("Quality of the report content:", 1, 5, 3)
+                suggestions = st.text_area("Please provide any suggestions for improvement:")
+                submit_feedback = st.form_submit_button("Submit Feedback")
+
+                if submit_feedback:
+                    if save_feedback_func(run_id, result['file_name'], accuracy_rating, content_rating, suggestions):
+                        st.success("Thank you for your feedback!")
+                    else:
+                        st.error("Failed to save feedback. Please try again.")
+
+    st.progress(100)  # Show completion of analysis
+    
+def display_nested_content(content):
+    if isinstance(content, dict):
+        for key, value in content.items():
+            st.write(f"**{key.capitalize()}:**")
+            display_nested_content(value)
+    elif isinstance(content, list):
+        for item in content:
+            if isinstance(item, dict):
+                display_nested_content(item)
+            else:
+                st.write(f"- {item}")
+    elif isinstance(content, (int, float)):
+        st.write(f"{content}")
+    else:
+        st.write(content)
+
+# Function to get available API keys
+def get_available_api_keys() -> Dict[str, str]:
+    api_keys = {}
+    backend = "llama"
+    key = os.getenv(f'{backend.upper()}_API_KEY')
+    if key:
+        api_keys[backend] = key
+    return api_keys
 
 def preprocess_text(text: str) -> str:
     cleaned_text = re.sub(r'[^\w\s]', '', text)
