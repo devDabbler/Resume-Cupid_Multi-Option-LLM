@@ -81,13 +81,18 @@ def extract_text_from_pdf(file_content: bytes) -> str:
     logger.debug("Extracting text from PDF...")
     try:
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
-        text = "".join([page.extract_text() for page in pdf_reader.pages])
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text()
         if not text.strip():
             logger.warning("Extracted PDF text is empty or contains only whitespace.")
         return text
+    except PyPDF2.errors.PdfReadError as e:
+        logger.error(f"Error reading PDF: {str(e)}")
+        return ""
     except Exception as e:
         logger.error(f"Error extracting text from PDF: {str(e)}")
-        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
+        return ""
 
 # Function to extract text from DOCX files
 @st.cache_data
