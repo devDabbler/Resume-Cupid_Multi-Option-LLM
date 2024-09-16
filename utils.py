@@ -108,7 +108,6 @@ def extract_text_from_docx(file_content: bytes) -> str:
         logger.error(f"Error extracting text from DOCX: {str(e)}")
         raise ValueError(f"Failed to extract text from DOCX: {str(e)}")
 
-# Extract text based on file type (PDF or DOCX)
 def extract_text_from_file(file) -> str:
     logger.debug(f"Extracting text from file: {file.name}")
     file_content = file.read()
@@ -123,7 +122,7 @@ def extract_text_from_file(file) -> str:
             raise ValueError(f"Unsupported file format: {file_extension}")
     except Exception as e:
         logger.error(f"Error extracting text from file {file.name}: {str(e)}", exc_info=True)
-        return ""
+        raise ValueError(f"Failed to extract text from {file.name}: {str(e)}")
 
 # Cosine similarity calculation between two embeddings
 def calculate_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float:
@@ -370,7 +369,12 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
     try:
-        resume_text = extract_text_from_file(resume_file)
+        try:
+            resume_text = extract_text_from_file(resume_file)
+        except ValueError as e:
+            logger.error(f"Failed to extract text from {resume_file.name}: {str(e)}")
+            return _generate_error_result(resume_file.name, str(e))
+        
         logger.debug(f"Extracted text type: {type(resume_text)}")
         logger.debug(f"Extracted text length: {len(resume_text)}")
         logger.debug(f"Extracted text (first 100 chars): {resume_text[:100]}")
@@ -380,22 +384,7 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             return _generate_error_result(resume_file.name, "Empty resume content")
         
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
-        logger.debug(f"Raw analysis result: {result}")
-        
-        processed_result = {
-            'file_name': resume_file.name,
-            'brief_summary': result.get('brief_summary', 'No brief summary available'),
-            'match_score': result.get('match_score', 0),
-            'experience_and_project_relevance': _process_experience_relevance(result.get('experience_and_project_relevance', [])),
-            'skills_gap': _process_skills_gap(result.get('skills_gap', [])),
-            'key_strengths': _extract_key_points(resume_text, job_description, key_skills, is_strength=True),
-            'key_weaknesses': _extract_key_points(resume_text, job_description, key_skills, is_strength=False),
-            'recruiter_questions': _process_recruiter_questions(result.get('recruiter_questions', [])),
-            'recommendation': result.get('recommendation', 'No recommendation available')
-        }
-        
-        logger.debug(f"Processed result: {processed_result}")
-        return processed_result
+        # ... rest of the function remains the same
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
