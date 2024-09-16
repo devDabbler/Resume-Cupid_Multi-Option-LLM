@@ -205,13 +205,13 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
     
     def color_scale(val):
-        if val < 40:
+        if val < 30:
             color = 'red'
-        elif val < 55:
+        elif val < 50:
             color = 'orange'
-        elif val < 71:
+        elif val < 70:
             color = 'yellow'
-        elif val < 82:
+        elif val < 85:
             color = 'lightgreen'
         else:
             color = 'green'
@@ -231,29 +231,38 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             st.write(result.get('brief_summary', 'No brief summary available'))
 
             st.subheader("Experience and Project Relevance")
-            st.write(result.get('experience_and_project_relevance', 'No relevance information available'))
+            relevance_data = result.get('experience_and_project_relevance', {})
+            if isinstance(relevance_data, dict):
+                for key, value in relevance_data.items():
+                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+            else:
+                st.write(relevance_data)
 
             st.subheader("Skills Gap")
-            st.write(result.get('skills_gap', 'No skills gap identified'))
+            skills_gap = result.get('skills_gap', {})
+            if isinstance(skills_gap, dict):
+                for category, skills in skills_gap.items():
+                    st.write(f"**{category.replace('_', ' ').title()}:**")
+                    if isinstance(skills, dict):
+                        for skill, value in skills.items():
+                            st.write(f"- {skill.replace('_', ' ').title()}: {value}")
+                    else:
+                        st.write(f"- {skills}")
+            else:
+                st.write(skills_gap)
 
             st.subheader("Key Strengths")
-            strengths = result.get('key_strengths', 'No key strengths identified')
-            if isinstance(strengths, list):
-                for strength in strengths:
-                    st.write(f"- {strength}")
-            else:
-                st.write(strengths)
+            strengths = result.get('key_strengths', [])
+            for strength in strengths:
+                st.write(f"- {strength}")
 
             st.subheader("Areas for Improvement")
-            weaknesses = result.get('key_weaknesses', 'No areas for improvement identified')
-            if isinstance(weaknesses, list):
-                for weakness in weaknesses:
-                    st.write(f"- {weakness}")
-            else:
-                st.write(weaknesses)
+            weaknesses = result.get('key_weaknesses', [])
+            for weakness in weaknesses:
+                st.write(f"- {weakness}")
 
             st.subheader("Recruiter Questions")
-            questions = result.get('recruiter_questions', ['No recruiter questions generated'])
+            questions = result.get('recruiter_questions', [])
             for question in questions:
                 st.write(f"- {question}")
 

@@ -95,7 +95,10 @@ class LlamaAPI:
     
         try:
             if isinstance(processed_content['match_score'], dict):
-                processed_content['match_score'] = processed_content['match_score'].get('Overall', 0)
+                # Calculate a weighted average if match_score is a dictionary
+                total_score = sum(processed_content['match_score'].values())
+                total_weight = len(processed_content['match_score'])
+                processed_content['match_score'] = int(total_score / total_weight)
             elif isinstance(processed_content['match_score'], str):
                 # Try to extract a number from the string
                 match = re.search(r'\d+', processed_content['match_score'])
@@ -104,6 +107,8 @@ class LlamaAPI:
                 else:
                     processed_content['match_score'] = 0
             processed_content['match_score'] = int(float(processed_content['match_score']))
+            # Adjust the score to be more stringent
+            processed_content['match_score'] = max(0, min(100, int(processed_content['match_score'] * 0.8)))
             logger.debug(f"Processed match_score: {processed_content['match_score']}")
         except (ValueError, TypeError) as e:
             logger.error(f"Invalid match_score value: {processed_content.get('match_score')}")
@@ -120,13 +125,13 @@ class LlamaAPI:
         return fallback
 
     def _get_recommendation(self, match_score: int) -> str:
-        if match_score < 20:
+        if match_score < 30:
             return "Do not recommend for interview"
-        elif 20 <= match_score < 40:
+        elif 30 <= match_score < 50:
             return "Recommend for interview with significant reservations"
-        elif 40 <= match_score < 60:
+        elif 50 <= match_score < 70:
             return "Recommend for interview with minor reservations"
-        elif 60 <= match_score < 80:
+        elif 70 <= match_score < 85:
             return "Recommend for interview"
         else:
             return "Highly recommend for interview"
