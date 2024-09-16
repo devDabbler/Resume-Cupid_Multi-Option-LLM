@@ -426,15 +426,33 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         
         # Format experience and project relevance
         exp_relevance = result.get('experience_and_project_relevance', {})
-        formatted_exp_relevance = "\n".join([f"{k.replace('_', ' ').title()}: {v}" for k, v in exp_relevance.items()])
+        if isinstance(exp_relevance, dict):
+            formatted_exp_relevance = "\n".join([f"{k.replace('_', ' ').title()}: {v}" for k, v in exp_relevance.items()])
+        elif isinstance(exp_relevance, list):
+            formatted_exp_relevance = "\n".join([str(item) for item in exp_relevance])
+        else:
+            formatted_exp_relevance = str(exp_relevance)
         
         # Format skills gap
         skills_gap = result.get('skills_gap', {})
-        formatted_skills_gap = "\n".join([f"{k.replace('_', ' ').title()}: {v}" for k, v in skills_gap.items()])
+        if isinstance(skills_gap, dict):
+            formatted_skills_gap = "\n".join([f"{k.replace('_', ' ').title()}: {v}" for k, v in skills_gap.items()])
+        elif isinstance(skills_gap, list):
+            formatted_skills_gap = "\n".join([str(item) for item in skills_gap])
+        else:
+            formatted_skills_gap = str(skills_gap)
         
         # Extract key strengths and areas for improvement
         key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
         areas_for_improvement = _extract_key_points(resume_text, job_description, key_skills, is_strength=False)
+        
+        # Format recruiter questions
+        formatted_questions = []
+        for q in result.get('recruiter_questions', []):
+            if isinstance(q, dict):
+                formatted_questions.append(q.get('question', ''))
+            else:
+                formatted_questions.append(q)
         
         processed_result = {
             'file_name': resume_file.name,
@@ -444,7 +462,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             'skills_gap': formatted_skills_gap,
             'key_strengths': key_strengths if isinstance(key_strengths, list) else ["Unable to extract key strengths"],
             'areas_for_improvement': areas_for_improvement if isinstance(areas_for_improvement, list) else ["Unable to extract areas for improvement"],
-            'recruiter_questions': result.get('recruiter_questions', []),
+            'recruiter_questions': formatted_questions,
             'recommendation': result.get('recommendation', 'No recommendation available')
         }
         
