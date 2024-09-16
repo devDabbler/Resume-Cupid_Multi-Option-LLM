@@ -228,42 +228,45 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.info(f"Recommendation: {result['recommendation']}")
 
             st.subheader("Brief Summary")
-            st.write(result.get('brief_summary', 'No brief summary available'))
+            if isinstance(result['brief_summary'], dict):
+                for key, value in result['brief_summary'].items():
+                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+            elif isinstance(result['brief_summary'], list):
+                for item in result['brief_summary']:
+                    st.write(f"- {item}")
+            else:
+                st.write(result['brief_summary'])
 
             st.subheader("Experience and Project Relevance")
-            relevance_data = result.get('experience_and_project_relevance', {})
-            if isinstance(relevance_data, dict):
-                for key, value in relevance_data.items():
+            if isinstance(result['experience_and_project_relevance'], dict):
+                for key, value in result['experience_and_project_relevance'].items():
                     st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+            elif isinstance(result['experience_and_project_relevance'], list):
+                for item in result['experience_and_project_relevance']:
+                    st.write(f"- **{item['project']}:** {item['comments']} (Relevance: {item['relevance']}%)")
             else:
-                st.write(relevance_data)
+                st.write(result['experience_and_project_relevance'])
 
             st.subheader("Skills Gap")
-            skills_gap = result.get('skills_gap', {})
-            if isinstance(skills_gap, dict):
-                for category, skills in skills_gap.items():
-                    st.write(f"**{category.replace('_', ' ').title()}:**")
-                    if isinstance(skills, dict):
-                        for skill, value in skills.items():
-                            st.write(f"- {skill.replace('_', ' ').title()}: {value}")
-                    else:
-                        st.write(f"- {skills}")
+            if isinstance(result['skills_gap'], list):
+                for skill in result['skills_gap']:
+                    st.write(f"- {skill}")
+            elif isinstance(result['skills_gap'], dict):
+                for key, value in result['skills_gap'].items():
+                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
             else:
-                st.write(skills_gap)
+                st.write(result['skills_gap'])
 
             st.subheader("Key Strengths")
-            strengths = result.get('key_strengths', [])
-            for strength in strengths:
+            for strength in result['key_strengths']:
                 st.write(f"- {strength}")
 
             st.subheader("Areas for Improvement")
-            weaknesses = result.get('key_weaknesses', [])
-            for weakness in weaknesses:
+            for weakness in result['key_weaknesses']:
                 st.write(f"- {weakness}")
 
             st.subheader("Recruiter Questions")
-            questions = result.get('recruiter_questions', [])
-            for question in questions:
+            for question in result['recruiter_questions']:
                 st.write(f"- {question}")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):

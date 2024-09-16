@@ -36,7 +36,7 @@ class LlamaAPI:
                 ],
                 model="llama-3.1-8b-instant",
                 max_tokens=4000,
-                temperature=0.7,
+                temperature=0.5,
             )
             logger.debug(f"Received response from Llama: {completion}")
 
@@ -106,6 +106,13 @@ class LlamaAPI:
                     processed_content['match_score'] = int(match.group())
                 else:
                     processed_content['match_score'] = 0
+            elif processed_content['match_score'] is None or processed_content['match_score'] == 0:
+                # If match_score is None or 0, calculate based on other factors
+                relevance = processed_content.get('experience_and_project_relevance', {}).get('relevance', 'Low')
+                relevance_score = {'High': 70, 'Medium': 50, 'Low': 30}.get(relevance, 30)
+                skills_gap = len(processed_content.get('skills_gap', []))
+                processed_content['match_score'] = max(0, relevance_score - skills_gap * 5)
+            
             processed_content['match_score'] = int(float(processed_content['match_score']))
             # Adjust the score to be more stringent
             processed_content['match_score'] = max(0, min(100, int(processed_content['match_score'] * 0.8)))
