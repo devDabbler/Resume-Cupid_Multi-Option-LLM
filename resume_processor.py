@@ -235,13 +235,6 @@ class ResumeProcessor:
         ranked_results = sorted(results, key=lambda x: x['match_score'], reverse=True)
         
         return ranked_results
-    
-    def rank_candidates(self, resumes: List[str], job_description: str, importance_factors: Dict[str, float] = None) -> List[Dict[str, Any]]:
-        results = [
-            self.analyze_resume(resume, job_description, importance_factors)
-            for resume in resumes
-        ]
-        return sorted(results, key=lambda x: x['match_score'], reverse=True)
 
 def create_resume_processor(api_key: str, backend: str = "claude") -> ResumeProcessor:
     logger.info(f"Creating ResumeProcessor with backend: {backend}")

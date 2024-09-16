@@ -252,17 +252,16 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
     buffer.seek(0)
     return buffer.getvalue()
 
+import streamlit as st
+import pandas as pd
+from typing import List, Dict, Any
+
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Stack Ranking of Candidates")
     
     # Sort results by match score in descending order
     sorted_results = sorted(evaluation_results, key=lambda x: x['match_score'], reverse=True)
-    
-    df = pd.DataFrame(sorted_results)
-    df['Rank'] = range(1, len(df) + 1)
-    df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
-    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
-    
+
     def color_scale(val):
         if val < 30:
             color = 'red'
@@ -278,16 +277,21 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     
     st.dataframe(df.style.applymap(color_scale, subset=['Match Score (%)']))
 
-    # Add download button for PDF only
-    pdf = generate_pdf_report(evaluation_results, run_id)
+    df = pd.DataFrame(sorted_results)
+    df['Rank'] = range(1, len(df) + 1)
+    df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
+    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
+    
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
+
     st.download_button(
         label="Download PDF Report",
-        data=pdf,
+        data=generate_pdf_report(evaluation_results, run_id),
         file_name=f"evaluation_report_{run_id}.pdf",
         mime="application/pdf"
     )
 
-    for i, result in enumerate(evaluation_results, 1):
+    for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis"):
             col1, col2 = st.columns(2)
             with col1:
@@ -296,18 +300,23 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.info(f"Recommendation: {result['recommendation']}")
 
             st.subheader("Brief Summary")
-            st.write(result['brief_summary'])
+            if isinstance(result['brief_summary'], dict):
+                for key, value in result['brief_summary'].items():
+                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+            else:
+                st.write(result['brief_summary'])
 
             st.subheader("Experience and Project Relevance")
-            st.write(result['experience_and_project_relevance'])
+            if isinstance(result['experience_and_project_relevance'], dict):
+                for key, value in result['experience_and_project_relevance'].items():
+                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+            else:
+                st.write(result['experience_and_project_relevance'])
 
             st.subheader("Skills Gap")
-            if isinstance(result['skills_gap'], list):
-                for skill in result['skills_gap']:
-                    st.write(f"- {skill}")
-            elif isinstance(result['skills_gap'], dict):
-                for key, value in result['skills_gap'].items():
-                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+            if isinstance(result['skills_gap'], dict):
+                for skill, gap in result['skills_gap'].items():
+                    st.write(f"- **{skill}:** {gap}")
             else:
                 st.write(result['skills_gap'])
 
@@ -336,8 +345,8 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                     else:
                         st.error("Failed to save feedback. Please try again.")
 
-    st.progress(1.0)  # Show completion of analysis
-
+    st.progress(100)  # Show completion of analysis
+    
 def display_nested_content(content):
     if isinstance(content, dict):
         for key, value in content.items():
