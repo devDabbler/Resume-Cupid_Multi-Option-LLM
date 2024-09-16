@@ -255,7 +255,10 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Stack Ranking of Candidates")
     
-    df = pd.DataFrame(evaluation_results)
+    # Sort results by match score in descending order
+    sorted_results = sorted(evaluation_results, key=lambda x: x['match_score'], reverse=True)
+    
+    df = pd.DataFrame(sorted_results)
     df['Rank'] = range(1, len(df) + 1)
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
@@ -604,15 +607,15 @@ def _generate_questions(resume_text: str, job_description: str, key_skills: List
     return questions
 
 def get_recommendation(match_score: int) -> str:
-    if match_score == 0:
+    if match_score < 30:
         return "Do not recommend for interview (not suitable for the role)"
-    elif match_score < 30:
-        return "Do not recommend for interview (significant skill gaps)"
     elif 30 <= match_score < 50:
-        return "Consider for interview only if making a career transition; review with a lead for a second opinion"
-    elif 50 <= match_score < 70:
-        return "Recommend for interview with reservations; focus on probing questions to verify fit"
-    elif 70 <= match_score < 85:
+        return "Do not recommend for interview (significant skill gaps)"
+    elif 50 <= match_score < 65:
+        return "Consider for interview only if making a career transition; review with a lead"
+    elif 65 <= match_score < 80:
+        return "Recommend for interview with minor reservations"
+    elif 80 <= match_score < 90:
         return "Recommend for interview"
     else:
         return "Highly recommend for interview"
