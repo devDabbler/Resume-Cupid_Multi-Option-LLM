@@ -615,37 +615,74 @@ def get_strengths_and_improvements(resume_text, job_description, llm):
         }
 
 def adjust_match_score(original_score, result, importance_factors, job_requirements):
+    logger.debug(f"Adjusting match score. Original score: {original_score}")
+    
     skills_weight = importance_factors.get('technical_skills', 0.3)
     experience_weight = importance_factors.get('experience', 0.3)
     education_weight = importance_factors.get('education', 0.2)
     industry_weight = importance_factors.get('industry_knowledge', 0.2)
     
-    skills_score = evaluate_skills(result.get('skills_gap', {}), job_requirements.get('required_skills', []))
-    experience_score = evaluate_experience(result.get('experience_and_project_relevance', {}), job_requirements.get('years_of_experience', 0))
-    education_score = evaluate_education(result, job_requirements.get('education_level', 'Bachelor'))
-    industry_score = evaluate_industry_knowledge(result, job_requirements.get('industry_keywords', []))
+    try:
+        skills_score = evaluate_skills(result.get('skills_gap', []), job_requirements.get('required_skills', []))
+        experience_score = evaluate_experience(result.get('experience_and_project_relevance', {}), job_requirements.get('years_of_experience', 0))
+        education_score = evaluate_education(result, job_requirements.get('education_level', 'Bachelor'))
+        industry_score = evaluate_industry_knowledge(result, job_requirements.get('industry_keywords', []))
     
-    adjusted_score = (
-        original_score * 0.4 +  # Base score
-        skills_score * skills_weight +
-        experience_score * experience_weight +
-        education_score * education_weight +
-        industry_score * industry_weight
-    )
+        logger.debug(f"Component scores - Skills: {skills_score}, Experience: {experience_score}, Education: {education_score}, Industry: {industry_score}")
     
-    return min(max(int(adjusted_score), 0), 100)  # Ensure score is between 0 and 100
+        adjusted_score = (
+            original_score * 0.6 +  # Base score weight
+            skills_score * skills_weight * 0.1 +
+            experience_score * experience_weight * 0.1 +
+            education_score * education_weight * 0.1 +
+            industry_score * industry_weight * 0.1
+        )
+    
+        # Cap the maximum adjustment
+        max_adjustment = 15  # Maximum 15 point increase
+        final_score = min(original_score + max_adjustment, adjusted_score)
+    
+        logger.debug(f"Adjusted score: {final_score}")
+    except Exception as e:
+        logger.error(f"Error in adjust_match_score: {str(e)}")
+        final_score = original_score  # Use original score if there's an error
+    
+    return min(max(int(final_score), 0), 100)  # Ensure score is between 0 and 100
 
 def evaluate_skills(skills_gap, required_skills):
+    logger.debug(f"Evaluating skills. Skills gap: {skills_gap}, Required skills: {required_skills}")
+    
+    # Handle both list and dictionary inputs for skills_gap
+    if isinstance(skills_gap, dict):
+        candidate_skills = skills_gap.get('key_skills', [])
+        if isinstance(candidate_skills, str):
+            candidate_skills = [candidate_skills]
+    elif isinstance(skills_gap, list):
+        candidate_skills = skills_gap
+    else:
+        candidate_skills = []
+    
+    logger.debug(f"Candidate skills: {candidate_skills}")
+    
+    # Ensure required_skills is a list
+    if isinstance(required_skills, str):
+        required_skills = [required_skills]
+    
     # Check how many required skills are missing
-    missing_skills = len([skill for skill in required_skills if skill not in skills_gap.get('key_skills', [])])
+    missing_skills = [skill for skill in required_skills if skill.lower() not in [s.lower() for s in candidate_skills]]
+    
+    logger.debug(f"Missing skills: {missing_skills}")
     
     # Max score based on total required skills
     max_possible_score = len(required_skills) * 10  # e.g., 10 points per skill
     
     if max_possible_score == 0:
+        logger.debug("No required skills listed, returning perfect score")
         return 100  # No required skills listed means perfect score
     
-    return max(100 - (missing_skills / len(required_skills)) * 100, 0)
+    score = max(100 - (len(missing_skills) / len(required_skills)) * 100, 0)
+    logger.debug(f"Skills evaluation score: {score}")
+    return score
 
 def evaluate_experience(experience_relevance, years_required):
     try:
