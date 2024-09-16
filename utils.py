@@ -366,7 +366,6 @@ def process_resumes_sequentially(resume_files, resume_processor, job_description
             logger.error(f"Error processing resume {file.name}: {str(e)}", exc_info=True)
             results.append(_generate_error_result(file.name, str(e)))
     return results
-
 def process_resume(resume_file, resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm, job_requirements):
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {resume_processor.backend} backend")
@@ -421,6 +420,14 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
                 formatted_questions.append(q.get('question', ''))
             else:
                 formatted_questions.append(q)
+        
+        # If no recruiter questions were generated, create default ones
+        if not formatted_questions:
+            formatted_questions = [
+                "Can you describe your experience with model governance and risk management?",
+                "How do you ensure compliance with regulatory requirements in your work?",
+                "Can you give an example of a complex machine learning project you've worked on and how you managed the associated risks?"
+            ]
         
         processed_result = {
             'file_name': resume_file.name,

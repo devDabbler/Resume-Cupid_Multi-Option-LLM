@@ -232,6 +232,10 @@ def main_app():
                 )
                 evaluation_results.append(result)
                 progress_bar.progress((i + 1) / len(resume_files))
+                
+                # Log the result for each resume
+                logger.debug(f"Processed resume: {resume_file.name}")
+                logger.debug(f"Result: {result}")
 
             if evaluation_results:
                 st.success("Evaluation complete!")
