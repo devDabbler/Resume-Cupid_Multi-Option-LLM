@@ -126,6 +126,47 @@ def extract_text_from_file(file) -> str:
         logger.error(f"Error extracting text from file {file.name}: {str(e)}", exc_info=True)
         raise ValueError(f"Failed to extract text from {file.name}: {str(e)}")
 
+import spacy
+import re
+from collections import Counter
+
+# Load the spaCy model (make sure to install it with: python -m spacy download en_core_web_sm)
+nlp = spacy.load("en_core_web_sm")
+
+def generate_job_requirements(job_description):
+    # Process the job description with spaCy
+    doc = nlp(job_description)
+    
+    # Extract required skills
+    required_skills = set()
+    for ent in doc.ents:
+        if ent.label_ in ["SKILL", "PRODUCT", "ORG"]:
+            required_skills.add(ent.text.lower())
+    
+    # Extract years of experience
+    experience_pattern = r'\b(\d+)(?:\+)?\s*(?:years?|yrs?)\b.*?experience'
+    experience_matches = re.findall(experience_pattern, job_description, re.IGNORECASE)
+    years_of_experience = max(map(int, experience_matches)) if experience_matches else 0
+    
+    # Extract education level
+    education_levels = ["high school", "associate", "bachelor", "master", "phd", "doctorate"]
+    education_level = "Not specified"
+    for level in education_levels:
+        if level in job_description.lower():
+            education_level = level.title()
+            break
+    
+    # Extract industry keywords
+    industry_keywords = [token.text.lower() for token in doc if token.pos_ in ["NOUN", "PROPN"] and len(token.text) > 2]
+    industry_keywords = [kw for kw, count in Counter(industry_keywords).most_common(10)]
+    
+    return {
+        'required_skills': list(required_skills),
+        'years_of_experience': years_of_experience,
+        'education_level': education_level,
+        'industry_keywords': industry_keywords
+    }
+    
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Stack Ranking of Candidates")
     
@@ -327,7 +368,7 @@ def process_resumes_sequentially(resume_files, resume_processor, job_description
             results.append(_generate_error_result(file.name, str(e)))
     return results
 
-def process_resume(resume_file, resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm):
+def process_resume(resume_file, resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm, job_requirements):
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {resume_processor.backend} backend")
     try:
@@ -338,8 +379,8 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         
         result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         
-        # Adjust match score based on importance factors
-        adjusted_score = adjust_match_score(result['match_score'], result, importance_factors)
+        # Adjust match score based on importance factors and job requirements
+        adjusted_score = adjust_match_score(result['match_score'], result, importance_factors, job_requirements)
         
         # Format experience and project relevance
         exp_relevance = result.get('experience_and_project_relevance', {})
