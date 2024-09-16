@@ -330,6 +330,7 @@ async def process_all_batches(batches: List[List], resume_processor, job_descrip
 
 def process_resumes_in_parallel(resume_files, resume_processor, job_description, importance_factors, candidate_data_list, job_title):
     logger.debug("Starting parallel resume processing...")
+    
     def process_with_context(file, candidate_data):
         try:
             resume_text = extract_text_from_file(file)
@@ -414,13 +415,13 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         processed_result = {
             'file_name': resume_file.name,
             'brief_summary': result.get('brief_summary', 'No summary available'),
-            'match_score': adjusted_score,
+            'match_score': adjusted_score,  # Use the adjusted score here
             'experience_and_project_relevance': formatted_exp_relevance,
             'skills_gap': formatted_skills_gap,
             'key_strengths': strengths_and_improvements['strengths'],
             'areas_for_improvement': strengths_and_improvements['improvements'],
             'recruiter_questions': formatted_questions,
-            'recommendation': get_recommendation(adjusted_score)
+            'recommendation': get_recommendation(adjusted_score)  # Use the adjusted score for recommendation
         }
         
         logger.debug(f"Processed result: {processed_result}")
