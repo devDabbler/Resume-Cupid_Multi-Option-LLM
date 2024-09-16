@@ -158,18 +158,34 @@ def main_app():
 
     st.subheader("Customize Importance Factors")
     
-    required_factors = ['technical_skills', 'experience', 'education', 'soft_skills', 'industry_knowledge']
-    st.session_state.importance_factors = st.session_state.get('importance_factors', {factor: 0.5 for factor in required_factors})
+    # Define the required factors and their defaults
+    required_factors = {
+        'technical_skills': 0.5,
+        'experience': 0.5,
+        'education': 0.5,
+        'soft_skills': 0.5,
+        'industry_knowledge': 0.5
+    }
 
+    # Initialize or update importance_factors in session state
+    if 'importance_factors' not in st.session_state:
+        # Initialize with default values if not present
+        st.session_state.importance_factors = {factor: default_value for factor, default_value in required_factors.items()}
+    else:
+        # Ensure all required factors are present, set missing ones to their default values
+        for factor, default_value in required_factors.items():
+            st.session_state.importance_factors.setdefault(factor, default_value)
+
+    # Create sliders for importance factors
     cols = st.columns(len(required_factors))
-    for i, factor in enumerate(required_factors):
+    for i, (factor, default_value) in enumerate(required_factors.items()):
         with cols[i]:
             st.session_state.importance_factors[factor] = st.slider(
                 f"{factor.replace('_', ' ').title()}",
                 0.0, 1.0,
                 st.session_state.importance_factors[factor],
                 0.1,
-                key=f"slider_{factor}"
+                key=f"slider_{factor}"  # Add a unique key for each slider
             )
 
     st.write("Current Importance Factors:", st.session_state.importance_factors)
@@ -210,7 +226,6 @@ def main_app():
     if st.button("Logout"):
         st.session_state.clear()
         st.experimental_rerun()
-
 
 def process_resumes_logic(resume_files, resume_processor, llm):
     run_id = str(uuid.uuid4())
