@@ -96,26 +96,15 @@ def main_app():
         st.error("No API key found for Llama. Please check your configuration.")
         return
 
-    available_backends = ['llama']  # Only allow Llama
-    backend_options = []
-    for backend in available_backends:
-        if backend in llm_descriptions:
-            backend_options.append(f"{backend}: {llm_descriptions[backend]}")
-        else:
-            backend_options.append(f"{backend}: No description available")
+    available_backends = ['llama']
+    backend_options = [f"{backend}: {llm_descriptions[backend]}" for backend in available_backends if backend in llm_descriptions]
 
     if not backend_options:
         st.error("No compatible backends found. Please check your API key configuration.")
         return
 
-    selected_backend = st.selectbox(
-        "Select AI backend:",
-        backend_options,
-        index=0
-    )
-    selected_backend = selected_backend.split(":")[0].strip()
+    selected_backend = st.selectbox("Select AI backend:", backend_options, index=0).split(":")[0].strip()
 
-    # Check if the backend has changed and clear cache if necessary
     if selected_backend != st.session_state.get('last_backend'):
         selected_api_key = api_keys.get(selected_backend, None)
         if selected_api_key is None:
@@ -124,31 +113,21 @@ def main_app():
     
         st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
         if hasattr(st.session_state.resume_processor, 'clear_cache'):
-            clear_cache()  # Clear the cache when switching backends
+            clear_cache()
             st.session_state.last_backend = selected_backend
         logger.debug(f"Switched to {selected_backend} backend and cleared cache")
     else:
-        # If the backend hasn't changed, use the existing API key
         selected_api_key = api_keys.get(selected_backend, None)
         if selected_api_key is None:
             st.error(f"No API key found for {selected_backend}. Please check your configuration.")
             return
 
     st.session_state.backend = selected_backend
-
-    logger.debug(f"Using ResumeProcessor with backend: {selected_backend}")
-
     resume_processor = st.session_state.resume_processor
 
-    if not resume_processor:
-        st.error("Failed to initialize resume processor. Please check your configuration.")
-        return
-
-    # Add this line to check if the analyze_match method exists
     if not hasattr(resume_processor, 'analyze_match'):
         raise AttributeError(f"ResumeProcessor for backend '{selected_backend}' does not have the 'analyze_match' method")
 
-    # Add dropdown for selecting saved roles
     saved_role_options = ["Select a saved role"] + [f"{role['role_name']} - {role['client']}" for role in st.session_state.saved_roles]
     selected_saved_role = st.selectbox("Select a saved role:", options=saved_role_options)
 
@@ -159,23 +138,15 @@ def main_app():
         st.session_state.role_name_input = selected_role['role_name']
         st.session_state.client = selected_role['client']
 
-    # Add job title input field
     st.session_state.job_title = st.text_input("Enter the job title:", value=st.session_state.get('job_title', ''))
 
     jd_option = st.radio("Job Description Input Method:", ("Paste Job Description", "Provide Link to Fractal Job Posting"))
 
     if jd_option == "Paste Job Description":
-        st.session_state.job_description = st.text_area(
-            "Paste the Job Description here:", 
-            value=st.session_state.get('job_description', ''), 
-            placeholder="Job description. This field is required."
-        )
+        st.session_state.job_description = st.text_area("Paste the Job Description here:", value=st.session_state.get('job_description', ''), placeholder="Job description. This field is required.")
         st.session_state.job_description_link = ""
     else:
-        st.session_state.job_description_link = st.text_input(
-            "Enter the link to the Fractal job posting:", 
-            value=st.session_state.get('job_description_link', '')
-        )
+        st.session_state.job_description_link = st.text_input("Enter the link to the Fractal job posting:", value=st.session_state.get('job_description_link', ''))
 
     if 'job_description' not in st.session_state or not st.session_state.job_description:
         if st.session_state.job_description_link and is_valid_fractal_job_link(st.session_state.job_description_link):
@@ -184,16 +155,12 @@ def main_app():
         else:
             st.session_state.job_description = ""
 
-    # Display the current job description
     if st.session_state.job_description:
         st.text_area("Current Job Description:", value=st.session_state.job_description, height=200, key='current_jd', disabled=True)
 
-    # Move the client name input field here
     st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
-
     st.subheader("Customize Importance Factors")
 
-    # Initialize importance_factors if not present in session state
     if 'importance_factors' not in st.session_state:
         st.session_state.importance_factors = {
             'technical_skills': 0.5,
@@ -203,34 +170,18 @@ def main_app():
             'industry_knowledge': 0.5
         }
 
-    # Ensure all required factors are present
     required_factors = ['technical_skills', 'experience', 'education', 'soft_skills', 'industry_knowledge']
-    for factor in required_factors:
-        if factor not in st.session_state.importance_factors:
-            st.session_state.importance_factors[factor] = 0.5
-
-    # Create columns for importance factors
     cols = st.columns(len(required_factors))
-
-    # Create sliders for each importance factor
     for i, factor in enumerate(required_factors):
         with cols[i]:
-            st.session_state.importance_factors[factor] = st.slider(
-                f"{factor.replace('_', ' ').title()}",
-                0.0, 1.0, st.session_state.importance_factors[factor], 0.1
-            )
+            st.session_state.importance_factors[factor] = st.slider(f"{factor.replace('_', ' ').title()}", 0.0, 1.0, st.session_state.importance_factors[factor], 0.1)
 
-    # Optionally, display the current importance factors for debugging
     st.write("Current Importance Factors:", st.session_state.importance_factors)
-
-    st.subheader("Key Skills/Requirements")
-    key_skills = st.text_area("Enter key skills or requirements (one per line):", 
-                          help="These will be used to assess the candidate's fit for the role.")
+    key_skills = st.text_area("Enter key skills or requirements (one per line):", help="These will be used to assess the candidate's fit for the role.")
+    
     if key_skills:
-        # Clean up the input and split into a list, ignoring empty lines
         st.session_state.key_skills = [skill.strip() for skill in key_skills.split('\n') if skill.strip()]
 
-    # Display entered key skills for confirmation
     if st.session_state.key_skills:
         st.write("Key Skills/Requirements Entered:")
         for skill in st.session_state.key_skills:
@@ -242,15 +193,11 @@ def main_app():
     if resume_files:
         if len(resume_files) > 3:
             st.warning("You've uploaded more than 3 resumes. Only the first 3 will be processed.")
-            resume_files = resume_files[:3]  # Truncate to first 3 files
+            resume_files = resume_files[:3]
         st.write(f"Number of resumes uploaded: {len(resume_files)}")
 
     if st.button('Process Resumes', key='process_resumes'):
         if resume_files and st.session_state.job_description and st.session_state.job_title:
-            if len(resume_files) > 3:
-                st.warning("You've uploaded more than 3 resumes. Only the first 3 will be processed.")
-                resume_files = resume_files[:3]
-        
             run_id = str(uuid.uuid4())
             insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
             logger.info("Processing resumes...")
@@ -269,9 +216,7 @@ def main_app():
                 with st.spinner('Processing resumes...'):
                     for i, (resume_file, candidate_data) in enumerate(zip(resume_files, candidate_data_list)):
                         status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
-                        result = process_resume(resume_file, resume_processor, st.session_state.job_description, 
-                                                st.session_state.importance_factors, candidate_data, st.session_state.job_title,
-                                                st.session_state.key_skills, selected_backend)
+                        result = process_resume(resume_file, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data, st.session_state.job_title, st.session_state.key_skills, selected_backend)
                         evaluation_results.append(result)
                         progress_bar.progress((i + 1) / len(resume_files))
                 
@@ -297,6 +242,7 @@ def main_app():
                 st.error("Please enter a job title.")
             if not resume_files:
                 st.error("Please upload at least one resume.")
+        
         save_role_option = False  # Initialize save_role_option with a default value
         save_role_option = st.checkbox("Save this role for future use")
 
@@ -322,11 +268,9 @@ def main_app():
                 except ValueError as e:
                     st.error(str(e))
 
-    # Initialize delete_role_options as an empty list outside the checkbox condition
     delete_role_options = []
     
     if st.checkbox("Delete a saved role"):
-        # Populate delete_role_options
         delete_role_options = [f"{role['role_name']} - {role['client']}" for role in st.session_state.saved_roles]
 
     if delete_role_options:
@@ -334,11 +278,9 @@ def main_app():
 
         if delete_role_name:
             if st.button(f"Delete {delete_role_name}"):
-                # Split the role name and take everything up to the second occurrence of " - "
                 role_parts = delete_role_name.rsplit(" - ", 2)
                 role_name_to_delete = " - ".join(role_parts[:-1])
                 
-                # Call delete_saved_role with error handling
                 try:
                     if delete_saved_role(role_name_to_delete):
                         st.success(f"Role '{delete_role_name}' deleted successfully!")
@@ -348,7 +290,6 @@ def main_app():
                 except Exception as e:
                     st.error(f"Failed to delete role '{delete_role_name}'. Error: {str(e)}")
 
-    # Add a logout button
     if st.button("Logout"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
