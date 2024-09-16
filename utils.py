@@ -7,6 +7,7 @@ from docx import Document
 import numpy as np
 import nltk
 import ssl
+from collections import Counter
 import streamlit as st
 import sys
 import threading
@@ -425,11 +426,11 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         
         # Format experience and project relevance
         exp_relevance = result.get('experience_and_project_relevance', {})
-        formatted_exp_relevance = "\n".join([f"{k.replace('_', ' ').title()}: {v}%" for k, v in exp_relevance.items()])
+        formatted_exp_relevance = "\n".join([f"{k.replace('_', ' ').title()}: {v}" for k, v in exp_relevance.items()])
         
         # Format skills gap
         skills_gap = result.get('skills_gap', {})
-        formatted_skills_gap = "\n".join([f"{k.replace('_', ' ').title()}: {v}%" for k, v in skills_gap.items()])
+        formatted_skills_gap = "\n".join([f"{k.replace('_', ' ').title()}: {v}" for k, v in skills_gap.items()])
         
         # Extract key strengths and areas for improvement
         key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
@@ -441,8 +442,8 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             'match_score': result.get('match_score', 0),
             'experience_and_project_relevance': formatted_exp_relevance,
             'skills_gap': formatted_skills_gap,
-            'key_strengths': key_strengths,
-            'areas_for_improvement': areas_for_improvement,
+            'key_strengths': key_strengths if isinstance(key_strengths, list) else ["Unable to extract key strengths"],
+            'areas_for_improvement': areas_for_improvement if isinstance(areas_for_improvement, list) else ["Unable to extract areas for improvement"],
             'recruiter_questions': result.get('recruiter_questions', []),
             'recommendation': result.get('recommendation', 'No recommendation available')
         }
@@ -616,24 +617,25 @@ def _extract_key_points(resume_text, job_description, key_skills, is_strength=Tr
         ignore_words = set(['work', 'learning', 'learn', 'role', 'company', 'business', 'data', 'set', 'machine'])
         try:
             ignore_words.update(nltk.corpus.stopwords.words('english'))
-        except LookupError:
-            logger.warning("NLTK stopwords not available. Proceeding without them.")
+        except:
+            logger.warning("NLTK stopwords not available. Using a basic stopword list.")
+            ignore_words.update(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'])
+
+        # Simple word extraction (fallback method)
+        words = re.findall(r'\b\w+\b', combined_text.lower())
+        words = [word for word in words if word not in ignore_words and len(word) > 2]
         
-        # Tokenize and process the text
-        words = nltk.word_tokenize(combined_text.lower())
-        words = [word for word in words if word.isalnum() and word not in ignore_words]
-        
-        # Get word frequencies
-        freq_dist = nltk.FreqDist(words)
+        # Count word frequencies
+        word_freq = Counter(words)
         
         # Filter words based on whether we're looking for strengths or areas for improvement
         if is_strength:
-            relevant_words = [word for word in freq_dist.keys() if word in resume_text.lower()]
+            relevant_words = [word for word in word_freq.keys() if word in resume_text.lower()]
         else:
-            relevant_words = [word for word in freq_dist.keys() if word in job_description.lower() and word not in resume_text.lower()]
+            relevant_words = [word for word in word_freq.keys() if word in job_description.lower() and word not in resume_text.lower()]
         
         # Sort by frequency and return top 5
-        sorted_words = sorted(relevant_words, key=freq_dist.get, reverse=True)
+        sorted_words = sorted(relevant_words, key=word_freq.get, reverse=True)
         return sorted_words[:5]
     except Exception as e:
         logger.error(f"Error in _extract_key_points: {str(e)}")
