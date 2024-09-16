@@ -326,8 +326,8 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
     logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
     try:
         resume_text = extract_text_from_file(resume_file)
-        if not isinstance(resume_text, str):
-            raise ValueError(f"Invalid resume text type: {type(resume_text)}")
+        logger.debug(f"Extracted text type: {type(resume_text)}")
+        logger.debug(f"Extracted text (first 100 chars): {resume_text[:100]}")
         
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         
@@ -564,15 +564,15 @@ def ensure_required_fields(result):
 # Replace `llm.generate` with the actual method you use to interact with your LLM
 
 def extract_key_features(text, llm):
+    if not isinstance(text, str):
+        text = str(text)
     prompt = f"Extract key features from the following text:\n{text}"
     response = llm.analyze_match(text, prompt, {}, "Feature Extraction")
-    # Return the entire response dictionary instead of just the brief_summary
     return response
 
 def compare_features(features1, features2, llm):
-    # Convert features to string if they're dictionaries
-    features1_str = json.dumps(features1) if isinstance(features1, dict) else features1
-    features2_str = json.dumps(features2) if isinstance(features2, dict) else features2
+    features1_str = json.dumps(features1) if isinstance(features1, dict) else str(features1)
+    features2_str = json.dumps(features2) if isinstance(features2, dict) else str(features2)
     
     prompt = f"Compare the following features and provide a similarity score (0-100):\nFeatures 1: {features1_str}\nFeatures 2: {features2_str}"
     response = llm.analyze_match(features1_str + "\n" + features2_str, prompt, {}, "Feature Comparison")
@@ -580,14 +580,17 @@ def compare_features(features1, features2, llm):
     return similarity_score
 
 def calculate_combined_score(resume_text, job_description, importance_factors, key_skills, llm):
+    if not isinstance(resume_text, str):
+        resume_text = str(resume_text)
+    if not isinstance(job_description, str):
+        job_description = str(job_description)
+    
     tfidf_score = calculate_tfidf_score(resume_text, job_description)
     keyword_match = calculate_keyword_match(resume_text, job_description, key_skills)
     
-    # Extract key features using LLM
     resume_features = extract_key_features(resume_text, llm)
     job_features = extract_key_features(job_description, llm)
     
-    # Compare features using LLM
     llm_similarity_score = compare_features(resume_features, job_features, llm)
     
     combined_score = (
