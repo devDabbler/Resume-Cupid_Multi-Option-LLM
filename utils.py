@@ -5,6 +5,7 @@ import io
 import PyPDF2
 from docx import Document
 import numpy as np
+import nltk
 import streamlit as st
 import sys
 import threading
@@ -414,32 +415,34 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {resume_processor.backend} backend")
     try:
-        try:
-            resume_text = extract_text_from_file(resume_file)
-        except ValueError as e:
-            logger.error(f"Failed to extract text from {resume_file.name}: {str(e)}")
-            return _generate_error_result(resume_file.name, str(e))
-        
-        logger.debug(f"Extracted text type: {type(resume_text)}")
-        logger.debug(f"Extracted text length: {len(resume_text)}")
-        logger.debug(f"Extracted text (first 100 chars): {resume_text[:100]}")
-        
+        resume_text = extract_text_from_file(resume_file)
         if not resume_text.strip():
-            logger.warning(f"Extracted text is empty for resume: {resume_file.name}")
-            return _generate_error_result(resume_file.name, "Empty resume content")
+            logger.warning(f"Empty content extracted from {resume_file.name}")
+            return _generate_error_result(resume_file.name, "Empty content extracted")
         
         result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
-        logger.debug(f"Raw analysis result: {result}")
+        
+        # Format experience and project relevance
+        exp_relevance = result.get('experience_and_project_relevance', {})
+        formatted_exp_relevance = "\n".join([f"{k.replace('_', ' ').title()}: {v}%" for k, v in exp_relevance.items()])
+        
+        # Format skills gap
+        skills_gap = result.get('skills_gap', {})
+        formatted_skills_gap = "\n".join([f"{k.replace('_', ' ').title()}: {v}%" for k, v in skills_gap.items()])
+        
+        # Extract key strengths and areas for improvement
+        key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
+        areas_for_improvement = _extract_key_points(resume_text, job_description, key_skills, is_strength=False)
         
         processed_result = {
             'file_name': resume_file.name,
             'brief_summary': result.get('brief_summary', 'No summary available'),
             'match_score': result.get('match_score', 0),
-            'experience_and_project_relevance': _process_experience_relevance(result.get('experience_and_project_relevance', [])),
-            'skills_gap': _process_skills_gap(result.get('skills_gap', [])),
-            'key_strengths': _extract_key_points(resume_text, job_description, key_skills, is_strength=True),
-            'key_weaknesses': _extract_key_points(resume_text, job_description, key_skills, is_strength=False),
-            'recruiter_questions': _process_recruiter_questions(result.get('recruiter_questions', [])),
+            'experience_and_project_relevance': formatted_exp_relevance,
+            'skills_gap': formatted_skills_gap,
+            'key_strengths': key_strengths,
+            'areas_for_improvement': areas_for_improvement,
+            'recruiter_questions': result.get('recruiter_questions', []),
             'recommendation': result.get('recommendation', 'No recommendation available')
         }
         
@@ -585,27 +588,30 @@ def _identify_skills_gap(resume_text: str, job_description: str, key_skills: Lis
     missing_skills = list(job_skills - resume_skills)
     return sorted(missing_skills, key=lambda x: job_description.lower().count(x), reverse=True)[:10]
 
-def _extract_key_points(resume_text: str, job_description: str, key_skills: List[str], is_strength: bool = True) -> List[str]:
-    resume_doc = nlp(resume_text.lower())
-    job_doc = nlp(job_description.lower())
+def _extract_key_points(resume_text, job_description, key_skills, is_strength=True):
+    # Combine resume text and job description
+    combined_text = resume_text + " " + job_description
     
-    # Define a list of stop words to filter out
-    stop_words = set(nlp.Defaults.stop_words).union({'experience', 'skill', 'ability', 'company', 'time', 'employment'})
+    # Create a set of words to ignore
+    ignore_words = set(['work', 'learning', 'learn', 'role', 'company', 'business', 'data', 'set', 'machine'])
+    ignore_words.update(nltk.corpus.stopwords.words('english'))
     
-    def is_valid_word(word):
-        return len(word) > 2 and word.lower() not in stop_words and word.isalpha()
+    # Tokenize and process the text
+    words = nltk.word_tokenize(combined_text.lower())
+    words = [word for word in words if word.isalnum() and word not in ignore_words]
     
-    resume_words = set([token.lemma_ for token in resume_doc if is_valid_word(token.text)])
-    job_words = set([token.lemma_ for token in job_doc if is_valid_word(token.text)])
-    key_skills_set = set([skill.lower() for skill in key_skills])
+    # Get word frequencies
+    freq_dist = nltk.FreqDist(words)
     
+    # Filter words based on whether we're looking for strengths or areas for improvement
     if is_strength:
-        strengths = list(resume_words.intersection(job_words).union(resume_words.intersection(key_skills_set)))
-        return sorted(strengths, key=lambda x: job_description.lower().count(x), reverse=True)[:5]
+        relevant_words = [word for word in freq_dist.keys() if word in resume_text.lower()]
     else:
-        weaknesses = list(job_words.difference(resume_words).union(key_skills_set.difference(resume_words)))
-        return sorted(weaknesses, key=lambda x: job_description.lower().count(x), reverse=True)[:5]
-
+        relevant_words = [word for word in freq_dist.keys() if word in job_description.lower() and word not in resume_text.lower()]
+    
+    # Sort by frequency and return top 5
+    sorted_words = sorted(relevant_words, key=freq_dist.get, reverse=True)
+    return sorted_words[:5]
 
 def generate_questions(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
