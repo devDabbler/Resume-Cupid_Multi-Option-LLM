@@ -75,24 +75,31 @@ class ThreadSafeLogger(logging.Logger):
 
 logging.setLoggerClass(ThreadSafeLogger)
 
-# Function to extract text from PDF files
 @st.cache_data
 def extract_text_from_pdf(file_content: bytes) -> str:
     logger.debug("Extracting text from PDF...")
     try:
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
         text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
+        for page_num in range(len(pdf_reader.pages)):
+            logger.debug(f"Processing page {page_num + 1}")
+            page = pdf_reader.pages[page_num]
+            page_text = page.extract_text()
+            logger.debug(f"Extracted text from page {page_num + 1}: {page_text[:100]}...")  # Log first 100 chars
+            text += page_text
+
         if not text.strip():
             logger.warning("Extracted PDF text is empty or contains only whitespace.")
+        else:
+            logger.debug(f"Successfully extracted {len(text)} characters from PDF")
+        
         return text
     except PyPDF2.errors.PdfReadError as e:
-        logger.error(f"Error reading PDF: {str(e)}")
-        return ""
+        logger.error(f"PyPDF2 error reading PDF: {str(e)}")
+        raise ValueError(f"Failed to read PDF: {str(e)}")
     except Exception as e:
-        logger.error(f"Error extracting text from PDF: {str(e)}")
-        return ""
+        logger.error(f"Unexpected error extracting text from PDF: {str(e)}", exc_info=True)
+        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
 
 # Function to extract text from DOCX files
 @st.cache_data
@@ -115,11 +122,17 @@ def extract_text_from_file(file) -> str:
     
     try:
         if file_extension == 'pdf':
-            return extract_text_from_pdf(file_content)
+            text = extract_text_from_pdf(file_content)
         elif file_extension in ['docx', 'doc']:
-            return extract_text_from_docx(file_content)
+            text = extract_text_from_docx(file_content)
         else:
             raise ValueError(f"Unsupported file format: {file_extension}")
+        
+        if not text.strip():
+            raise ValueError(f"Extracted text is empty for file: {file.name}")
+        
+        logger.debug(f"Successfully extracted {len(text)} characters from {file.name}")
+        return text
     except Exception as e:
         logger.error(f"Error extracting text from file {file.name}: {str(e)}", exc_info=True)
         raise ValueError(f"Failed to extract text from {file.name}: {str(e)}")
