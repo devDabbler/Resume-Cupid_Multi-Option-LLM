@@ -231,13 +231,10 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             st.write(result.get('brief_summary', 'No brief summary available'))
 
             st.subheader("Experience and Project Relevance")
-            relevance_info = result.get('experience_and_project_relevance', 'No relevance information available')
-            if isinstance(relevance_info, dict):
-                st.write(f"Relevance Score: {relevance_info.get('relevance_rating', 'N/A')}")
-                st.write(f"Alignment: {relevance_info.get('alignment', 'N/A')}")
-                st.write(f"Explanation: {relevance_info.get('relevance_rating_explanation', 'No explanation provided')}")
-            else:
-                st.write(relevance_info)
+            st.write(result.get('experience_and_project_relevance', 'No relevance information available'))
+
+            st.subheader("Skills Gap")
+            st.write(result.get('skills_gap', 'No skills gap identified'))
 
             st.subheader("Key Strengths")
             strengths = result.get('key_strengths', 'No key strengths identified')
@@ -254,14 +251,6 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                     st.write(f"- {weakness}")
             else:
                 st.write(weaknesses)
-
-            st.subheader("Skills Gap")
-            skills_gap = result.get('skills_gap', 'No skills gap identified')
-            if isinstance(skills_gap, list):
-                for skill in skills_gap:
-                    st.write(f"- {skill}")
-            else:
-                st.write(skills_gap)
 
             st.subheader("Recruiter Questions")
             questions = result.get('recruiter_questions', ['No recruiter questions generated'])
@@ -354,26 +343,16 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         logger.debug(f"Raw analysis result: {result}")
         
-        combined_score = calculate_combined_score(resume_text, job_description, importance_factors, key_skills, llm)
-        
-        skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
-        key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
-        key_weaknesses = _extract_key_points(resume_text, job_description, key_skills, is_strength=False)
-        
-        recommendation = _get_recommendation(combined_score)
-        
-        brief_summary = _generate_brief_summary(result.get('brief_summary', ''), combined_score, recommendation)
-        
         processed_result = {
             'file_name': resume_file.name,
-            'brief_summary': brief_summary,
-            'match_score': combined_score,
-            'experience_and_project_relevance': _summarize_relevance(result.get('experience_and_project_relevance', {})),
-            'skills_gap': ", ".join(skills_gap) if skills_gap else "No significant skills gap identified",
-            'key_strengths': ", ".join(key_strengths) if key_strengths else "No key strengths identified",
-            'key_weaknesses': ", ".join(key_weaknesses) if key_weaknesses else "No key weaknesses identified",
-            'recruiter_questions': result.get('recruiter_questions', [])[:3],  # Limit to top 3 questions
-            'recommendation': recommendation
+            'brief_summary': result.get('brief_summary', 'No brief summary available'),
+            'match_score': result.get('match_score', 0),
+            'experience_and_project_relevance': _process_experience_relevance(result.get('experience_and_project_relevance', [])),
+            'skills_gap': _process_skills_gap(result.get('skills_gap', [])),
+            'key_strengths': _extract_key_points(resume_text, job_description, key_skills, is_strength=True),
+            'key_weaknesses': _extract_key_points(resume_text, job_description, key_skills, is_strength=False),
+            'recruiter_questions': _process_recruiter_questions(result.get('recruiter_questions', [])),
+            'recommendation': result.get('recommendation', 'No recommendation available')
         }
         
         logger.debug(f"Processed result: {processed_result}")
@@ -381,6 +360,21 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
+
+def _process_experience_relevance(experience_data):
+    if isinstance(experience_data, list):
+        return "\n".join([f"{exp['project']}: {exp['description']} (Relevance: {exp['relevance']}%)" for exp in experience_data])
+    return str(experience_data)
+
+def _process_skills_gap(skills_gap):
+    if isinstance(skills_gap, list):
+        return "\n".join([f"{skill['skill']}: {skill['description']} (Importance: {skill['importance']}%)" for skill in skills_gap])
+    return str(skills_gap)
+
+def _process_recruiter_questions(questions):
+    if isinstance(questions, list):
+        return [q['question'] for q in questions[:3]]  # Return top 3 questions
+    return questions if isinstance(questions, list) else [questions]
 
 def _generate_brief_summary(original_summary, match_score, recommendation):
     # Extract the candidate's name from the original summary
