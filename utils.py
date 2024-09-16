@@ -170,13 +170,13 @@ def generate_job_requirements(job_description):
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Stack Ranking of Candidates")
     
-    # Sort results by match score in descending order
+    # Sort results by adjusted match score in descending order
     sorted_results = sorted(evaluation_results, key=lambda x: x['match_score'], reverse=True)
 
     df = pd.DataFrame(sorted_results)
     df['Rank'] = range(1, len(df) + 1)
-    df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
-    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
+    df = df[['Rank', 'file_name', 'match_score', 'original_match_score', 'recommendation']]
+    df.columns = ['Rank', 'Candidate', 'Adjusted Match Score (%)', 'Original Match Score (%)', 'Recommendation']
     
     def color_scale(val):
         if val < 30:
@@ -191,7 +191,8 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             color = 'green'
         return f'background-color: {color}'
     
-    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}).applymap(color_scale, subset=['Match Score (%)']))
+    st.dataframe(df.style.format({'Adjusted Match Score (%)': '{:.0f}', 'Original Match Score (%)': '{:.0f}'})
+                   .applymap(color_scale, subset=['Adjusted Match Score (%)', 'Original Match Score (%)']))
 
     st.download_button(
         label="Download PDF Report",
@@ -202,10 +203,12 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis"):
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Match Score", f"{result['match_score']}%")
+                st.metric("Adjusted Match Score", f"{result['match_score']}%")
             with col2:
+                st.metric("Original Match Score", f"{result['original_match_score']}%")
+            with col3:
                 st.info(f"Recommendation: {result['recommendation']}")
 
             st.subheader("Brief Summary")
@@ -243,8 +246,8 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.write(f"- {strength}")
 
             st.subheader("Areas for Improvement")
-            for weakness in result.get('key_weaknesses', []):
-                st.write(f"- {weakness}")
+            for improvement in result.get('areas_for_improvement', []):
+                st.write(f"- {improvement}")
 
             st.subheader("Recruiter Questions")
             for question in result['recruiter_questions']:
@@ -381,7 +384,15 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         
         # Adjust match score based on importance factors and job requirements
-        adjusted_score = adjust_match_score(result['match_score'], result, importance_factors, job_requirements)
+        original_score = result['match_score']
+        adjusted_score = adjust_match_score(original_score, result, importance_factors, job_requirements)
+        
+        # Update the result with the adjusted score
+        result['original_match_score'] = original_score
+        result['match_score'] = adjusted_score
+        
+        # Generate a new brief summary based on the adjusted score
+        result['brief_summary'] = generate_brief_summary(adjusted_score, job_title)
         
         # Format experience and project relevance
         exp_relevance = result.get('experience_and_project_relevance', {})
@@ -414,14 +425,15 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         
         processed_result = {
             'file_name': resume_file.name,
-            'brief_summary': result.get('brief_summary', 'No summary available'),
-            'match_score': adjusted_score,  # Use the adjusted score here
+            'brief_summary': result['brief_summary'],
+            'match_score': adjusted_score,
+            'original_match_score': original_score,
             'experience_and_project_relevance': formatted_exp_relevance,
             'skills_gap': formatted_skills_gap,
             'key_strengths': strengths_and_improvements['strengths'],
             'areas_for_improvement': strengths_and_improvements['improvements'],
             'recruiter_questions': formatted_questions,
-            'recommendation': get_recommendation(adjusted_score)  # Use the adjusted score for recommendation
+            'recommendation': get_recommendation(adjusted_score)
         }
         
         logger.debug(f"Processed result: {processed_result}")
@@ -576,44 +588,6 @@ def adjust_match_score(original_score, result, importance_factors, job_requireme
     logger.debug(f"Adjusted score: {final_score}")
     return min(max(int(final_score), 0), 100)  # Ensure score is between 0 and 100
 
-def get_strengths_and_improvements(resume_text, job_description, llm):
-    prompt = f"""
-    Analyze the following resume and job description, then provide a structured summary of the candidate's key strengths and areas for improvement. Focus on the most impactful points relevant to the job.
-
-    Resume:
-    {resume_text}
-
-    Job Description:
-    {job_description}
-
-    Provide a JSON object with the following structure:
-    {{
-        "strengths": [
-            {{ "category": "Technical Skills", "points": ["...", "..."] }},
-            {{ "category": "Experience", "points": ["...", "..."] }},
-            {{ "category": "Education", "points": ["...", "..."] }}
-        ],
-        "improvements": [
-            {{ "category": "Skills Gap", "points": ["...", "..."] }},
-            {{ "category": "Experience", "points": ["...", "..."] }},
-            {{ "category": "Industry Knowledge", "points": ["...", "..."] }}
-        ]
-    }}
-
-    Each category should have 2-3 concise points (1-2 sentences each).
-    """
-    
-    response = llm.analyze_match(resume_text, prompt, {}, "Structured Strengths and Improvements Analysis")
-    
-    try:
-        strengths_and_improvements = json.loads(response['brief_summary'])
-        return strengths_and_improvements
-    except:
-        return {
-            'strengths': [{'category': 'General', 'points': ['Unable to extract key strengths']}],
-            'improvements': [{'category': 'General', 'points': ['Unable to extract areas for improvement']}]
-        }
-
 def adjust_match_score(original_score, result, importance_factors, job_requirements):
     logger.debug(f"Adjusting match score. Original score: {original_score}")
     
@@ -767,3 +741,15 @@ def get_recommendation(match_score: int) -> str:
         return "Recommend for interview"
     else:
         return "Highly recommend for interview"
+    
+def generate_brief_summary(score, job_title):
+    if score < 30:
+        return f"The candidate is not a strong fit for the {job_title} role. With a match score of {score}%, there are significant gaps in required skills and experience for this position."
+    elif 30 <= score < 50:
+        return f"The candidate shows limited potential for the {job_title} role. With a match score of {score}%, there are considerable gaps in meeting the requirements. Further evaluation is needed."
+    elif 50 <= score < 65:
+        return f"The candidate shows some potential for the {job_title} role, but with a match score of {score}%, there are gaps in meeting the requirements. Further evaluation is recommended."
+    elif 65 <= score < 80:
+        return f"The candidate is a good fit for the {job_title} role. With a match score of {score}%, they demonstrate alignment with many of the required skills and experience for this position."
+    else:
+        return f"The candidate is an excellent fit for the {job_title} role. With a match score of {score}%, they demonstrate strong alignment with the required skills and experience for this position."
