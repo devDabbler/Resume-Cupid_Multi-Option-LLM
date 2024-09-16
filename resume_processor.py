@@ -16,7 +16,6 @@ import sqlite3
 import traceback
 from config_settings import Config  # Change this line
 from utils import get_logger
-from utils import root_logger
 
 logger = get_logger(__name__)
 
