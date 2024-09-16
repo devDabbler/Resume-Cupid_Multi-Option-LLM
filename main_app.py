@@ -243,6 +243,7 @@ def main_app():
             if not resume_files:
                 st.error("Please upload at least one resume.")
         
+        save_button = False  # Initialize save_button to a default value before usage
         save_role_option = False  # Initialize save_role_option with a default value
         save_role_option = st.checkbox("Save this role for future use")
 

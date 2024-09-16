@@ -174,7 +174,6 @@ class LlamaAPI:
     def clear_cache(self):
         pass
 
-
 def initialize_llm():
     """
     Initializes and returns the LlamaAPI instance.
