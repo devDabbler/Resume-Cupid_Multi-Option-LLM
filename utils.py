@@ -566,7 +566,7 @@ def ensure_required_fields(result):
 def extract_key_features(text, llm):
     # Prompt the LLM to extract key features from the text
     prompt = f"Extract key features from the following text:\n{text}"
-    response = llm.analyze(prompt)  # Use analyze() instead of generate()
+    response = llm.analyze(prompt)
     return response
 
 def compare_features(features1, features2, llm):

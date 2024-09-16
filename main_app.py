@@ -125,6 +125,9 @@ def main_app():
     st.session_state.backend = selected_backend
     resume_processor = st.session_state.resume_processor
 
+    # Initialize the LlamaAPI instance here
+    llm = initialize_llm()
+
     if not hasattr(resume_processor, 'analyze_match'):
         raise AttributeError(f"ResumeProcessor for backend '{selected_backend}' does not have the 'analyze_match' method")
 
@@ -216,7 +219,7 @@ def main_app():
                 with st.spinner('Processing resumes...'):
                     for i, (resume_file, candidate_data) in enumerate(zip(resume_files, candidate_data_list)):
                         status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
-                        result = process_resume(resume_file, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data, st.session_state.job_title, st.session_state.key_skills, selected_backend)
+                        result = process_resume(resume_file, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data, st.session_state.job_title, st.session_state.key_skills, llm)
                         evaluation_results.append(result)
                         progress_bar.progress((i + 1) / len(resume_files))
                 
@@ -298,3 +301,4 @@ def main_app():
 
 if __name__ == "__main__":
     main_app()
+
