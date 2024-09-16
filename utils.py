@@ -547,29 +547,34 @@ def extract_job_description(url):
         driver.quit()
         
 def adjust_match_score(original_score, result, importance_factors, job_requirements):
-    # Apply default weights
+    logger.debug(f"Original score: {original_score}")
+    
     skills_weight = importance_factors.get('technical_skills', 0.3)
     experience_weight = importance_factors.get('experience', 0.3)
     education_weight = importance_factors.get('education', 0.2)
     industry_weight = importance_factors.get('industry_knowledge', 0.2)
     
-    # Evaluate each component (skills, experience, etc.)
     skills_score = evaluate_skills(result.get('skills_gap', {}), job_requirements.get('required_skills', []))
     experience_score = evaluate_experience(result.get('experience_and_project_relevance', {}), job_requirements.get('years_of_experience', 0))
     education_score = evaluate_education(result, job_requirements.get('education_level', 'Bachelor'))
     industry_score = evaluate_industry_knowledge(result, job_requirements.get('industry_keywords', []))
     
-    # Adjust original score by calculating a weighted average of all factors
+    logger.debug(f"Component scores - Skills: {skills_score}, Experience: {experience_score}, Education: {education_score}, Industry: {industry_score}")
+    
     adjusted_score = (
-        original_score * 0.4 +  # Base score has a fixed weight
-        skills_score * skills_weight +
-        experience_score * experience_weight +
-        education_score * education_weight +
-        industry_score * industry_weight
+        original_score * 0.6 +  # Increase base score weight
+        skills_score * skills_weight * 0.1 +
+        experience_score * experience_weight * 0.1 +
+        education_score * education_weight * 0.1 +
+        industry_score * industry_weight * 0.1
     )
     
-    # Return the final score, ensuring it is between 0 and 100
-    return min(max(int(adjusted_score), 0), 100)
+    # Cap the maximum adjustment
+    max_adjustment = 15  # Maximum 15 point increase
+    final_score = min(original_score + max_adjustment, adjusted_score)
+    
+    logger.debug(f"Adjusted score: {final_score}")
+    return min(max(int(final_score), 0), 100)  # Ensure score is between 0 and 100
 
 def get_strengths_and_improvements(resume_text, job_description, llm):
     prompt = f"""
