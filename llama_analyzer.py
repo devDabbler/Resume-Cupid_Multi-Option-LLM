@@ -74,62 +74,96 @@ class LlamaAPI:
                 logger.error(f"Failed to parse JSON even after cleaning: {str(e)}")
                 return {}
 
-    def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_parsed_content(self, parsed_content: Dict[str, Any]) -> Dict[str, Any]:    
         logger.debug(f"Processing parsed content: {parsed_content}")
         processed_content = {}
-    
+
+        # Process keys and normalize them
         for key, value in parsed_content.items():
             processed_key = key.lower().replace(' ', '_')
             processed_content[processed_key] = value
             logger.debug(f"Processed key-value pair: {processed_key} = {value}")
-    
+
+        # Required fields to check and fill in if missing
         required_fields = [
             'brief_summary', 'match_score', 'recommendation_for_interview',
             'experience_and_project_relevance', 'skills_gap', 'recruiter_questions'
         ]
-    
+
         for field in required_fields:
             if field not in processed_content:
                 processed_content[field] = self._generate_fallback_content(field)
                 logger.warning(f"Generated fallback content for missing field: {field}")
-    
+
         try:
-            if isinstance(processed_content['match_score'], dict):
-                # Calculate a weighted average if match_score is a dictionary
-                total_score = sum(processed_content['match_score'].values())
-                total_weight = len(processed_content['match_score'])
+            # Process 'match_score'
+            match_score = processed_content.get('match_score')
+            if isinstance(match_score, dict):
+            # Calculate a weighted average if 'match_score' is a dictionary
+                total_score = sum(match_score.values())
+                total_weight = len(match_score)
                 processed_content['match_score'] = int(total_score / total_weight)
-            elif isinstance(processed_content['match_score'], str):
+            elif isinstance(match_score, str):
                 # Try to extract a number from the string
-                match = re.search(r'\d+', processed_content['match_score'])
+                match = re.search(r'\d+', match_score)
                 if match:
                     processed_content['match_score'] = int(match.group())
                 else:
                     processed_content['match_score'] = 0
-            elif processed_content['match_score'] is None or processed_content['match_score'] == 0:
-                # If match_score is None or 0, calculate based on other factors
-                relevance = processed_content.get('experience_and_project_relevance', {}).get('overall_relevance', 0)
-                skills_gap = processed_content.get('skills_gap', {}).get('overall_gap', 100)
-                processed_content['match_score'] = int((relevance * 0.7 + (100 - skills_gap) * 0.3))
-        
+            elif match_score is None or match_score == 0:
+                # If 'match_score' is None or 0, calculate based on other factors
+                # Safely extract 'overall_relevance' from 'experience_and_project_relevance'
+                exp_proj_relevance = processed_content.get('experience_and_project_relevance', {})
+                if isinstance(exp_proj_relevance, dict):
+                    relevance = exp_proj_relevance.get('overall_relevance', 0)
+                else:
+                    # Attempt to extract a number from the string
+                    match = re.search(r'\d+', str(exp_proj_relevance))
+                    relevance = int(match.group()) if match else 0
+
+                # Safely extract 'overall_gap' from 'skills_gap'
+                skills_gap = processed_content.get('skills_gap', {})
+                if isinstance(skills_gap, dict):
+                    gap = skills_gap.get('overall_gap', 100)
+                else:
+                    # Attempt to extract a number from the string
+                    match = re.search(r'\d+', str(skills_gap))
+                    gap = int(match.group()) if match else 100
+
+                # Calculate 'match_score' based on relevance and skills gap
+                processed_content['match_score'] = int((relevance * 0.7 + (100 - gap) * 0.3))
+
+            # Ensure 'match_score' is an integer between 0 and 100
             processed_content['match_score'] = int(float(processed_content['match_score']))
-            # Adjust the score to be more stringent
-            processed_content['match_score'] = max(0, min(100, int(processed_content['match_score'] * 0.9)))
+            processed_content['match_score'] = max(0, min(100, processed_content['match_score']))
             logger.debug(f"Processed match_score: {processed_content['match_score']}")
+
         except (ValueError, TypeError) as e:
             logger.error(f"Invalid match_score value: {processed_content.get('match_score')}")
             processed_content['match_score'] = 0
 
+        # Generate recommendation based on 'match_score'
         processed_content['recommendation'] = self._get_recommendation(processed_content['match_score'])
         logger.debug(f"Generated recommendation: {processed_content['recommendation']}")
 
-        # Update brief summary based on match score
-        if processed_content['match_score'] < 50:
-            processed_content['brief_summary'] = f"The candidate is not a strong fit for the Data Scientist role at Fractal Analytics. With a match score of {processed_content['match_score']}%, there are significant gaps in required skills and experience for this position."
-        elif 50 <= processed_content['match_score'] < 65:
-            processed_content['brief_summary'] = f"The candidate shows some potential for the Data Scientist role at Fractal Analytics, but with a match score of {processed_content['match_score']}%, there are considerable gaps in meeting the requirements. Further evaluation is needed."
+        # Update 'brief_summary' based on 'match_score'
+        match_score = processed_content['match_score']
+        if match_score < 50:
+            processed_content['brief_summary'] = (
+            f"The candidate is not a strong fit for the Data Scientist role at Fractal Analytics. "
+            f"With a match score of {match_score}%, there are significant gaps in required skills and experience for this position."
+            )
+        elif 50 <= match_score < 65:
+            processed_content['brief_summary'] = (
+                f"The candidate shows some potential for the Data Scientist role at Fractal Analytics, "
+                f"but with a match score of {match_score}%, there are considerable gaps in meeting the requirements. "
+                f"Further evaluation is needed."
+            )
         else:
-            processed_content['brief_summary'] = f"The candidate is a good fit for the Data Scientist role at Fractal Analytics. With a match score of {processed_content['match_score']}%, they demonstrate strong alignment with the required skills and experience for this position."
+            processed_content['brief_summary'] = (
+                f"The candidate is a good fit for the Data Scientist role at Fractal Analytics. "
+                f"With a match score of {match_score}%, they demonstrate strong alignment with the required skills and experience for this position."
+            )
 
         logger.debug(f"Final processed content: {processed_content}")
         return processed_content
