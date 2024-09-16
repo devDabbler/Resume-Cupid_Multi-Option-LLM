@@ -546,25 +546,29 @@ def extract_job_description(url):
         driver.quit()
         
 def adjust_match_score(original_score, result, importance_factors, job_requirements):
+    # Apply default weights
     skills_weight = importance_factors.get('technical_skills', 0.3)
     experience_weight = importance_factors.get('experience', 0.3)
     education_weight = importance_factors.get('education', 0.2)
     industry_weight = importance_factors.get('industry_knowledge', 0.2)
     
+    # Evaluate each component (skills, experience, etc.)
     skills_score = evaluate_skills(result.get('skills_gap', {}), job_requirements.get('required_skills', []))
     experience_score = evaluate_experience(result.get('experience_and_project_relevance', {}), job_requirements.get('years_of_experience', 0))
     education_score = evaluate_education(result, job_requirements.get('education_level', 'Bachelor'))
     industry_score = evaluate_industry_knowledge(result, job_requirements.get('industry_keywords', []))
     
+    # Adjust original score by calculating a weighted average of all factors
     adjusted_score = (
-        original_score * 0.4 +  # Base score
+        original_score * 0.4 +  # Base score has a fixed weight
         skills_score * skills_weight +
         experience_score * experience_weight +
         education_score * education_weight +
         industry_score * industry_weight
     )
     
-    return min(max(int(adjusted_score), 0), 100)  # Ensure score is between 0 and 100
+    # Return the final score, ensuring it is between 0 and 100
+    return min(max(int(adjusted_score), 0), 100)
 
 def get_strengths_and_improvements(resume_text, job_description, llm):
     prompt = f"""
@@ -626,33 +630,31 @@ def adjust_match_score(original_score, result, importance_factors, job_requireme
     return min(max(int(adjusted_score), 0), 100)  # Ensure score is between 0 and 100
 
 def evaluate_skills(skills_gap, required_skills):
-    total_score = 0
-    for skill, proficiency in skills_gap.items():
-        if skill in required_skills:
-            if proficiency == 'Expert':
-                total_score += 10
-            elif proficiency == 'Intermediate':
-                total_score += 5
-            elif proficiency == 'Beginner':
-                total_score += 2
+    # Check how many required skills are missing
+    missing_skills = len([skill for skill in required_skills if skill not in skills_gap.get('key_skills', [])])
     
-    max_possible_score = len(required_skills) * 10
-    return (total_score / max_possible_score) * 100 if max_possible_score > 0 else 0
+    # Max score based on total required skills
+    max_possible_score = len(required_skills) * 10  # e.g., 10 points per skill
+    
+    if max_possible_score == 0:
+        return 100  # No required skills listed means perfect score
+    
+    return max(100 - (missing_skills / len(required_skills)) * 100, 0)
 
 def evaluate_experience(experience_relevance, years_required):
     try:
-        total_years = sum(float(years) for _, years in experience_relevance.items())
+        total_years = sum(float(years) for _, years in experience_relevance.items() if isinstance(years, (int, float)))
         
-        # Convert the relevance to a float and compare with 0.7
-        relevant_years = sum(float(years) for relevance, years in experience_relevance.items() if float(relevance) >= 0.7)
+        relevant_years = sum(float(years) for relevance, years in experience_relevance.items() if isinstance(relevance, (int, float)) and relevance >= 0.7)
         
         years_factor = min(total_years / years_required, 1) if years_required > 0 else 1
         relevance_factor = relevant_years / total_years if total_years > 0 else 0
         
+        # Ensure balanced contribution from both factors
         return (years_factor * 0.6 + relevance_factor * 0.4) * 100
     except (ValueError, TypeError) as e:
         logger.error(f"Error processing experience relevance: {str(e)}")
-        return 0  # Return a default value in case of error
+        return 0
 
 def evaluate_education(result, required_level):
     education_levels = ['High School', 'Associate', 'Bachelor', 'Master', 'PhD']
