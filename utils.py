@@ -564,16 +564,14 @@ def ensure_required_fields(result):
 # Replace `llm.generate` with the actual method you use to interact with your LLM
 
 def extract_key_features(text, llm):
-    # Prompt the LLM to extract key features from the text
     prompt = f"Extract key features from the following text:\n{text}"
-    response = llm.analyze(prompt)
-    return response
+    response = llm.analyze_match(text, prompt, {}, "Feature Extraction")
+    return response.get('brief_summary', '')  # Assuming the key features will be in the brief_summary
 
 def compare_features(features1, features2, llm):
-    # Prompt the LLM to compare the extracted features
     prompt = f"Compare the following features and provide a similarity score (0-100):\nFeatures 1: {features1}\nFeatures 2: {features2}"
-    response = llm.analyze(prompt)  # Use analyze() instead of generate()
-    similarity_score = int(response.strip())
+    response = llm.analyze_match(features1 + "\n" + features2, prompt, {}, "Feature Comparison")
+    similarity_score = int(response.get('match_score', 0))
     return similarity_score
 
 def calculate_combined_score(resume_text, job_description, importance_factors, key_skills, llm):
