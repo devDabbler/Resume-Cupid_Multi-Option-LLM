@@ -114,12 +114,16 @@ def extract_text_from_file(file) -> str:
     file_content = file.read()
     file_extension = file.name.split('.')[-1].lower()
     
-    if file_extension == 'pdf':
-        return extract_text_from_pdf(file_content)
-    elif file_extension in ['docx', 'doc']:
-        return extract_text_from_docx(file_content)
-    else:
-        raise ValueError(f"Unsupported file format: {file_extension}")
+    try:
+        if file_extension == 'pdf':
+            return extract_text_from_pdf(file_content)
+        elif file_extension in ['docx', 'doc']:
+            return extract_text_from_docx(file_content)
+        else:
+            raise ValueError(f"Unsupported file format: {file_extension}")
+    except Exception as e:
+        logger.error(f"Error extracting text from file {file.name}: {str(e)}", exc_info=True)
+        return ""
 
 # Cosine similarity calculation between two embeddings
 def calculate_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float:
@@ -368,7 +372,12 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
     try:
         resume_text = extract_text_from_file(resume_file)
         logger.debug(f"Extracted text type: {type(resume_text)}")
+        logger.debug(f"Extracted text length: {len(resume_text)}")
         logger.debug(f"Extracted text (first 100 chars): {resume_text[:100]}")
+        
+        if not resume_text.strip():
+            logger.warning(f"Extracted text is empty for resume: {resume_file.name}")
+            return _generate_error_result(resume_file.name, "Empty resume content")
         
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         logger.debug(f"Raw analysis result: {result}")
