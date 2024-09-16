@@ -117,7 +117,24 @@ def extract_text_from_docx(file_content: bytes) -> str:
 
 def extract_text_from_file(file) -> str:
     logger.debug(f"Extracting text from file: {file.name}")
+    
+    # Check if the file object is empty
+    if file is None:
+        raise ValueError(f"File object is None for {file.name}")
+    
+    # Reset file pointer to the beginning
+    file.seek(0)
+    
+    # Read file content
     file_content = file.read()
+    
+    # Log file content details
+    logger.debug(f"File content type: {type(file_content)}")
+    logger.debug(f"File content length: {len(file_content)} bytes")
+    
+    if len(file_content) == 0:
+        raise ValueError(f"File {file.name} is empty (0 bytes)")
+    
     file_extension = file.name.split('.')[-1].lower()
     
     try:
@@ -378,9 +395,9 @@ def clear_cache():
     else:
         logger.warning("Unable to clear cache: resume_processor not found or doesn't have clear_cache method")
 
-def process_resume(resume_file, _resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm):
+def process_resume(resume_file, resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm):
     logger = get_logger(__name__)
-    logger.debug(f"Processing resume: {resume_file.name} with {_resume_processor.backend} backend")
+    logger.debug(f"Processing resume: {resume_file.name} with {resume_processor.backend} backend")
     try:
         try:
             resume_text = extract_text_from_file(resume_file)
@@ -396,8 +413,23 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             logger.warning(f"Extracted text is empty for resume: {resume_file.name}")
             return _generate_error_result(resume_file.name, "Empty resume content")
         
-        result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
-        # ... rest of the function remains the same
+        result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
+        logger.debug(f"Raw analysis result: {result}")
+        
+        processed_result = {
+            'file_name': resume_file.name,
+            'brief_summary': result.get('brief_summary', 'No summary available'),
+            'match_score': result.get('match_score', 0),
+            'experience_and_project_relevance': _process_experience_relevance(result.get('experience_and_project_relevance', [])),
+            'skills_gap': _process_skills_gap(result.get('skills_gap', [])),
+            'key_strengths': _extract_key_points(resume_text, job_description, key_skills, is_strength=True),
+            'key_weaknesses': _extract_key_points(resume_text, job_description, key_skills, is_strength=False),
+            'recruiter_questions': _process_recruiter_questions(result.get('recruiter_questions', [])),
+            'recommendation': result.get('recommendation', 'No recommendation available')
+        }
+        
+        logger.debug(f"Processed result: {processed_result}")
+        return processed_result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
