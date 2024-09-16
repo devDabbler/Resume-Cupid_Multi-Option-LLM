@@ -640,13 +640,19 @@ def evaluate_skills(skills_gap, required_skills):
     return (total_score / max_possible_score) * 100 if max_possible_score > 0 else 0
 
 def evaluate_experience(experience_relevance, years_required):
-    total_years = sum(years for _, years in experience_relevance.items())
-    relevant_years = sum(years for relevance, years in experience_relevance.items() if relevance >= 0.7)
-    
-    years_factor = min(total_years / years_required, 1) if years_required > 0 else 1
-    relevance_factor = relevant_years / total_years if total_years > 0 else 0
-    
-    return (years_factor * 0.6 + relevance_factor * 0.4) * 100
+    try:
+        total_years = sum(float(years) for _, years in experience_relevance.items())
+        
+        # Convert the relevance to a float and compare with 0.7
+        relevant_years = sum(float(years) for relevance, years in experience_relevance.items() if float(relevance) >= 0.7)
+        
+        years_factor = min(total_years / years_required, 1) if years_required > 0 else 1
+        relevance_factor = relevant_years / total_years if total_years > 0 else 0
+        
+        return (years_factor * 0.6 + relevance_factor * 0.4) * 100
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error processing experience relevance: {str(e)}")
+        return 0  # Return a default value in case of error
 
 def evaluate_education(result, required_level):
     education_levels = ['High School', 'Associate', 'Bachelor', 'Master', 'PhD']
