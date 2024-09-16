@@ -231,19 +231,41 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             st.write(result.get('brief_summary', 'No brief summary available'))
 
             st.subheader("Experience and Project Relevance")
-            st.write(result.get('experience_and_project_relevance', 'No relevance information available'))
+            relevance_info = result.get('experience_and_project_relevance', 'No relevance information available')
+            if isinstance(relevance_info, dict):
+                st.write(f"Relevance Score: {relevance_info.get('relevance_rating', 'N/A')}")
+                st.write(f"Alignment: {relevance_info.get('alignment', 'N/A')}")
+                st.write(f"Explanation: {relevance_info.get('relevance_rating_explanation', 'No explanation provided')}")
+            else:
+                st.write(relevance_info)
 
             st.subheader("Key Strengths")
-            st.write(result.get('key_strengths', 'No key strengths identified'))
+            strengths = result.get('key_strengths', 'No key strengths identified')
+            if isinstance(strengths, list):
+                for strength in strengths:
+                    st.write(f"- {strength}")
+            else:
+                st.write(strengths)
 
             st.subheader("Areas for Improvement")
-            st.write(result.get('key_weaknesses', 'No areas for improvement identified'))
+            weaknesses = result.get('key_weaknesses', 'No areas for improvement identified')
+            if isinstance(weaknesses, list):
+                for weakness in weaknesses:
+                    st.write(f"- {weakness}")
+            else:
+                st.write(weaknesses)
 
             st.subheader("Skills Gap")
-            st.write(result.get('skills_gap', 'No skills gap identified'))
+            skills_gap = result.get('skills_gap', 'No skills gap identified')
+            if isinstance(skills_gap, list):
+                for skill in skills_gap:
+                    st.write(f"- {skill}")
+            else:
+                st.write(skills_gap)
 
             st.subheader("Recruiter Questions")
-            for question in result.get('recruiter_questions', ['No recruiter questions generated']):
+            questions = result.get('recruiter_questions', ['No recruiter questions generated'])
+            for question in questions:
                 st.write(f"- {question}")
 
             with st.form(key=f'feedback_form_{run_id}_{i}'):
@@ -330,8 +352,8 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         logger.debug(f"Extracted text (first 100 chars): {resume_text[:100]}")
         
         result = _resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
+        logger.debug(f"Raw analysis result: {result}")
         
-        # Calculate combined score using multiple techniques
         combined_score = calculate_combined_score(resume_text, job_description, importance_factors, key_skills, llm)
         
         skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
@@ -354,6 +376,7 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
             'recommendation': recommendation
         }
         
+        logger.debug(f"Processed result: {processed_result}")
         return processed_result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
@@ -377,8 +400,10 @@ def _generate_brief_summary(original_summary, match_score, recommendation):
 
 def _summarize_relevance(relevance_data):
     if isinstance(relevance_data, dict):
-        return f"Relevance Score: {relevance_data.get('relevance_score', 'N/A')}%, " \
-               f"Matched Phrases: {relevance_data.get('matched_phrases', 'N/A')}"
+        relevance_score = relevance_data.get('relevance_rating', 'N/A')
+        matched_phrases = relevance_data.get('alignment', 'N/A')
+        explanation = relevance_data.get('relevance_rating_explanation', 'No explanation provided')
+        return f"Relevance Score: {relevance_score}, Alignment: {matched_phrases}, Explanation: {explanation}"
     return str(relevance_data)
 
 def _calculate_match_score(resume_text: str, job_description: str, importance_factors: Dict[str, float], key_skills: List[str]) -> int:
