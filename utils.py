@@ -566,13 +566,13 @@ def ensure_required_fields(result):
 def extract_key_features(text, llm):
     # Prompt the LLM to extract key features from the text
     prompt = f"Extract key features from the following text:\n{text}"
-    response = llm.generate(prompt)
+    response = llm.analyze(prompt)  # Use analyze() instead of generate()
     return response
 
 def compare_features(features1, features2, llm):
     # Prompt the LLM to compare the extracted features
     prompt = f"Compare the following features and provide a similarity score (0-100):\nFeatures 1: {features1}\nFeatures 2: {features2}"
-    response = llm.generate(prompt)
+    response = llm.analyze(prompt)  # Use analyze() instead of generate()
     similarity_score = int(response.strip())
     return similarity_score
 
