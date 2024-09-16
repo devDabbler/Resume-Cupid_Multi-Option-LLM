@@ -262,6 +262,13 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     # Sort results by match score in descending order
     sorted_results = sorted(evaluation_results, key=lambda x: x['match_score'], reverse=True)
 
+    df = pd.DataFrame(sorted_results)
+    df['Rank'] = range(1, len(df) + 1)
+    df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
+    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
+    
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
+    
     def color_scale(val):
         if val < 30:
             color = 'red'
@@ -276,13 +283,6 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
         return f'background-color: {color}'
     
     st.dataframe(df.style.applymap(color_scale, subset=['Match Score (%)']))
-
-    df = pd.DataFrame(sorted_results)
-    df['Rank'] = range(1, len(df) + 1)
-    df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
-    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
-    
-    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
 
     st.download_button(
         label="Download PDF Report",
