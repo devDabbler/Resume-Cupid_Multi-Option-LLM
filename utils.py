@@ -566,11 +566,16 @@ def ensure_required_fields(result):
 def extract_key_features(text, llm):
     prompt = f"Extract key features from the following text:\n{text}"
     response = llm.analyze_match(text, prompt, {}, "Feature Extraction")
-    return response.get('brief_summary', '')  # Assuming the key features will be in the brief_summary
+    # Return the entire response dictionary instead of just the brief_summary
+    return response
 
 def compare_features(features1, features2, llm):
-    prompt = f"Compare the following features and provide a similarity score (0-100):\nFeatures 1: {features1}\nFeatures 2: {features2}"
-    response = llm.analyze_match(features1 + "\n" + features2, prompt, {}, "Feature Comparison")
+    # Convert features to string if they're dictionaries
+    features1_str = json.dumps(features1) if isinstance(features1, dict) else features1
+    features2_str = json.dumps(features2) if isinstance(features2, dict) else features2
+    
+    prompt = f"Compare the following features and provide a similarity score (0-100):\nFeatures 1: {features1_str}\nFeatures 2: {features2_str}"
+    response = llm.analyze_match(features1_str + "\n" + features2_str, prompt, {}, "Feature Comparison")
     similarity_score = int(response.get('match_score', 0))
     return similarity_score
 
