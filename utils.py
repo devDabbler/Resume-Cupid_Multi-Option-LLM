@@ -24,6 +24,11 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 import spacy
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+import io
 
 # Load spaCy model
 nlp = spacy.load("en_core_web_md")
@@ -675,3 +680,59 @@ def calculate_keyword_match(resume_text, job_description, key_skills):
     matched_skills = job_skills & resume_skills
     return len(matched_skills) / len(job_skills) if job_skills else 0
 
+def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = []
+
+    styles = getSampleStyleSheet()
+    elements.append(Paragraph(f"Evaluation Report (Run ID: {run_id})", styles['Heading1']))
+
+    # Create the data for the summary table
+    data = [['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']]
+    for i, result in enumerate(evaluation_results, 1):
+        data.append([
+            i,
+            result['file_name'],
+            result['match_score'],
+            result['recommendation']
+        ])
+
+    # Create the summary table
+    table = Table(data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 12),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(table)
+
+    # Add detailed information for each candidate
+    for i, result in enumerate(evaluation_results, 1):
+        elements.append(Paragraph(f"\n\nRank {i}: {result['file_name']}", styles['Heading2']))
+        elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
+        elements.append(Paragraph(f"Recommendation: {result['recommendation']}", styles['Normal']))
+        elements.append(Paragraph("Brief Summary:", styles['Heading3']))
+        elements.append(Paragraph(result['brief_summary'], styles['Normal']))
+        elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
+        elements.append(Paragraph(str(result['experience_and_project_relevance']), styles['Normal']))
+        elements.append(Paragraph("Skills Gap:", styles['Heading3']))
+        elements.append(Paragraph(", ".join(result['skills_gap']), styles['Normal']))
+        elements.append(Paragraph("Recruiter Questions:", styles['Heading3']))
+        for question in result['recruiter_questions']:
+            elements.append(Paragraph(f"- {question}", styles['Normal']))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
