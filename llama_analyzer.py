@@ -145,31 +145,42 @@ class LlamaAPI:
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
         logger.debug(f"Analyzing match for candidate: {candidate_data.get('file_name', 'Unknown')}")
-        prompt = f"""
-        Analyze the fit between the following resume and job description for the role of {job_title}. 
-        Provide a detailed evaluation covering these key areas:
+    
+        if not resume or not job_description:
+            logger.error("Empty resume or job description provided")
+            return self._generate_error_response("Empty input provided")
+    
+        try:
+            prompt = f"""
+            Analyze the fit between the following resume and job description for the role of {job_title}. 
+            Provide a detailed evaluation covering these key areas:
 
-        1. Brief Summary: Provide a concise overview of the candidate's fit for the role in 2-3 sentences.
-        2. Match Score: Assign a percentage (0-100%) indicating how well the candidate matches the job requirements.
-        3. Recommendation for Interview: Based on the analysis, provide a clear recommendation.
-        4. Experience and Project Relevance: Analyze how the candidate's past experiences and projects align with the job requirements.
-        5. Skills Gap: Identify any important skills or qualifications mentioned in the job description that the candidate lacks.
-        6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements.
+            1. Brief Summary: Provide a concise overview of the candidate's fit for the role in 2-3 sentences.
+            2. Match Score: Assign a percentage (0-100%) indicating how well the candidate matches the job requirements.
+            3. Recommendation for Interview: Based on the analysis, provide a clear recommendation.
+            4. Experience and Project Relevance: Analyze how the candidate's past experiences and projects align with the job requirements.
+            5. Skills Gap: Identify any important skills or qualifications mentioned in the job description that the candidate lacks.
+            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements.
 
-        Resume:
-        {resume}
+            Resume:
+            {resume}
 
-        Job Description:
-        {job_description}
+            Job Description:
+            {job_description}
 
-        Provide your analysis in a structured JSON format with the following keys:
-        "brief_summary", "match_score", "recommendation_for_interview", "experience_and_project_relevance", "skills_gap", "recruiter_questions"
-        """
+            Provide your analysis in a structured JSON format with the following keys:
+            "brief_summary", "match_score", "recommendation_for_interview", "experience_and_project_relevance", "skills_gap", "recruiter_questions"
+            """
 
-        result = self.analyze(prompt)
-        result['file_name'] = candidate_data.get('file_name', 'Unknown')
-        logger.debug(f"Analysis result for {result['file_name']}: {result}")
-        return result
+            logger.debug(f"Prompt length: {len(prompt)}")
+        
+            result = self.analyze(prompt)
+            result['file_name'] = candidate_data.get('file_name', 'Unknown')
+            logger.debug(f"Analysis result for {result['file_name']}: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error during analysis for {candidate_data.get('file_name', 'Unknown')}: {str(e)}", exc_info=True)
+            return self._generate_error_response(str(e))
 
     def _generate_error_response(self, error_message: str) -> Dict[str, Any]:
         logger.warning(f"Generating error response: {error_message}")

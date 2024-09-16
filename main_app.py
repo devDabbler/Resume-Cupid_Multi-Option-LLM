@@ -2,7 +2,7 @@ from config_settings import Config
 import logging
 import uuid
 import streamlit as st
-from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results
+from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results, extract_text_from_file
 from database import init_db, insert_run_log, save_role, delete_saved_role, get_saved_roles, save_feedback
 from resume_processor import create_resume_processor
 from candidate_data import get_candidate_data
@@ -55,6 +55,13 @@ if 'resume_processor' not in st.session_state:
     st.session_state.resume_processor = None
 
 BATCH_SIZE = 3  # Number of resumes to process in each batch
+
+def _generate_error_result(file_name, error_message):
+    return {
+        "file_name": file_name,
+        "error": error_message,
+        "status": "error"
+    }
 
 def main_app():
     init_db()
@@ -219,10 +226,19 @@ def main_app():
                 with st.spinner('Processing resumes...'):
                     for i, (resume_file, candidate_data) in enumerate(zip(resume_files, candidate_data_list)):
                         status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
-                        result = process_resume(resume_file, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data, st.session_state.job_title, st.session_state.key_skills, llm)
-                        evaluation_results.append(result)
-                        progress_bar.progress((i + 1) / len(resume_files))
-                
+                        try:
+                            resume_text = extract_text_from_file(resume_file)
+                            if not resume_text.strip():
+                                logger.warning(f"Empty content extracted from {resume_file.name}")
+                                result = _generate_error_result(resume_file.name, "Empty content extracted")
+                            else:
+                                result = process_resume(resume_file, resume_processor, st.session_state.job_description, st.session_state.importance_factors, candidate_data, st.session_state.job_title, st.session_state.key_skills, llm)
+                            evaluation_results.append(result)
+                            progress_bar.progress((i + 1) / len(resume_files))
+                        except Exception as e:
+                            logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
+                            evaluation_results.append(_generate_error_result(resume_file.name, str(e)))
+
                 logger.debug(f"Processed resumes with {selected_backend} backend. Results: {evaluation_results}")
                 insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
 
@@ -269,6 +285,8 @@ def main_app():
                         st.session_state.saved_roles = get_saved_roles()
                     else:
                         st.error("Failed to save the role. Please try again.")
+                except Exception as e:
+                    st.error(f"An error occurred while saving the role: {str(e)}")
                 except ValueError as e:
                     st.error(str(e))
 
