@@ -905,3 +905,102 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
     doc.build(elements)
     buffer.seek(0)
     return buffer.getvalue()
+
+def adjust_match_score(original_score, result, importance_factors, job_requirements):
+    skills_weight = importance_factors.get('technical_skills', 0.3)
+    experience_weight = importance_factors.get('experience', 0.3)
+    education_weight = importance_factors.get('education', 0.2)
+    industry_weight = importance_factors.get('industry_knowledge', 0.2)
+    
+    skills_score = evaluate_skills(result.get('skills_gap', {}), job_requirements.get('required_skills', []))
+    experience_score = evaluate_experience(result.get('experience_and_project_relevance', {}), job_requirements.get('years_of_experience', 0))
+    education_score = evaluate_education(result, job_requirements.get('education_level', 'Bachelor'))
+    industry_score = evaluate_industry_knowledge(result, job_requirements.get('industry_keywords', []))
+    
+    adjusted_score = (
+        original_score * 0.4 +  # Base score
+        skills_score * skills_weight +
+        experience_score * experience_weight +
+        education_score * education_weight +
+        industry_score * industry_weight
+    )
+    
+    return min(max(int(adjusted_score), 0), 100)  # Ensure score is between 0 and 100
+
+def evaluate_skills(skills_gap, required_skills):
+    total_score = 0
+    for skill, proficiency in skills_gap.items():
+        if skill in required_skills:
+            if proficiency == 'Expert':
+                total_score += 10
+            elif proficiency == 'Intermediate':
+                total_score += 5
+            elif proficiency == 'Beginner':
+                total_score += 2
+    
+    max_possible_score = len(required_skills) * 10
+    return (total_score / max_possible_score) * 100 if max_possible_score > 0 else 0
+
+def evaluate_experience(experience_relevance, years_required):
+    total_years = sum(years for _, years in experience_relevance.items())
+    relevant_years = sum(years for relevance, years in experience_relevance.items() if relevance >= 0.7)
+    
+    years_factor = min(total_years / years_required, 1) if years_required > 0 else 1
+    relevance_factor = relevant_years / total_years if total_years > 0 else 0
+    
+    return (years_factor * 0.6 + relevance_factor * 0.4) * 100
+
+def evaluate_education(result, required_level):
+    education_levels = ['High School', 'Associate', 'Bachelor', 'Master', 'PhD']
+    candidate_level = result.get('highest_education_level', 'High School')
+    candidate_field = result.get('field_of_study', '')
+    
+    level_score = education_levels.index(candidate_level) / (len(education_levels) - 1)
+    field_score = 1 if candidate_field.lower() in ['computer science', 'data science'] else 0.5
+    
+    return (level_score * 0.7 + field_score * 0.3) * 100
+
+def evaluate_industry_knowledge(result, industry_keywords):
+    keyword_count = sum(1 for word in result.get('resume_text', '').lower().split() if word in industry_keywords)
+    total_words = len(result.get('resume_text', '').split())
+    
+    keyword_density = keyword_count / total_words if total_words > 0 else 0
+    return min(keyword_density * 200, 100)  # Cap at 100%
+
+def get_strengths_and_improvements(resume_text, job_description, llm):
+    prompt = f"""
+    Analyze the following resume and job description, then provide a structured summary of the candidate's key strengths and areas for improvement. Focus on the most impactful points relevant to the job.
+
+    Resume:
+    {resume_text}
+
+    Job Description:
+    {job_description}
+
+    Provide a JSON object with the following structure:
+    {{
+        "strengths": [
+            {{ "category": "Technical Skills", "points": ["...", "..."] }},
+            {{ "category": "Experience", "points": ["...", "..."] }},
+            {{ "category": "Education", "points": ["...", "..."] }}
+        ],
+        "improvements": [
+            {{ "category": "Skills Gap", "points": ["...", "..."] }},
+            {{ "category": "Experience", "points": ["...", "..."] }},
+            {{ "category": "Industry Knowledge", "points": ["...", "..."] }}
+        ]
+    }}
+
+    Each category should have 2-3 concise points (1-2 sentences each).
+    """
+    
+    response = llm.analyze_match(resume_text, prompt, {}, "Structured Strengths and Improvements Analysis")
+    
+    try:
+        strengths_and_improvements = json.loads(response['brief_summary'])
+        return strengths_and_improvements
+    except:
+        return {
+            'strengths': [{'category': 'General', 'points': ['Unable to extract key strengths']}],
+            'improvements': [{'category': 'General', 'points': ['Unable to extract areas for improvement']}]
+        }
