@@ -201,6 +201,19 @@ def process_resumes_sequentially(resume_files, resume_processor, job_description
             results.append(_generate_error_result(file.name, str(e)))
     return results
 
+import streamlit as st
+import pandas as pd
+from typing import List, Dict, Any
+from io import BytesIO
+
+def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
+    # Implement this function to generate the PDF report
+    # For now, we'll use a placeholder
+    buffer = BytesIO()
+    # PDF generation code goes here
+    buffer.seek(0)
+    return buffer.getvalue()
+
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Stack Ranking of Candidates")
     
@@ -242,24 +255,10 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.info(f"Recommendation: {result['recommendation']}")
 
             st.subheader("Brief Summary")
-            if isinstance(result['brief_summary'], dict):
-                for key, value in result['brief_summary'].items():
-                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
-            elif isinstance(result['brief_summary'], list):
-                for item in result['brief_summary']:
-                    st.write(f"- {item}")
-            else:
-                st.write(result['brief_summary'])
+            st.write(result['brief_summary'])
 
             st.subheader("Experience and Project Relevance")
-            if isinstance(result['experience_and_project_relevance'], dict):
-                for key, value in result['experience_and_project_relevance'].items():
-                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
-            elif isinstance(result['experience_and_project_relevance'], list):
-                for item in result['experience_and_project_relevance']:
-                    st.write(f"- **{item['project']}:** {item['comments']} (Relevance: {item['relevance']}%)")
-            else:
-                st.write(result['experience_and_project_relevance'])
+            st.write(result['experience_and_project_relevance'])
 
             st.subheader("Skills Gap")
             if isinstance(result['skills_gap'], list):
@@ -272,11 +271,11 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.write(result['skills_gap'])
 
             st.subheader("Key Strengths")
-            for strength in result['key_strengths']:
+            for strength in result.get('key_strengths', []):
                 st.write(f"- {strength}")
 
             st.subheader("Areas for Improvement")
-            for weakness in result['key_weaknesses']:
+            for weakness in result.get('key_weaknesses', []):
                 st.write(f"- {weakness}")
 
             st.subheader("Recruiter Questions")
@@ -457,37 +456,25 @@ def _calculate_match_score(resume_text: str, job_description: str, importance_fa
     # Calculate skills match
     skills_match = sum(1 for skill in key_skills if skill.lower() in resume_text.lower()) / len(key_skills) if key_skills else 0
 
+    # Calculate experience match
+    experience_match = _calculate_experience_match(resume_text, job_description)
+
     # Apply importance factors
     weighted_score = (
-        base_score * importance_factors.get('technical_skills', 0.2) +
-        relevance_score * importance_factors.get('experience', 0.3) +
-        (skills_match * 100) * importance_factors.get('industry_knowledge', 0.5)
+        base_score * importance_factors.get('technical_skills', 0.25) +
+        relevance_score * importance_factors.get('experience', 0.25) +
+        (skills_match * 100) * importance_factors.get('industry_knowledge', 0.25) +
+        experience_match * importance_factors.get('years_of_experience', 0.25)
     ) / sum(importance_factors.values() or [1])
 
-    # Apply penalties for missing critical skills
-    if 'model governance' not in resume_text.lower():
-        weighted_score *= 0.7
-    if 'risk management' not in resume_text.lower():
-        weighted_score *= 0.7
-    if 'compliance' not in resume_text.lower():
-        weighted_score *= 0.7
-    if '5+ years' not in resume_text.lower():
-        weighted_score *= 0.8
-
-    final_score = int(min(max(weighted_score * 0.7, 0), 100))  # Further reduce scores
+    final_score = int(min(max(weighted_score * 0.8, 0), 100))  # Adjust overall score
     return final_score
 
 def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
     job_doc = nlp(job_description)
     resume_doc = nlp(resume_text)
     
-    relevant_terms = [
-        "machine learning", "model risk", "model governance", "risk management",
-        "compliance", "mlops", "model validation", "model monitoring",
-        "documentation", "regulatory requirements", "financial services"
-    ]
-    
-    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks if any(term in chunk.text.lower() for term in relevant_terms)]
+    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks]
     resume_phrases = [chunk.text.lower() for chunk in resume_doc.noun_chunks]
     
     relevant_experiences = []
@@ -503,6 +490,16 @@ def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
         "total_job_phrases": len(job_phrases),
         "matched_phrases": len(relevant_experiences)
     }
+
+def _calculate_experience_match(resume_text: str, job_description: str) -> float:
+    required_years = re.search(r'(\d+)\+?\s*years?', job_description)
+    if required_years:
+        required_years = int(required_years.group(1))
+        candidate_years = re.search(r'(\d+)\+?\s*years?', resume_text)
+        if candidate_years:
+            candidate_years = int(candidate_years.group(1))
+            return min(candidate_years / required_years, 1.0)
+    return 0.5  # Default to middle score if can't determine
 
 def _identify_skills_gap(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     job_doc = nlp(job_description)
