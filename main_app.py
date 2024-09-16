@@ -170,7 +170,7 @@ def main_app():
 
     st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
     st.subheader("Customize Importance Factors")
-
+    
     if 'importance_factors' not in st.session_state:
         st.session_state.importance_factors = {
             'technical_skills': 0.5,
@@ -181,14 +181,20 @@ def main_app():
         }
 
     required_factors = ['technical_skills', 'experience', 'education', 'soft_skills', 'industry_knowledge']
-    cols = st.columns(len(required_factors))
-    for i, factor in enumerate(required_factors):
-        with cols[i]:
-            st.session_state.importance_factors[factor] = st.slider(f"{factor.replace('_', ' ').title()}", 0.0, 1.0, st.session_state.importance_factors[factor], 0.1)
+
+    # Add this right before the slider creation loop
+    for factor in required_factors:
+        if factor not in st.session_state.importance_factors:
+            st.session_state.importance_factors[factor] = 0.5
+
+        cols = st.columns(len(required_factors))
+        for i, factor in enumerate(required_factors):
+            with cols[i]:
+                st.session_state.importance_factors[factor] = st.slider(f"{factor.replace('_', ' ').title()}", 0.0, 1.0, st.session_state.importance_factors[factor], 0.1)
 
     st.write("Current Importance Factors:", st.session_state.importance_factors)
     key_skills = st.text_area("Enter key skills or requirements (one per line):", help="These will be used to assess the candidate's fit for the role.")
-    
+
     if key_skills:
         st.session_state.key_skills = [skill.strip() for skill in key_skills.split('\n') if skill.strip()]
 
