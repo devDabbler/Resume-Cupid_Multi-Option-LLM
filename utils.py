@@ -30,6 +30,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from functools import lru_cache
+from config_settings import Config
 
 # Load spaCy model lazily using a singleton pattern
 @lru_cache(maxsize=1)
@@ -66,6 +67,16 @@ class ThreadSafeLogger(logging.Logger):
             super()._log(level, msg, args, exc_info, extra, stack_info)
 
 logging.setLoggerClass(ThreadSafeLogger)
+
+def get_available_api_keys():
+    api_keys = {}
+    if Config.CLAUDE_API_KEY:
+        api_keys['claude'] = Config.CLAUDE_API_KEY
+    if Config.GPT4O_MINI_API_KEY:
+        api_keys['gpt4o_mini'] = Config.GPT4O_MINI_API_KEY
+    if Config.LLAMA_API_KEY:
+        api_keys['llama'] = Config.LLAMA_API_KEY
+    return api_keys
 
 @st.cache_data
 def extract_text_from_pdf(file_content: bytes) -> str:
