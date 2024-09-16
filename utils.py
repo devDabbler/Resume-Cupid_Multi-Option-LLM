@@ -445,20 +445,28 @@ def _calculate_match_score(resume_text: str, job_description: str, importance_fa
 
     # Apply importance factors (use get() method with default value to avoid KeyError)
     weighted_score = (
-        base_score * importance_factors.get('technical_skills', 0.5) +
-        relevance_score * importance_factors.get('experience', 0.5) +
-        (skills_match * 100) * importance_factors.get('industry_knowledge', 0.5) +
-        base_score * importance_factors.get('soft_skills', 0.5) +
-        base_score * importance_factors.get('education', 0.5)
+        base_score * importance_factors.get('technical_skills', 0.3) +
+        relevance_score * importance_factors.get('experience', 0.3) +
+        (skills_match * 100) * importance_factors.get('industry_knowledge', 0.4)
     ) / sum(importance_factors.values() or [1])  # Use [1] as fallback if the dict is empty
 
-    return int(min(max(weighted_score, 0), 100))
+    # Apply a penalty for lack of specific experience
+    experience_penalty = 0.5 if "5+ years" not in resume_text.lower() else 1
+
+    final_score = int(min(max(weighted_score * experience_penalty * 0.5, 0), 100))  # Multiply by 0.5 to further reduce scores
+    return final_score
 
 def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
     job_doc = nlp(job_description)
     resume_doc = nlp(resume_text)
     
-    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks]
+    relevant_terms = [
+        "machine learning", "model risk", "model governance", "risk management",
+        "compliance", "mlops", "model validation", "model monitoring",
+        "documentation", "regulatory requirements", "financial services"
+    ]
+    
+    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks if any(term in chunk.text.lower() for term in relevant_terms)]
     resume_phrases = [chunk.text.lower() for chunk in resume_doc.noun_chunks]
     
     relevant_experiences = []
@@ -466,7 +474,7 @@ def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
         if phrase in resume_phrases:
             relevant_experiences.append(phrase)
     
-    relevance_score = len(relevant_experiences) / len(job_phrases) * 100
+    relevance_score = len(relevant_experiences) / len(job_phrases) * 100 if job_phrases else 0
     
     return {
         "relevant_experiences": relevant_experiences,
@@ -484,7 +492,13 @@ def _identify_skills_gap(resume_text: str, job_description: str, key_skills: Lis
     def is_valid_skill(word):
         return len(word) > 3 and word.lower() not in stop_words and word.isalpha()
     
-    job_skills = set([token.text.lower() for token in job_doc if token.pos_ in ["NOUN", "PROPN"] and is_valid_skill(token.text)] + [skill.lower() for skill in key_skills])
+    specific_skills = [
+        "machine learning", "model risk management", "model governance",
+        "risk management", "compliance", "mlops", "python", "r", "scala",
+        "nlp models", "financial services", "insurance"
+    ]
+    
+    job_skills = set([token.text.lower() for token in job_doc if token.pos_ in ["NOUN", "PROPN"] and is_valid_skill(token.text)] + specific_skills + [skill.lower() for skill in key_skills])
     resume_skills = set([token.text.lower() for token in resume_doc if token.pos_ in ["NOUN", "PROPN"] and is_valid_skill(token.text)])
     
     missing_skills = list(job_skills - resume_skills)
