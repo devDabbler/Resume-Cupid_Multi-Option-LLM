@@ -366,6 +366,9 @@ def process_resumes_sequentially(resume_files, resume_processor, job_description
             logger.error(f"Error processing resume {file.name}: {str(e)}", exc_info=True)
             results.append(_generate_error_result(file.name, str(e)))
     return results
+
+import json
+
 def process_resume(resume_file, resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm, job_requirements):
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {resume_processor.backend} backend")
@@ -376,7 +379,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             return _generate_error_result(resume_file.name, "Empty content extracted")
         
         result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
-        logger.debug(f"Initial analysis result: {result}")
+        logger.debug(f"Initial analysis result: {json.dumps(result, indent=2)}")
         
         # Slightly lower the original match score
         original_score = result['match_score']
@@ -390,44 +393,19 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         # Generate a new brief summary based on the adjusted score
         result['brief_summary'] = generate_brief_summary(adjusted_score, job_title)
         
-        logger.debug(f"Updated brief summary: {result['brief_summary']}")
-        
         # Format experience and project relevance
         exp_relevance = result.get('experience_and_project_relevance', {})
-        if isinstance(exp_relevance, dict):
-            formatted_exp_relevance = "\n".join([f"{k.replace('_', ' ').title()}: {v}" for k, v in exp_relevance.items()])
-        elif isinstance(exp_relevance, list):
-            formatted_exp_relevance = "\n".join([str(item) for item in exp_relevance])
-        else:
-            formatted_exp_relevance = str(exp_relevance)
+        formatted_exp_relevance = format_nested_structure(exp_relevance)
         
         # Format skills gap
         skills_gap = result.get('skills_gap', {})
-        if isinstance(skills_gap, dict):
-            formatted_skills_gap = "\n".join([f"{k.replace('_', ' ').title()}: {v}" for k, v in skills_gap.items()])
-        elif isinstance(skills_gap, list):
-            formatted_skills_gap = "\n".join([str(item) for item in skills_gap])
-        else:
-            formatted_skills_gap = str(skills_gap)
+        formatted_skills_gap = format_nested_structure(skills_gap)
         
         # Extract key strengths and areas for improvement using LLM
         strengths_and_improvements = get_strengths_and_improvements(resume_text, job_description, llm)
         
         # Format recruiter questions
-        formatted_questions = []
-        for q in result.get('recruiter_questions', []):
-            if isinstance(q, dict):
-                formatted_questions.append(q.get('question', ''))
-            else:
-                formatted_questions.append(q)
-        
-        # If no recruiter questions were generated, create default ones
-        if not formatted_questions:
-            formatted_questions = [
-                "Can you describe your experience with model governance and risk management?",
-                "How do you ensure compliance with regulatory requirements in your work?",
-                "Can you give an example of a complex machine learning project you've worked on and how you managed the associated risks?"
-            ]
+        formatted_questions = format_recruiter_questions(result.get('recruiter_questions', []))
         
         processed_result = {
             'file_name': resume_file.name,
@@ -441,11 +419,68 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             'recommendation': get_recommendation(adjusted_score)
         }
         
-        logger.debug(f"Final processed result: {processed_result}")
+        logger.debug(f"Final processed result: {json.dumps(processed_result, indent=2)}")
         return processed_result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
+
+def format_nested_structure(data):
+    if isinstance(data, dict):
+        return {k: format_nested_structure(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [format_nested_structure(item) for item in data]
+    elif isinstance(data, str):
+        return data.replace('\n', ' ').strip()
+    else:
+        return str(data)
+
+def format_recruiter_questions(questions):
+    formatted = []
+    for q in questions:
+        if isinstance(q, dict):
+            formatted.append(q.get('question', ''))
+        else:
+            formatted.append(str(q))
+    return formatted[:5]  # Limit to 5 questions
+
+def get_strengths_and_improvements(resume_text, job_description, llm):
+    prompt = f"""
+    Analyze the following resume and job description, then provide a structured summary of the candidate's key strengths and areas for improvement. Focus on the most impactful points relevant to the job.
+
+    Resume:
+    {resume_text}
+
+    Job Description:
+    {job_description}
+
+    Provide a JSON object with the following structure:
+    {{
+        "strengths": [
+            {{ "category": "Technical Skills", "points": ["...", "..."] }},
+            {{ "category": "Experience", "points": ["...", "..."] }},
+            {{ "category": "Soft Skills", "points": ["...", "..."] }}
+        ],
+        "improvements": [
+            {{ "category": "Skills Gap", "points": ["...", "..."] }},
+            {{ "category": "Experience", "points": ["...", "..."] }},
+            {{ "category": "Industry Knowledge", "points": ["...", "..."] }}
+        ]
+    }}
+
+    Each category should have 2-3 concise points (1-2 sentences each).
+    """
+    
+    response = llm.analyze_match(resume_text, prompt, {}, "Structured Strengths and Improvements Analysis")
+    
+    try:
+        strengths_and_improvements = json.loads(response['brief_summary'])
+        return strengths_and_improvements
+    except:
+        return {
+            'strengths': [{'category': 'General', 'points': ['Unable to extract key strengths']}],
+            'improvements': [{'category': 'General', 'points': ['Unable to extract areas for improvement']}]
+        }
     
 def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
     buffer = io.BytesIO()
@@ -694,44 +729,6 @@ def evaluate_industry_knowledge(result, industry_keywords):
     
     keyword_density = keyword_count / total_words if total_words > 0 else 0
     return min(keyword_density * 200, 100)  # Cap at 100%
-
-def get_strengths_and_improvements(resume_text, job_description, llm):
-    prompt = f"""
-    Analyze the following resume and job description, then provide a structured summary of the candidate's key strengths and areas for improvement. Focus on the most impactful points relevant to the job.
-
-    Resume:
-    {resume_text}
-
-    Job Description:
-    {job_description}
-
-    Provide a JSON object with the following structure:
-    {{
-        "strengths": [
-            {{ "category": "Technical Skills", "points": ["...", "..."] }},
-            {{ "category": "Experience", "points": ["...", "..."] }},
-            {{ "category": "Education", "points": ["...", "..."] }}
-        ],
-        "improvements": [
-            {{ "category": "Skills Gap", "points": ["...", "..."] }},
-            {{ "category": "Experience", "points": ["...", "..."] }},
-            {{ "category": "Industry Knowledge", "points": ["...", "..."] }}
-        ]
-    }}
-
-    Each category should have 2-3 concise points (1-2 sentences each).
-    """
-    
-    response = llm.analyze_match(resume_text, prompt, {}, "Structured Strengths and Improvements Analysis")
-    
-    try:
-        strengths_and_improvements = json.loads(response['brief_summary'])
-        return strengths_and_improvements
-    except:
-        return {
-            'strengths': [{'category': 'General', 'points': ['Unable to extract key strengths']}],
-            'improvements': [{'category': 'General', 'points': ['Unable to extract areas for improvement']}]
-        }
 
 def get_recommendation(match_score: int) -> str:
     if match_score < 30:
