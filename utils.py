@@ -603,14 +603,16 @@ def _generate_questions(resume_text: str, job_description: str, key_skills: List
     
     return questions
 
-def _get_recommendation(match_score: int) -> str:
-    if match_score < 40:
-        return "Do not recommend for interview"
-    elif 40 <= match_score < 55:
-        return "Review profile again and/or conduct indepth recruiter screen focusing on the questions provided. Recommend for interview with significant reservations"
-    elif 55 <= match_score < 71:
-        return "Recommend for interview with minor reservations - be sure to focus on skill gaps etc."
-    elif 71 <= match_score < 82:
+def get_recommendation(match_score: int) -> str:
+    if match_score == 0:
+        return "Do not recommend for interview (not suitable for the role)"
+    elif match_score < 30:
+        return "Do not recommend for interview (significant skill gaps)"
+    elif 30 <= match_score < 50:
+        return "Consider for interview only if making a career transition; review with a lead for a second opinion"
+    elif 50 <= match_score < 70:
+        return "Recommend for interview with reservations; focus on probing questions to verify fit"
+    elif 70 <= match_score < 85:
         return "Recommend for interview"
     else:
         return "Highly recommend for interview"
@@ -628,7 +630,7 @@ def _generate_error_result(file_name: str, error_message: str) -> Dict[str, Any]
         'recruiter_questions': ['Unable to generate recruiter questions due to an error']
     }
 
-def _calculate_strengths(result: dict) -> List[str]:
+def calculate_strengths(result: dict) -> List[str]:
     strengths = []
     if result['match_score'] >= 80:
         strengths.append("Excellent overall match to job requirements")
@@ -642,7 +644,7 @@ def _calculate_strengths(result: dict) -> List[str]:
         strengths.append("Relevant project experience")
     return strengths
 
-def _calculate_areas_for_improvement(result: dict) -> List[str]:
+def calculate_areas_for_improvement(result: dict) -> List[str]:
     areas_for_improvement = []
     if result['skills_gap']:
         areas_for_improvement.append("Address identified skills gaps")

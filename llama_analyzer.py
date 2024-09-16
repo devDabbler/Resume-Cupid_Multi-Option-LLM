@@ -94,37 +94,36 @@ class LlamaAPI:
                 logger.warning(f"Generated fallback content for missing field: {field}")
     
         try:
-            if isinstance(processed_content['match_score'], dict):
+            if isinstance(parsed_content['match_score'], dict):
                 # Calculate a weighted average if match_score is a dictionary
-                total_score = sum(processed_content['match_score'].values())
-                total_weight = len(processed_content['match_score'])
-                processed_content['match_score'] = int(total_score / total_weight)
-            elif isinstance(processed_content['match_score'], str):
+                total_score = sum(parsed_content['match_score'].values())
+                total_weight = len(parsed_content['match_score'])
+                parsed_content['match_score'] = int(total_score / total_weight)
+            elif isinstance(parsed_content['match_score'], str):
                 # Try to extract a number from the string
-                match = re.search(r'\d+', processed_content['match_score'])
+                match = re.search(r'\d+', parsed_content['match_score'])
                 if match:
-                    processed_content['match_score'] = int(match.group())
+                    parsed_content['match_score'] = int(match.group())
                 else:
-                    processed_content['match_score'] = 0
-            elif processed_content['match_score'] is None or processed_content['match_score'] == 0:
+                    parsed_content['match_score'] = 0
+            elif parsed_content['match_score'] is None or parsed_content['match_score'] == 0:
                 # If match_score is None or 0, calculate based on other factors
-                relevance = processed_content.get('experience_and_project_relevance', {}).get('relevance', 'Low')
-                relevance_score = {'High': 70, 'Medium': 50, 'Low': 30}.get(relevance, 30)
-                skills_gap = len(processed_content.get('skills_gap', []))
-                processed_content['match_score'] = max(0, relevance_score - skills_gap * 5)
-            
-            processed_content['match_score'] = int(float(processed_content['match_score']))
+                relevance = parsed_content.get('experience_and_project_relevance', {}).get('overall_relevance', 0)
+                skills_gap = parsed_content.get('skills_gap', {}).get('overall_gap', 100)
+                parsed_content['match_score'] = int((relevance * 0.7 + (100 - skills_gap) * 0.3))
+        
+            parsed_content['match_score'] = int(float(parsed_content['match_score']))
             # Adjust the score to be more stringent
-            processed_content['match_score'] = max(0, min(100, int(processed_content['match_score'] * 0.8)))
-            logger.debug(f"Processed match_score: {processed_content['match_score']}")
+            parsed_content['match_score'] = max(0, min(100, int(parsed_content['match_score'] * 0.9)))
+            logger.debug(f"Processed match_score: {parsed_content['match_score']}")
         except (ValueError, TypeError) as e:
-            logger.error(f"Invalid match_score value: {processed_content.get('match_score')}")
-            processed_content['match_score'] = 0
-    
-        processed_content['recommendation'] = self._get_recommendation(processed_content['match_score'])
-        logger.debug(f"Generated recommendation: {processed_content['recommendation']}")
-    
-        return processed_content
+            logger.error(f"Invalid match_score value: {parsed_content.get('match_score')}")
+            parsed_content['match_score'] = 0
+
+        parsed_content['recommendation'] = self._get_recommendation(parsed_content['match_score'])
+        logger.debug(f"Generated recommendation: {parsed_content['recommendation']}")
+
+        return parsed_content
 
     def _generate_fallback_content(self, field: str) -> str:
         fallback = f"No {field.replace('_', ' ')} available"
