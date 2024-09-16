@@ -693,8 +693,11 @@ def calculate_keyword_match(resume_text, job_description, key_skills):
     matched_skills = job_skills & resume_skills
     return len(matched_skills) / len(job_skills) if job_skills else 0
 
+def dict_to_string(d):
+    return '\n'.join(f"{k}: {v}" for k, v in d.items())
+
 def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
-    buffer = io.BytesIO()
+    buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     elements = []
 
@@ -732,19 +735,53 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
     elements.append(table)
 
     # Add detailed information for each candidate
-    for i, result in enumerate(evaluation_results, 1):
-        elements.append(Paragraph(f"\n\nRank {i}: {result['file_name']}", styles['Heading2']))
+    for result in evaluation_results:
+        elements.append(Paragraph(f"\n\n{result['file_name']}", styles['Heading2']))
         elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
         elements.append(Paragraph(f"Recommendation: {result['recommendation']}", styles['Normal']))
         elements.append(Paragraph("Brief Summary:", styles['Heading3']))
-        elements.append(Paragraph(result['brief_summary'], styles['Normal']))
+        
+        # Handle 'brief_summary' whether it's a string or a dictionary
+        if isinstance(result['brief_summary'], dict):
+            brief_summary = dict_to_string(result['brief_summary'])
+        else:
+            brief_summary = str(result['brief_summary'])
+        elements.append(Paragraph(brief_summary, styles['Normal']))
+
+        # Handle 'experience_and_project_relevance'
         elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
-        elements.append(Paragraph(str(result['experience_and_project_relevance']), styles['Normal']))
+        if isinstance(result['experience_and_project_relevance'], dict):
+            exp_relevance = dict_to_string(result['experience_and_project_relevance'])
+        else:
+            exp_relevance = str(result['experience_and_project_relevance'])
+        elements.append(Paragraph(exp_relevance, styles['Normal']))
+
+        # Handle 'skills_gap'
         elements.append(Paragraph("Skills Gap:", styles['Heading3']))
-        elements.append(Paragraph(", ".join(result['skills_gap']), styles['Normal']))
+        if isinstance(result['skills_gap'], list):
+            skills_gap = '\n'.join(f"- {skill}" for skill in result['skills_gap'])
+        elif isinstance(result['skills_gap'], dict):
+            skills_gap = dict_to_string(result['skills_gap'])
+        else:
+            skills_gap = str(result['skills_gap'])
+        elements.append(Paragraph(skills_gap, styles['Normal']))
+
+        # Add 'key_strengths' if available
+        if 'key_strengths' in result:
+            elements.append(Paragraph("Key Strengths:", styles['Heading3']))
+            strengths = '\n'.join(f"- {strength}" for strength in result['key_strengths'])
+            elements.append(Paragraph(strengths, styles['Normal']))
+
+        # Add 'key_weaknesses' if available
+        if 'key_weaknesses' in result:
+            elements.append(Paragraph("Areas for Improvement:", styles['Heading3']))
+            weaknesses = '\n'.join(f"- {weakness}" for weakness in result['key_weaknesses'])
+            elements.append(Paragraph(weaknesses, styles['Normal']))
+
+        # Add 'recruiter_questions'
         elements.append(Paragraph("Recruiter Questions:", styles['Heading3']))
-        for question in result['recruiter_questions']:
-            elements.append(Paragraph(f"- {question}", styles['Normal']))
+        questions = '\n'.join(f"- {question}" for question in result['recruiter_questions'])
+        elements.append(Paragraph(questions, styles['Normal']))
 
     doc.build(elements)
     buffer.seek(0)
