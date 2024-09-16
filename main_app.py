@@ -211,7 +211,33 @@ def main_app():
 
     if st.button('Process Resumes', key='process_resumes'):
         if resume_files and st.session_state.job_description and st.session_state.job_title:
-            process_resumes_logic(resume_files, resume_processor, llm)
+            evaluation_results = []
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            job_requirements = generate_job_requirements(st.session_state.job_description)
+
+            for i, resume_file in enumerate(resume_files):
+                status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
+                result = process_resume(
+                    resume_file, 
+                    resume_processor, 
+                    st.session_state.job_description, 
+                    st.session_state.importance_factors,
+                    {}, # Empty dict for candidate_data as it's not being used
+                    st.session_state.job_title, 
+                    st.session_state.key_skills, 
+                    llm, 
+                    job_requirements
+                )
+                evaluation_results.append(result)
+                progress_bar.progress((i + 1) / len(resume_files))
+
+            if evaluation_results:
+                st.success("Evaluation complete!")
+                display_results(evaluation_results, str(uuid.uuid4()), save_feedback)
+            else:
+                st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
         else:
             if not st.session_state.job_description:
                 st.error("Please ensure a job description is provided.")

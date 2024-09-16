@@ -402,14 +402,13 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         logger.debug(f"Initial analysis result: {result}")
         
-        # Adjust match score based on importance factors and job requirements
+        # Slightly lower the original match score
         original_score = result['match_score']
-        adjusted_score = adjust_match_score(original_score, result, importance_factors, job_requirements)
+        adjusted_score = max(0, min(100, int(original_score * 0.9)))  # Reduce by 10% and ensure it's between 0 and 100
         
         logger.debug(f"Original score: {original_score}, Adjusted score: {adjusted_score}")
         
         # Update the result with the adjusted score
-        result['original_match_score'] = original_score
         result['match_score'] = adjusted_score
         
         # Generate a new brief summary based on the adjusted score
@@ -450,7 +449,6 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             'file_name': resume_file.name,
             'brief_summary': result['brief_summary'],
             'match_score': adjusted_score,
-            'original_match_score': original_score,
             'experience_and_project_relevance': formatted_exp_relevance,
             'skills_gap': formatted_skills_gap,
             'key_strengths': strengths_and_improvements['strengths'],
