@@ -242,12 +242,30 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.write(result['skills_gap'])
 
             st.subheader("Key Strengths")
-            for strength in result.get('key_strengths', []):
-                st.write(f"- {strength}")
+            strengths = result.get('key_strengths', [])
+            if isinstance(strengths, list) and len(strengths) > 0 and not (len(strengths) == 1 and strengths[0].get('category') == 'General'):
+                for strength in strengths:
+                    if isinstance(strength, dict):
+                        st.write(f"**{strength['category']}:**")
+                        for point in strength['points']:
+                            st.write(f"- {point}")
+                    else:
+                        st.write(f"- {strength}")
+            else:
+                st.write("Key strengths could not be extracted. Please review the candidate's experience and skills manually.")
 
             st.subheader("Areas for Improvement")
-            for improvement in result.get('areas_for_improvement', []):
-                st.write(f"- {improvement}")
+            improvements = result.get('areas_for_improvement', [])
+            if isinstance(improvements, list) and len(improvements) > 0 and not (len(improvements) == 1 and improvements[0].get('category') == 'General'):
+                for improvement in improvements:
+                    if isinstance(improvement, dict):
+                        st.write(f"**{improvement['category']}:**")
+                        for point in improvement['points']:
+                            st.write(f"- {point}")
+                    else:
+                        st.write(f"- {improvement}")
+            else:
+                st.write("Areas for improvement could not be extracted. Please review the candidate's skills gap and experience to identify potential areas for growth.")
 
             st.subheader("Recruiter Questions")
             for question in result['recruiter_questions']:
@@ -382,10 +400,13 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             return _generate_error_result(resume_file.name, "Empty content extracted")
         
         result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
+        logger.debug(f"Initial analysis result: {result}")
         
         # Adjust match score based on importance factors and job requirements
         original_score = result['match_score']
         adjusted_score = adjust_match_score(original_score, result, importance_factors, job_requirements)
+        
+        logger.debug(f"Original score: {original_score}, Adjusted score: {adjusted_score}")
         
         # Update the result with the adjusted score
         result['original_match_score'] = original_score
@@ -393,6 +414,8 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         
         # Generate a new brief summary based on the adjusted score
         result['brief_summary'] = generate_brief_summary(adjusted_score, job_title)
+        
+        logger.debug(f"Updated brief summary: {result['brief_summary']}")
         
         # Format experience and project relevance
         exp_relevance = result.get('experience_and_project_relevance', {})
@@ -436,7 +459,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             'recommendation': get_recommendation(adjusted_score)
         }
         
-        logger.debug(f"Processed result: {processed_result}")
+        logger.debug(f"Final processed result: {processed_result}")
         return processed_result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
