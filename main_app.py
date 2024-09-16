@@ -161,6 +161,7 @@ def main_app():
         st.text_area("Current Job Description:", value=st.session_state.job_description, height=200, key='current_jd', disabled=True)
 
     st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
+
     st.subheader("Customize Importance Factors")
     
     # Define the required factors
@@ -183,10 +184,12 @@ def main_app():
                 f"{factor.replace('_', ' ').title()}",
                 0.0, 1.0,
                 st.session_state.importance_factors[factor],
-                0.1
+                0.1,
+                key=f"slider_{factor}"  # Add a unique key for each slider
             )
 
     st.write("Current Importance Factors:", st.session_state.importance_factors)
+
     key_skills = st.text_area("Enter key skills or requirements (one per line):", help="These will be used to assess the candidate's fit for the role.")
 
     if key_skills:
