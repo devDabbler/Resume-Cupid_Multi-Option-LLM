@@ -170,13 +170,13 @@ def generate_job_requirements(job_description):
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Stack Ranking of Candidates")
     
-    # Sort results by adjusted match score in descending order
+    # Sort results by match score in descending order
     sorted_results = sorted(evaluation_results, key=lambda x: x['match_score'], reverse=True)
 
     df = pd.DataFrame(sorted_results)
     df['Rank'] = range(1, len(df) + 1)
-    df = df[['Rank', 'file_name', 'match_score', 'original_match_score', 'recommendation']]
-    df.columns = ['Rank', 'Candidate', 'Adjusted Match Score (%)', 'Original Match Score (%)', 'Recommendation']
+    df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
+    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
     
     def color_scale(val):
         if val < 30:
@@ -191,8 +191,8 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             color = 'green'
         return f'background-color: {color}'
     
-    st.dataframe(df.style.format({'Adjusted Match Score (%)': '{:.0f}', 'Original Match Score (%)': '{:.0f}'})
-                   .applymap(color_scale, subset=['Adjusted Match Score (%)', 'Original Match Score (%)']))
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'})
+                   .applymap(color_scale, subset=['Match Score (%)']))
 
     st.download_button(
         label="Download PDF Report",
@@ -203,43 +203,20 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis"):
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             with col1:
-                st.metric("Adjusted Match Score", f"{result['match_score']}%")
+                st.metric("Match Score", f"{result['match_score']}%")
             with col2:
-                st.metric("Original Match Score", f"{result['original_match_score']}%")
-            with col3:
                 st.info(f"Recommendation: {result['recommendation']}")
 
             st.subheader("Brief Summary")
             st.write(result['brief_summary'])
 
             st.subheader("Experience and Project Relevance")
-            if isinstance(result['experience_and_project_relevance'], dict):
-                for key, value in result['experience_and_project_relevance'].items():
-                    if isinstance(value, dict):
-                        st.write(f"**{key.replace('_', ' ').title()}:**")
-                        for sub_key, sub_value in value.items():
-                            st.write(f"- {sub_key.replace('_', ' ').title()}: {sub_value}")
-                    else:
-                        st.write(f"**{key.replace('_', ' ').title()}:** {value}")
-            else:
-                st.write(result['experience_and_project_relevance'])
+            st.write(result['experience_and_project_relevance'])
 
             st.subheader("Skills Gap")
-            if isinstance(result['skills_gap'], dict):
-                for category, skills in result['skills_gap'].items():
-                    st.write(f"**{category.replace('_', ' ').title()}:**")
-                    if isinstance(skills, dict):
-                        for skill_type, skill_list in skills.items():
-                            st.write(f"- {skill_type.replace('_', ' ').title()}:")
-                            for skill in skill_list:
-                                st.write(f"  - {skill}")
-                    else:
-                        for skill in skills:
-                            st.write(f"- {skill}")
-            else:
-                st.write(result['skills_gap'])
+            st.write(result['skills_gap'])
 
             st.subheader("Key Strengths")
             strengths = result.get('key_strengths', [])
