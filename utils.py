@@ -131,7 +131,7 @@ import re
 from collections import Counter
 
 # Load the spaCy model (make sure to install it with: python -m spacy download en_core_web_sm)
-nlp = spacy.load("en_core_web_sm")
+nlp = spacy.load("en_core_web_md")
 
 def generate_job_requirements(job_description):
     # Process the job description with spaCy
