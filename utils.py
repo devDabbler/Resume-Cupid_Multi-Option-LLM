@@ -362,19 +362,36 @@ def process_resume(resume_file, _resume_processor, job_description, importance_f
         return _generate_error_result(resume_file.name, str(e))
 
 def _process_experience_relevance(experience_data):
-    if isinstance(experience_data, list):
-        return "\n".join([f"{exp['project']}: {exp['description']} (Relevance: {exp['relevance']}%)" for exp in experience_data])
-    return str(experience_data)
+    try:
+        if isinstance(experience_data, list):
+            return "\n".join([f"{exp['project']}: {exp['description']} (Relevance: {exp['relevance']}%)" for exp in experience_data])
+        return str(experience_data)
+    except Exception as e:
+        logger.error(f"Error processing experience relevance: {str(e)}")
+        return "Unable to process experience relevance data"
 
 def _process_skills_gap(skills_gap):
-    if isinstance(skills_gap, list):
-        return "\n".join([f"{skill['skill']}: {skill['description']} (Importance: {skill['importance']}%)" for skill in skills_gap])
-    return str(skills_gap)
+    try:
+        if isinstance(skills_gap, list):
+            if skills_gap and isinstance(skills_gap[0], dict):
+                return "\n".join([f"{skill['skill']}: {skill['description']} (Importance: {skill['importance']}%)" for skill in skills_gap])
+            else:
+                return ", ".join(skills_gap)
+        return str(skills_gap)
+    except Exception as e:
+        logger.error(f"Error processing skills gap: {str(e)}")
+        return "Unable to process skills gap data"
 
 def _process_recruiter_questions(questions):
     if isinstance(questions, list):
-        return [q['question'] for q in questions[:3]]  # Return top 3 questions
-    return questions if isinstance(questions, list) else [questions]
+        if questions and isinstance(questions[0], dict):
+            return [q['question'] for q in questions[:3]]  # Return top 3 questions
+        else:
+            return questions[:3]  # Return top 3 questions if they're already strings
+    elif isinstance(questions, str):
+        return [questions]  # Return the string as a single-item list
+    else:
+        return ['No recruiter questions generated']
 
 def _generate_brief_summary(original_summary, match_score, recommendation):
     # Extract the candidate's name from the original summary
