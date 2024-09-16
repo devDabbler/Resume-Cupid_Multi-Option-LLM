@@ -224,6 +224,15 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     
     st.dataframe(df.style.applymap(color_scale, subset=['Match Score (%)']))
 
+    # Add download button for PDF only
+    pdf = generate_pdf_report(evaluation_results, run_id)
+    st.download_button(
+        label="Download PDF Report",
+        data=pdf,
+        file_name=f"evaluation_report_{run_id}.pdf",
+        mime="application/pdf"
+    )
+
     for i, result in enumerate(evaluation_results, 1):
         with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis"):
             col1, col2 = st.columns(2)
@@ -448,17 +457,24 @@ def _calculate_match_score(resume_text: str, job_description: str, importance_fa
     # Calculate skills match
     skills_match = sum(1 for skill in key_skills if skill.lower() in resume_text.lower()) / len(key_skills) if key_skills else 0
 
-    # Apply importance factors (use get() method with default value to avoid KeyError)
+    # Apply importance factors
     weighted_score = (
-        base_score * importance_factors.get('technical_skills', 0.3) +
+        base_score * importance_factors.get('technical_skills', 0.2) +
         relevance_score * importance_factors.get('experience', 0.3) +
-        (skills_match * 100) * importance_factors.get('industry_knowledge', 0.4)
-    ) / sum(importance_factors.values() or [1])  # Use [1] as fallback if the dict is empty
+        (skills_match * 100) * importance_factors.get('industry_knowledge', 0.5)
+    ) / sum(importance_factors.values() or [1])
 
-    # Apply a penalty for lack of specific experience
-    experience_penalty = 0.5 if "5+ years" not in resume_text.lower() else 1
+    # Apply penalties for missing critical skills
+    if 'model governance' not in resume_text.lower():
+        weighted_score *= 0.7
+    if 'risk management' not in resume_text.lower():
+        weighted_score *= 0.7
+    if 'compliance' not in resume_text.lower():
+        weighted_score *= 0.7
+    if '5+ years' not in resume_text.lower():
+        weighted_score *= 0.8
 
-    final_score = int(min(max(weighted_score * experience_penalty * 0.5, 0), 100))  # Multiply by 0.5 to further reduce scores
+    final_score = int(min(max(weighted_score * 0.7, 0), 100))  # Further reduce scores
     return final_score
 
 def _assess_relevance(resume_text: str, job_description: str) -> Dict[str, Any]:
