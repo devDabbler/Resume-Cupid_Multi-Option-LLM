@@ -252,10 +252,6 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
     buffer.seek(0)
     return buffer.getvalue()
 
-import streamlit as st
-import pandas as pd
-from typing import List, Dict, Any
-
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Stack Ranking of Candidates")
     
@@ -266,8 +262,6 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df['Rank'] = range(1, len(df) + 1)
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
-    
-    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
     
     def color_scale(val):
         if val < 30:
@@ -282,7 +276,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             color = 'green'
         return f'background-color: {color}'
     
-    st.dataframe(df.style.applymap(color_scale, subset=['Match Score (%)']))
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}).applymap(color_scale, subset=['Match Score (%)']))
 
     st.download_button(
         label="Download PDF Report",
@@ -300,23 +294,32 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.info(f"Recommendation: {result['recommendation']}")
 
             st.subheader("Brief Summary")
-            if isinstance(result['brief_summary'], dict):
-                for key, value in result['brief_summary'].items():
-                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
-            else:
-                st.write(result['brief_summary'])
+            st.write(result['brief_summary'])
 
             st.subheader("Experience and Project Relevance")
             if isinstance(result['experience_and_project_relevance'], dict):
                 for key, value in result['experience_and_project_relevance'].items():
-                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+                    if isinstance(value, dict):
+                        st.write(f"**{key.replace('_', ' ').title()}:**")
+                        for sub_key, sub_value in value.items():
+                            st.write(f"- {sub_key.replace('_', ' ').title()}: {sub_value}")
+                    else:
+                        st.write(f"**{key.replace('_', ' ').title()}:** {value}")
             else:
                 st.write(result['experience_and_project_relevance'])
 
             st.subheader("Skills Gap")
             if isinstance(result['skills_gap'], dict):
-                for skill, gap in result['skills_gap'].items():
-                    st.write(f"- **{skill}:** {gap}")
+                for category, skills in result['skills_gap'].items():
+                    st.write(f"**{category.replace('_', ' ').title()}:**")
+                    if isinstance(skills, dict):
+                        for skill_type, skill_list in skills.items():
+                            st.write(f"- {skill_type.replace('_', ' ').title()}:")
+                            for skill in skill_list:
+                                st.write(f"  - {skill}")
+                    else:
+                        for skill in skills:
+                            st.write(f"- {skill}")
             else:
                 st.write(result['skills_gap'])
 
@@ -583,26 +586,28 @@ def _identify_skills_gap(resume_text: str, job_description: str, key_skills: Lis
     return sorted(missing_skills, key=lambda x: job_description.lower().count(x), reverse=True)[:10]
 
 def _extract_key_points(resume_text: str, job_description: str, key_skills: List[str], is_strength: bool = True) -> List[str]:
-    resume_doc = nlp(resume_text)
-    job_doc = nlp(job_description)
+    resume_doc = nlp(resume_text.lower())
+    job_doc = nlp(job_description.lower())
     
-    # Filter out common words and short words
-    stop_words = set(nlp.Defaults.stop_words).union({'experience', 'skill', 'ability'})
+    # Define a list of stop words to filter out
+    stop_words = set(nlp.Defaults.stop_words).union({'experience', 'skill', 'ability', 'company', 'time', 'employment'})
     
     def is_valid_word(word):
-        return len(word) > 3 and word.lower() not in stop_words and word.isalpha()
+        return len(word) > 2 and word.lower() not in stop_words and word.isalpha()
     
-    resume_phrases = [chunk.text.lower() for chunk in resume_doc.noun_chunks if is_valid_word(chunk.root.text)]
-    job_phrases = [chunk.text.lower() for chunk in job_doc.noun_chunks if is_valid_word(chunk.root.text)]
+    resume_words = set([token.lemma_ for token in resume_doc if is_valid_word(token.text)])
+    job_words = set([token.lemma_ for token in job_doc if is_valid_word(token.text)])
+    key_skills_set = set([skill.lower() for skill in key_skills])
     
     if is_strength:
-        strengths = list(set([phrase for phrase in resume_phrases if phrase in job_phrases or any(skill.lower() in phrase for skill in key_skills)]))
+        strengths = list(resume_words.intersection(job_words).union(resume_words.intersection(key_skills_set)))
         return sorted(strengths, key=lambda x: job_description.lower().count(x), reverse=True)[:5]
     else:
-        weaknesses = list(set([phrase for phrase in job_phrases if phrase not in resume_phrases and not any(skill.lower() in phrase for skill in key_skills)]))
+        weaknesses = list(job_words.difference(resume_words).union(key_skills_set.difference(resume_words)))
         return sorted(weaknesses, key=lambda x: job_description.lower().count(x), reverse=True)[:5]
 
-def _generate_questions(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
+
+def generate_questions(resume_text: str, job_description: str, key_skills: List[str]) -> List[str]:
     skills_gap = _identify_skills_gap(resume_text, job_description, key_skills)
     key_strengths = _extract_key_points(resume_text, job_description, key_skills, is_strength=True)
     
