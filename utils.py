@@ -206,7 +206,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             with col1:
                 st.metric("Match Score", f"{result['match_score']}%")
             with col2:
-                st.info(f"Recommendation: {result['recommendation']}")
+                st.info(f"Recommendation: {get_recommendation(result['match_score'])}")
 
             st.subheader("Brief Summary")
             st.write(result['brief_summary'])
