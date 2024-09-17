@@ -63,7 +63,12 @@ try:
 except Exception as e:
     logger.error(f"Failed to import or use Config: {e}")
 
+def load_css():
+    with open('style.css') as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
 def main():
+    load_css()
     try:
         logger.debug("Entering main function")
         logger.debug(f"Current working directory: {os.getcwd()}")
