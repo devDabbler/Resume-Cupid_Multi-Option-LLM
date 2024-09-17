@@ -240,13 +240,17 @@ def generate_fit_summary(result):
 def display_nested_content(data):
     """
     Simplifies nested structures (dictionaries/lists) into human-readable strings.
+    Ensures the output is always a string.
     """
     if isinstance(data, dict):
         return '\n'.join(f"{k.capitalize()}: {v}" for k, v in data.items())
     elif isinstance(data, list):
+        # Ensure list is converted to a string of items separated by commas
         return ', '.join(str(item) for item in data)
     else:
+        # For any other types (including strings), return as string
         return str(data)
+
 
 # Function to get available API keys
 def get_available_api_keys() -> Dict[str, str]:
