@@ -176,33 +176,36 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     # Display summary table
     st.subheader("Candidate Summary")
-    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}).hide_index())
 
     # Display detailed results for each candidate in a more readable format
     for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result.get('file_name', 'Unknown')} - Detailed Analysis", expanded=i == 1):
-            st.write(f"**Match Score**: {result.get('match_score', 0)}%")
-            st.write(f"**Recommendation**: {result.get('recommendation', 'N/A')}")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Match Score", f"{result.get('match_score', 0)}%")
+            with col2:
+                st.write("**Recommendation:**", result.get('recommendation', 'N/A'))
 
-            # Add a concise summary of why the candidate is a fit, not a fit, or borderline
-            fit_summary = result.get('fit_summary', 'No fit summary available.')
-            st.write(f"**Fit Summary**: {fit_summary}")
+            st.write("**Fit Summary:**", result.get('fit_summary', 'No fit summary available.'))
 
-            # Experience and project relevance
             st.subheader("Experience and Project Relevance")
-            exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
-            st.write(exp_relevance)
+            st.write(result.get('experience_and_project_relevance', 'Not provided'))
 
-            # Skills gap
             st.subheader("Skills Gap")
-            skills_gap = result.get('skills_gap', 'Not provided')
-            st.write(skills_gap)
+            st.write(result.get('skills_gap', 'Not provided'))
 
-            # Recruiter questions
+            st.subheader("Key Strengths")
+            for strength in result.get('key_strengths', []):
+                st.write(f"**{strength['category']}:** {', '.join(strength['points'])}")
+
+            st.subheader("Areas for Improvement")
+            for area in result.get('areas_for_improvement', []):
+                st.write(f"**{area['category']}:** {', '.join(area['points'])}")
+
             st.subheader("Recommended Interview Questions")
-            recruiter_questions = result.get('recruiter_questions', ['No questions generated'])
-            for question in recruiter_questions:
-                st.write(f"• {question}")
+            for question in result.get('recruiter_questions', []):
+                st.write(f"- {question}")
 
             # Feedback form
             st.subheader("Provide Feedback")
@@ -260,7 +263,6 @@ def display_nested_content(data):
     else:
         # For any other types (including strings), return as string
         return str(data)
-
 
 # Function to get available API keys
 def get_available_api_keys() -> Dict[str, str]:
@@ -379,6 +381,9 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         # Generate a new brief summary based on the adjusted score
         result['brief_summary'] = generate_brief_summary(adjusted_score, job_title)
         
+        # Generate fit summary
+        result['fit_summary'] = generate_fit_summary(result)
+        
         # Format experience and project relevance
         exp_relevance = result.get('experience_and_project_relevance', {})
         formatted_exp_relevance = format_nested_structure(exp_relevance)
@@ -390,12 +395,17 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         # Extract key strengths and areas for improvement using LLM
         strengths_and_improvements = get_strengths_and_improvements(resume_text, job_description, llm)
         
+        # Ensure recruiter questions are present
+        if not result.get('recruiter_questions'):
+            result['recruiter_questions'] = generate_generic_questions(job_title)
+        
         # Format recruiter questions
         formatted_questions = format_recruiter_questions(result.get('recruiter_questions', []))
         
         processed_result = {
             'file_name': resume_file.name,
             'brief_summary': result['brief_summary'],
+            'fit_summary': result['fit_summary'],
             'match_score': adjusted_score,
             'experience_and_project_relevance': formatted_exp_relevance,
             'skills_gap': formatted_skills_gap,
@@ -411,13 +421,20 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
 
+def generate_generic_questions(job_title):
+    return [
+        f"Can you describe your experience that's most relevant to the {job_title} role?",
+        f"What challenges have you faced in previous roles similar to {job_title}, and how did you overcome them?",
+        "How do you stay updated with the latest technologies and best practices in your field?",
+        "Can you give an example of a complex problem you've solved and the approach you took?",
+        "How do you handle high-pressure situations or tight deadlines?"
+    ]
+
 def format_nested_structure(data):
     if isinstance(data, dict):
-        return {k: format_nested_structure(v) for k, v in data.items()}
+        return "\n".join([f"{k}: {format_nested_structure(v)}" for k, v in data.items()])
     elif isinstance(data, list):
-        return [format_nested_structure(item) for item in data]
-    elif isinstance(data, str):
-        return data.replace('\n', ' ').strip()
+        return "\n".join([f"- {format_nested_structure(item)}" for item in data])
     else:
         return str(data)
 
