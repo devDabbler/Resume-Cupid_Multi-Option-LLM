@@ -31,9 +31,14 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from functools import lru_cache
 from config_settings import Config
-import pandas as pd
 import plotly.graph_objects as go
-import streamlit as st
+
+# Try to import matplotlib, but provide a fallback if it's not available
+try:
+    import matplotlib
+    matplotlib_available = True
+except ImportError:
+    matplotlib_available = False
 
 # Load spaCy model lazily using a singleton pattern
 @lru_cache(maxsize=1)
@@ -129,15 +134,9 @@ def extract_text_from_file(file) -> str:
         logger.error(f"Error extracting text from file {file.name}: {str(e)}", exc_info=True)
         raise ValueError(f"Failed to extract text from {file.name}: {str(e)}")
 
-import spacy
-import re
-from collections import Counter
-
-# Load the spaCy model (make sure to install it with: python -m spacy download en_core_web_sm)
-nlp = spacy.load("en_core_web_md")
-
 def generate_job_requirements(job_description):
     # Process the job description with spaCy
+    nlp = get_spacy_model()
     doc = nlp(job_description)
     
     # Extract required skills
@@ -169,12 +168,6 @@ def generate_job_requirements(job_description):
         'education_level': education_level,
         'industry_keywords': industry_keywords
     }
-    
-try:
-    import matplotlib
-    matplotlib_available = True
-except ImportError:
-    matplotlib_available = False
 
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Candidate Evaluation Results")
@@ -190,20 +183,20 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     # Display summary table with custom styling
     st.subheader("Candidate Summary")
+    
     if matplotlib_available:
-        st.dataframe(
-            df.style.format({'Match Score (%)': '{:.0f}'})
-            .background_gradient(subset=['Match Score (%)'], cmap='RdYlGn', vmin=0, vmax=100)
-            .set_properties(**{'text-align': 'left'})
-            .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
-        )
+        try:
+            styled_df = df.style.format({'Match Score (%)': '{:.0f}'}) \
+                .background_gradient(subset=['Match Score (%)'], cmap='RdYlGn', vmin=0, vmax=100) \
+                .set_properties(**{'text-align': 'left'}) \
+                .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+            st.dataframe(styled_df)
+        except Exception as e:
+            st.warning(f"Unable to apply advanced styling due to an error: {str(e)}")
+            st.dataframe(df)
     else:
         # Fallback option without background gradient
-        st.dataframe(
-            df.style.format({'Match Score (%)': '{:.0f}'})
-            .set_properties(**{'text-align': 'left'})
-            .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
-        )
+        st.dataframe(df)
 
     # Create a download button for the PDF report
     st.download_button(
@@ -288,7 +281,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                         st.error("Failed to save feedback. Please try again.")
 
     st.success("Evaluation complete!")
-    
+
 def display_nested_content(content):
     if isinstance(content, dict):
         for key, value in content.items():
@@ -392,8 +385,6 @@ def process_resumes_sequentially(resume_files, resume_processor, job_description
             logger.error(f"Error processing resume {file.name}: {str(e)}", exc_info=True)
             results.append(_generate_error_result(file.name, str(e)))
     return results
-
-import json
 
 def process_resume(resume_file, resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm, job_requirements):
     logger = get_logger(__name__)
@@ -507,7 +498,7 @@ def get_strengths_and_improvements(resume_text, job_description, llm):
             'strengths': [{'category': 'General', 'points': ['Unable to extract key strengths']}],
             'improvements': [{'category': 'General', 'points': ['Unable to extract areas for improvement']}]
         }
-    
+
 def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -556,7 +547,6 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
     buffer.seek(0)
     return buffer.getvalue()
 
-# Utility Functions
 def dict_to_string(d):
     return '\n'.join(f"{k}: {v}" for k, v in d.items())
 
@@ -597,7 +587,6 @@ def _generate_error_result(file_name: str, error_message: str) -> Dict[str, Any]
         'recruiter_questions': ['Unable to generate recruiter questions due to an error']
     }
 
-# Handle validation for Fractal job links
 def is_valid_fractal_job_link(url):
     pattern = r'^https?://fractal\.wd1\.myworkdayjobs\.com/.*Careers/.*'
     return re.match(pattern, url) is not None
@@ -623,36 +612,6 @@ def extract_job_description(url):
         raise
     finally:
         driver.quit()
-        
-def adjust_match_score(original_score, result, importance_factors, job_requirements):
-    logger.debug(f"Original score: {original_score}")
-    
-    skills_weight = importance_factors.get('technical_skills', 0.3)
-    experience_weight = importance_factors.get('experience', 0.3)
-    education_weight = importance_factors.get('education', 0.2)
-    industry_weight = importance_factors.get('industry_knowledge', 0.2)
-    
-    skills_score = evaluate_skills(result.get('skills_gap', {}), job_requirements.get('required_skills', []))
-    experience_score = evaluate_experience(result.get('experience_and_project_relevance', {}), job_requirements.get('years_of_experience', 0))
-    education_score = evaluate_education(result, job_requirements.get('education_level', 'Bachelor'))
-    industry_score = evaluate_industry_knowledge(result, job_requirements.get('industry_keywords', []))
-    
-    logger.debug(f"Component scores - Skills: {skills_score}, Experience: {experience_score}, Education: {education_score}, Industry: {industry_score}")
-    
-    adjusted_score = (
-        original_score * 0.6 +  # Increase base score weight
-        skills_score * skills_weight * 0.1 +
-        experience_score * experience_weight * 0.1 +
-        education_score * education_weight * 0.1 +
-        industry_score * industry_weight * 0.1
-    )
-    
-    # Cap the maximum adjustment
-    max_adjustment = 15  # Maximum 15 point increase
-    final_score = min(original_score + max_adjustment, adjusted_score)
-    
-    logger.debug(f"Adjusted score: {final_score}")
-    return min(max(int(final_score), 0), 100)  # Ensure score is between 0 and 100
 
 def adjust_match_score(original_score, result, importance_factors, job_requirements):
     logger.debug(f"Adjusting match score. Original score: {original_score}")
@@ -781,3 +740,5 @@ def generate_brief_summary(score, job_title):
         return f"The candidate is a good fit for the {job_title} role. With a match score of {score}%, they demonstrate alignment with many of the required skills and experience for this position."
     else:
         return f"The candidate is an excellent fit for the {job_title} role. With a match score of {score}%, they demonstrate strong alignment with the required skills and experience for this position."
+
+# Add any additional utility functions here as needed
