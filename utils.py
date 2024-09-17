@@ -162,7 +162,7 @@ def generate_job_requirements(job_description):
         'industry_keywords': industry_keywords
     }
 
-def display_simplified_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
+def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Candidate Evaluation Results")
 
     # Sort results by match score in descending order
