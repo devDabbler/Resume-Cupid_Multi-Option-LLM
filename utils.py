@@ -209,11 +209,15 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 
                 st.subheader("Key Strengths")
                 for strength in result['key_strengths']:
-                    st.write(f"- {strength}")
+                    st.write(f"**{strength['category']}:**")
+                    for point in strength['points']:
+                        st.write(f"- {point}")
                 
                 st.subheader("Areas for Improvement")
                 for area in result['areas_for_improvement']:
-                    st.write(f"- {area}")
+                    st.write(f"**{area['category']}:**")
+                    for point in area['points']:
+                        st.write(f"- {point}")
             
             with col2:
                 # Create a gauge chart for the match score
@@ -251,11 +255,10 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                     for weakness in relevance['weaknesses']:
                         st.write(f"- {weakness}")
             else:
-                st.write(relevance)  # Display the relevance information as is if it's not a dictionary
+                st.write(f"**Relevance Information:** {relevance}")  # Display the relevance information as is if it's not a dictionary
 
             st.subheader("Skills Gap")
-            for skill in result['skills_gap']:
-                st.write(f"- {skill}")
+            st.write(f"**Skills Gap:** {result['skills_gap']}")
 
             st.subheader("Recommended Interview Questions")
             for question in result['recruiter_questions']:
