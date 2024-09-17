@@ -20,13 +20,6 @@ logger = get_logger(__name__)
 # Get the BASE_URL from the Config
 BASE_URL = Config.BASE_URL
 
-def load_css():
-    with open('style.css') as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-
-# Call this function at the start of your app
-load_css()
-
 # Get the directory of the current script
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -64,7 +57,7 @@ if 'resume_processor' not in st.session_state:
 
 BATCH_SIZE = 3  # Number of resumes to process in each batch
 
-def _generate_error_result(file_name, error_message):
+def generate_error_result(file_name, error_message):
     return {
         "file_name": file_name,
         "error": error_message,
