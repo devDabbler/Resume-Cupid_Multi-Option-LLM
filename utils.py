@@ -173,10 +173,11 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df['Rank'] = range(1, len(df) + 1)
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
+    df = df.set_index('Rank')  # Set 'Rank' as index to avoid showing a separate index column
 
     # Display summary table
     st.subheader("Candidate Summary")
-    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}).hide_index())
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
 
     # Display detailed results for each candidate in a more readable format
     for i, result in enumerate(sorted_results, 1):
