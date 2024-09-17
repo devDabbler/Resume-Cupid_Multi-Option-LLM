@@ -183,20 +183,19 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     # Display summary table with custom styling
     st.subheader("Candidate Summary")
-    
-    if matplotlib_available:
-        try:
-            styled_df = df.style.format({'Match Score (%)': '{:.0f}'}) \
-                .background_gradient(subset=['Match Score (%)'], cmap='RdYlGn', vmin=0, vmax=100) \
-                .set_properties(**{'text-align': 'left'}) \
-                .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
-            st.dataframe(styled_df)
-        except Exception as e:
-            st.warning(f"Unable to apply advanced styling due to an error: {str(e)}")
-            st.dataframe(df)
-    else:
-        # Fallback option without background gradient
-        st.dataframe(df)
+
+    # Custom styling function
+    def color_match_score(val):
+        color = 'red' if val < 50 else 'yellow' if val < 75 else 'green'
+        return f'background-color: {color}'
+
+    # Apply custom styling
+    styled_df = df.style.format({'Match Score (%)': '{:.0f}'}) \
+        .applymap(color_match_score, subset=['Match Score (%)']) \
+        .set_properties(**{'text-align': 'left'}) \
+        .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+
+    st.dataframe(styled_df)
 
     # Create a download button for the PDF report
     st.download_button(
