@@ -1,57 +1,61 @@
-import streamlit as st
 import os
-from main_app import main_app
-from auth import auth_main, handle_password_reset, login_page, verify_email
+import sys
 import logging
 from dotenv import load_dotenv
+import streamlit as st
+from main_app import main_app
+from auth import auth_main, handle_password_reset, login_page, verify_email
 from database import init_db, debug_db_contents
-import sys
 
+# Streamlit configuration
 st.set_page_config(page_title="Resume Cupid", page_icon="💘", layout="centered")
 
-# Set up logging
-log_directory = "/home/rezcupid2024/Resume_Cupid_Multi_LLM/logs"
-os.makedirs(log_directory, exist_ok=True)
-log_file = os.path.join(log_directory, "app.log")
+# Logging configuration
+def setup_logging():
+    log_directory = "/home/rezcupid2024/Resume_Cupid_Multi_LLM/logs"
+    os.makedirs(log_directory, exist_ok=True)
+    log_file = os.path.join(log_directory, "app.log")
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename=log_file,
-    filemode='a'
-)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
 
-logger = logging.getLogger(__name__)
+    return logging.getLogger(__name__)
+
+logger = setup_logging()
 logger.info("Application started")
 
-# Load the .env.production file
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+# Environment configuration
+def load_environment():
+    environment = os.getenv('ENVIRONMENT', 'development')
+    env_file = '.env.production' if environment == 'production' else '.env.development'
+    env_path = os.path.join(os.path.dirname(__file__), env_file)
 
-# Set the path for the .env file
-if ENVIRONMENT == 'production':
-    env_path = os.path.join(os.path.dirname(__file__), '.env.production')
-else:
-    env_path = os.path.join(os.path.dirname(__file__), '.env.development')
+    try:
+        load_dotenv(dotenv_path=env_path)
+        logger.info(f"Loaded environment variables from {env_path}")
+    except Exception as e:
+        logger.error(f"Failed to load {env_path} file: {e}")
 
-# Load the appropriate .env file
-try:
-    load_dotenv(dotenv_path=env_path)
-    logger.info(f"Loaded environment variables from {env_path}")
-except Exception as e:
-    logger.error(f"Failed to load {env_path} file: {e}")
+    return environment
 
-# Now import Config after loading environment variables
+ENVIRONMENT = load_environment()
+
+# Configuration import and logging
 try:
     from config_settings import Config
 
-    # Log environment and configuration details
     logger.debug(f"Current environment: {Config.ENVIRONMENT}")
     logger.debug(f"Base URL: {Config.BASE_URL}")
 
     smtp_config = Config.get_smtp_config()
     logger.debug(f"SMTP Configuration from Config: {smtp_config}")
 
-    # Log all environment variables (excluding sensitive ones)
     logger.debug("All environment variables:")
     for key, value in os.environ.items():
         if not key.endswith(('PASSWORD', 'SECRET', 'KEY')):
@@ -64,10 +68,8 @@ def main():
         logger.debug("Entering main function")
         logger.debug(f"Current working directory: {os.getcwd()}")
         
-        # Log the database path
         logger.info(f"Attempting to connect to database at: {Config.DB_PATH}")
         
-        # Initialize the database
         try:
             init_db()
             logger.info("Database initialized successfully")

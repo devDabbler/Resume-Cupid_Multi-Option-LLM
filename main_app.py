@@ -11,6 +11,7 @@ from claude_analyzer import ClaudeAPI
 from gpt4o_mini_analyzer import GPT4oMiniAPI
 from llama_analyzer import LlamaAPI, initialize_llm
 from logger import get_logger
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -234,8 +235,8 @@ def main_app():
                 progress_bar.progress((i + 1) / len(resume_files))
                 
                 # Log the result for each resume
-                logger.debug(f"Processed resume: {resume_file.name}")
-                logger.debug(f"Result: {result}")
+                logger.info(f"Processed resume: {resume_file.name}")
+                logger.info(f"Result: {json.dumps(result, indent=2)}")
 
             if evaluation_results:
                 st.success("Evaluation complete!")
