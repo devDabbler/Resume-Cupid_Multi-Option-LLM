@@ -166,7 +166,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     st.header("Candidate Evaluation Results")
 
     # Sort results by match score in descending order
-    sorted_results = sorted(evaluation_results, key=lambda x: x['match_score'], reverse=True)
+    sorted_results = sorted(evaluation_results, key=lambda x: x.get('match_score', 0), reverse=True)
 
     # Create a summary dataframe
     df = pd.DataFrame(sorted_results)
@@ -176,32 +176,33 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     # Display summary table
     st.subheader("Candidate Summary")
-    st.dataframe(df)
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
 
     # Display detailed results for each candidate in a more readable format
     for i, result in enumerate(sorted_results, 1):
-        with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis", expanded=i == 1):
-            st.write(f"**Match Score**: {result['match_score']}%")
-            st.write(f"**Recommendation**: {result['recommendation']}")
+        with st.expander(f"Rank {i}: {result.get('file_name', 'Unknown')} - Detailed Analysis", expanded=i == 1):
+            st.write(f"**Match Score**: {result.get('match_score', 0)}%")
+            st.write(f"**Recommendation**: {result.get('recommendation', 'N/A')}")
 
             # Add a concise summary of why the candidate is a fit, not a fit, or borderline
-            fit_summary = generate_fit_summary(result)
+            fit_summary = result.get('fit_summary', 'No fit summary available.')
             st.write(f"**Fit Summary**: {fit_summary}")
 
-            # Cleaned experience and project relevance
+            # Experience and project relevance
             st.subheader("Experience and Project Relevance")
             exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
-            st.write(format_nested_structure(exp_relevance))
+            st.write(exp_relevance)
 
-            # Cleaned skills gap
+            # Skills gap
             st.subheader("Skills Gap")
             skills_gap = result.get('skills_gap', 'Not provided')
-            st.write(format_nested_structure(skills_gap))
+            st.write(skills_gap)
 
-            # Add recruiter questions
+            # Recruiter questions
             st.subheader("Recommended Interview Questions")
             recruiter_questions = result.get('recruiter_questions', ['No questions generated'])
-            st.write(format_nested_structure(recruiter_questions))
+            for question in recruiter_questions:
+                st.write(f"• {question}")
 
             # Feedback form
             st.subheader("Provide Feedback")
@@ -229,7 +230,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
         )
     except Exception as e:
         logger.error(f"Error generating PDF report: {str(e)}", exc_info=True)
-        st.error("Unable to generate PDF report due to an error.")
+        st.error("Unable to generate PDF report due to an error. Please try again later.")
 
     st.success("Evaluation complete!")
 
@@ -477,61 +478,66 @@ def get_strengths_and_improvements(resume_text, job_description, llm):
     return strengths_and_improvements
 
 def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    elements = []
+    try:
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
 
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph(f"Evaluation Report (Run ID: {run_id})", styles['Heading1']))
+        styles = getSampleStyleSheet()
+        elements.append(Paragraph(f"Evaluation Report (Run ID: {run_id})", styles['Heading1']))
 
-    # Create summary table
-    data = [['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']]
-    for i, result in enumerate(evaluation_results, 1):
-        data.append([
-            i,
-            result['file_name'],
-            result['match_score'],
-            result['recommendation']
-        ])
+        # Create summary table
+        data = [['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']]
+        for i, result in enumerate(evaluation_results, 1):
+            data.append([
+                i,
+                result.get('file_name', 'Unknown'),
+                result.get('match_score', 0),
+                result.get('recommendation', 'N/A')
+            ])
 
-    table = Table(data)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    elements.append(table)
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(table)
 
-    # Adding cleaned details for each result
-    for result in evaluation_results:
-        elements.append(Paragraph(f"\n\n{result['file_name']}", styles['Heading2']))
-        elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
-        elements.append(Paragraph(f"Recommendation: {result['recommendation']}", styles['Normal']))
+        # Adding details for each result
+        for result in evaluation_results:
+            elements.append(Paragraph(f"\n\n{result.get('file_name', 'Unknown')}", styles['Heading2']))
+            elements.append(Paragraph(f"Match Score: {result.get('match_score', 0)}%", styles['Normal']))
+            elements.append(Paragraph(f"Recommendation: {result.get('recommendation', 'N/A')}", styles['Normal']))
 
-        # Add the fit summary for each candidate
-        fit_summary = generate_fit_summary(result)
-        elements.append(Paragraph(f"Fit Summary: {fit_summary}", styles['Normal']))
+            # Add the fit summary for each candidate
+            fit_summary = result.get('fit_summary', 'No fit summary available.')
+            elements.append(Paragraph(f"Fit Summary: {fit_summary}", styles['Normal']))
 
-        # Cleaned experience and project relevance
-        elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
-        exp_relevance = format_nested_structure(result.get('experience_and_project_relevance', 'Not provided'))
-        elements.append(Paragraph(exp_relevance, styles['Normal']))
+            # Experience and project relevance
+            elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
+            exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
+            elements.append(Paragraph(str(exp_relevance), styles['Normal']))
 
-        # Cleaned skills gap
-        elements.append(Paragraph("Skills Gap:", styles['Heading3']))
-        skills_gap = format_nested_structure(result.get('skills_gap', 'Not provided'))
-        elements.append(Paragraph(skills_gap, styles['Normal']))
+            # Skills gap
+            elements.append(Paragraph("Skills Gap:", styles['Heading3']))
+            skills_gap = result.get('skills_gap', 'Not provided')
+            elements.append(Paragraph(str(skills_gap), styles['Normal']))
 
-        # Add recruiter questions
-        elements.append(Paragraph("Recommended Interview Questions:", styles['Heading3']))
-        recruiter_questions = format_nested_structure(result.get('recruiter_questions', ['No questions generated']))
-        elements.append(Paragraph(recruiter_questions, styles['Normal']))
+            # Recruiter questions
+            elements.append(Paragraph("Recommended Interview Questions:", styles['Heading3']))
+            recruiter_questions = result.get('recruiter_questions', ['No questions generated'])
+            for question in recruiter_questions:
+                elements.append(Paragraph(f"• {question}", styles['Normal']))
 
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer.getvalue()
-
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer.getvalue()
+    except Exception as e:
+        logger.error(f"Error generating PDF report: {str(e)}", exc_info=True)
+        raise
+    
 def dict_to_string(d):
     return '\n'.join(f"{k}: {v}" for k, v in d.items())
 
