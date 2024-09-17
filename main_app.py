@@ -216,10 +216,11 @@ def main_app():
             progress_bar = st.progress(0)
             status_text = st.empty()
 
-            job_requirements = generate_job_requirements(st.session_state.job_description)
+        job_requirements = generate_job_requirements(st.session_state.job_description)
 
-            for i, resume_file in enumerate(resume_files):
-                status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
+        for i, resume_file in enumerate(resume_files):
+            status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
+            try:
                 result = process_resume(
                     resume_file, 
                     resume_processor, 
@@ -237,19 +238,26 @@ def main_app():
                 # Log the result for each resume
                 logger.info(f"Processed resume: {resume_file.name}")
                 logger.info(f"Result: {json.dumps(result, indent=2)}")
+            except Exception as e:
+                logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
+                st.error(f"Error processing resume {resume_file.name}: {str(e)}")
 
-            if evaluation_results:
-                st.success("Evaluation complete!")
+        if evaluation_results:
+            st.success("Evaluation complete!")
+            try:
                 display_results(evaluation_results, str(uuid.uuid4()), save_feedback)
-            else:
-                st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
+            except Exception as e:
+                logger.error(f"Error displaying results: {str(e)}", exc_info=True)
+                st.error(f"Error displaying results: {str(e)}")
         else:
-            if not st.session_state.job_description:
-                st.error("Please ensure a job description is provided.")
-            if not st.session_state.job_title:
-                st.error("Please enter a job title.")
-            if not resume_files:
-                st.error("Please upload at least one resume.")
+            st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
+    else:
+        if not st.session_state.job_description:
+            st.error("Please ensure a job description is provided.")
+        if not st.session_state.job_title:
+            st.error("Please enter a job title.")
+        if not resume_files:
+            st.error("Please upload at least one resume.")
 
     handle_save_role_logic()
     handle_delete_role_logic()

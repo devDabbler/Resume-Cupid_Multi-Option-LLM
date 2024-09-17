@@ -218,14 +218,18 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                         st.error("Failed to save feedback. Please try again.")
 
     # Add the PDF download button to the Streamlit UI
-    pdf_data = generate_pdf_report(evaluation_results, run_id)
+    try:
+        pdf_data = generate_pdf_report(evaluation_results, run_id)
 
-    st.download_button(
-        label="Download Detailed PDF Report",
-        data=pdf_data,
-        file_name=f"evaluation_report_{run_id}.pdf",
-        mime="application/pdf"
-    )
+        st.download_button(
+            label="Download Detailed PDF Report",
+            data=pdf_data,
+            file_name=f"evaluation_report_{run_id}.pdf",
+            mime="application/pdf"
+        )
+    except Exception as e:
+        logger.error(f"Error generating PDF report: {str(e)}", exc_info=True)
+        st.error("Unable to generate PDF report due to an error.")
 
     st.success("Evaluation complete!")
 
@@ -357,8 +361,13 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         logger.debug(f"Initial analysis result: {json.dumps(result, indent=2)}")
         
+        # Ensure result is a dictionary
+        if not isinstance(result, dict):
+            logger.error(f"Unexpected result type: {type(result)}")
+            return _generate_error_result(resume_file.name, "Unexpected result type")
+        
         # Slightly lower the original match score
-        original_score = result['match_score']
+        original_score = result.get('match_score', 0)
         adjusted_score = max(0, min(100, int(original_score * 0.9)))  # Reduce by 10% and ensure it's between 0 and 100
         
         logger.debug(f"Original score: {original_score}, Adjusted score: {adjusted_score}")
@@ -647,6 +656,8 @@ def evaluate_skills(skills_gap, required_skills):
     # Ensure required_skills is a list
     if isinstance(required_skills, str):
         required_skills = [required_skills]
+    elif not isinstance(required_skills, list):
+        required_skills = []
     
     # Check how many required skills are missing
     missing_skills = [skill for skill in required_skills if skill.lower() not in [s.lower() for s in candidate_skills]]
@@ -666,6 +677,10 @@ def evaluate_skills(skills_gap, required_skills):
 
 def evaluate_experience(experience_relevance, years_required):
     try:
+        if not isinstance(experience_relevance, dict):
+            logger.warning(f"Unexpected experience_relevance type: {type(experience_relevance)}")
+            return 0
+        
         total_years = sum(float(years) for _, years in experience_relevance.items() if isinstance(years, (int, float)))
         
         relevant_years = sum(float(years) for relevance, years in experience_relevance.items() if isinstance(relevance, (int, float)) and relevance >= 0.7)
