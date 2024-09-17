@@ -162,7 +162,7 @@ def generate_job_requirements(job_description):
         'industry_keywords': industry_keywords
     }
 
-def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
+def display_simplified_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Candidate Evaluation Results")
 
     # Sort results by match score in descending order
@@ -178,21 +178,21 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     st.subheader("Candidate Summary")
     st.dataframe(df)
 
-    # Display simplified detailed results for each candidate
+    # Display detailed results for each candidate in a more readable format
     for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis", expanded=i == 1):
             st.write(f"**Match Score**: {result['match_score']}%")
             st.write(f"**Recommendation**: {result['recommendation']}")
 
-            # Simplified experience and project relevance
+            # Cleaned experience and project relevance
             st.subheader("Experience and Project Relevance")
             exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
-            st.write(exp_relevance if isinstance(exp_relevance, str) else str(exp_relevance)[:100] + '...')
+            st.write(format_nested_structure(exp_relevance))
 
-            # Simplified skills gap
+            # Cleaned skills gap
             st.subheader("Skills Gap")
             skills_gap = result.get('skills_gap', 'Not provided')
-            st.write(skills_gap if isinstance(skills_gap, str) else str(skills_gap)[:100] + '...')
+            st.write(format_nested_structure(skills_gap))
 
             # Feedback form
             st.subheader("Provide Feedback")
@@ -210,21 +210,17 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     st.success("Evaluation complete!")
 
-def display_nested_content(content):
-    if isinstance(content, dict):
-        for key, value in content.items():
-            st.write(f"**{key.capitalize()}:**")
-            display_nested_content(value)
-    elif isinstance(content, list):
-        for item in content:
-            if isinstance(item, dict):
-                display_nested_content(item)
-            else:
-                st.write(f"- {item}")
-    elif isinstance(content, (int, float)):
-        st.write(f"{content}")
+# Utility function to format nested data
+def display_nested_content(data):
+    """
+    Simplifies nested structures (dictionaries/lists) into human-readable strings.
+    """
+    if isinstance(data, dict):
+        return '\n'.join(f"{k.capitalize()}: {v}" for k, v in data.items())
+    elif isinstance(data, list):
+        return ', '.join(str(item) for item in data)
     else:
-        st.write(content)
+        return str(data)
 
 # Function to get available API keys
 def get_available_api_keys() -> Dict[str, str]:
@@ -436,6 +432,7 @@ def get_strengths_and_improvements(resume_text, job_description, llm):
     
     return strengths_and_improvements
 
+# PDF report function
 def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -463,25 +460,25 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
     ]))
     elements.append(table)
 
-    # Reduce the amount of detailed content
+    # Adding cleaned details for each result
     for result in evaluation_results:
         elements.append(Paragraph(f"\n\n{result['file_name']}", styles['Heading2']))
         elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
         elements.append(Paragraph(f"Recommendation: {result['recommendation']}", styles['Normal']))
 
-        # Brief summary is kept simple
+        # Brief summary
         elements.append(Paragraph("Brief Summary:", styles['Heading3']))
-        brief_summary = str(result['brief_summary'])[:150] + '...'  # Limiting to 150 characters
+        brief_summary = str(result['brief_summary'])[:150] + '...'  # Limit to 150 characters
         elements.append(Paragraph(brief_summary, styles['Normal']))
 
-        # Condensed Experience and Project Relevance
+        # Cleaned experience and project relevance
         elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
-        exp_relevance = str(result.get('experience_and_project_relevance', 'Not provided'))[:100] + '...'  # Limiting to 100 characters
+        exp_relevance = format_nested_structure(result.get('experience_and_project_relevance', 'Not provided'))
         elements.append(Paragraph(exp_relevance, styles['Normal']))
 
-        # Skills Gap (optional section)
+        # Cleaned skills gap
         elements.append(Paragraph("Skills Gap:", styles['Heading3']))
-        skills_gap = str(result.get('skills_gap', 'Not provided'))[:100] + '...'
+        skills_gap = format_nested_structure(result.get('skills_gap', 'Not provided'))
         elements.append(Paragraph(skills_gap, styles['Normal']))
 
     doc.build(elements)
