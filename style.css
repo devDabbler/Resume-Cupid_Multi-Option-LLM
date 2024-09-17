@@ -1,41 +1,37 @@
-/* Custom CSS for Resume Cupid */
-body {
-    font-family: 'Arial', sans-serif;
-    color: #333;
-    background-color: #f0f2f6;
-}
+/* style.css */
 
-.stApp {
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-h1, h2, h3 {
-    color: #2c3e50;
-}
-
-.stButton>button {
-    background-color: #3498db;
-    color: white;
+/* Styling for the main title (Resume Cupid) */
+.main-title {
+    font-family: 'Roboto', 'Helvetica Neue', sans-serif;
     font-weight: bold;
+    color: #37474F;
 }
 
-.stTextInput>div>div>input, .stTextArea textarea {
-    background-color: white;
-    border: 1px solid #bdc3c7;
+/* Styling for buttons to match the search button in the image */
+.stButton > button {
+    background-color: #FFC107;
+    color: #37474F;
+    font-weight: bold;
+    border: none;
+    border-radius: 20px;
+    padding: 10px 20px;
 }
 
-.stExpander {
-    background-color: white;
-    border: 1px solid #ecf0f1;
-    border-radius: 5px;
-    margin-bottom: 1rem;
+/* Styling for the sidebar */
+.css-1d391kg {  /* This targets the sidebar in Streamlit */
+    background-color: #F5F5F5;
 }
 
-.stDataFrame {
-    border: 1px solid #bdc3c7;
+/* Custom class for Fractal-style links */
+.fractal-link {
+    color: #4285F4;
+    text-decoration: none;
+    font-weight: 500;
 }
 
-.css-1v0mbdj {
-    width: 100%;
+/* Custom class for content areas */
+.content-area {
+    background-color: #E0F2F1;
+    padding: 20px;
+    border-radius: 8px;
 }

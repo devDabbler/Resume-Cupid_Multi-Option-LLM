@@ -67,7 +67,7 @@ def generate_error_result(file_name, error_message):
 def main_app():
     init_db()  # Initialize the database
     st.markdown("", unsafe_allow_html=True)
-    st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">Resume Cupid 💘</h1>', unsafe_allow_html=True)
     st.markdown("Resume Cupid is an intelligent resume evaluation tool designed to streamline the hiring process. Upload one or multiple resumes to evaluate and rank candidates for a specific role.")
 
     # Initialize session state variables
@@ -142,8 +142,9 @@ def main_app():
     jd_option = st.radio("Job Description Input Method:", ("Paste Job Description", "Provide Link to Fractal Job Posting"))
 
     if jd_option == "Paste Job Description":
-        st.session_state.job_description = st.text_area("Paste the Job Description here:", value=st.session_state.get('job_description', ''), placeholder="Job description. This field is required.")
-        st.session_state.job_description_link = ""
+        st.markdown('<div class="content-area">', unsafe_allow_html=True)
+        st.text_area("Paste the Job Description here:", value=st.session_state.get('job_description', ''), placeholder="Job description. This field is required.")
+        st.markdown('</div>', unsafe_allow_html=True)   
     else:
         st.session_state.job_description_link = st.text_input("Enter the link to the Fractal job posting:", value=st.session_state.get('job_description_link', ''))
 
