@@ -20,6 +20,13 @@ logger = get_logger(__name__)
 # Get the BASE_URL from the Config
 BASE_URL = Config.BASE_URL
 
+def load_css():
+    with open('style.css') as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# Call this function at the start of your app
+load_css()
+
 # Get the directory of the current script
 current_dir = os.path.dirname(os.path.abspath(__file__))
 

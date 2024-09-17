@@ -1,0 +1,41 @@
+/* Custom CSS for Resume Cupid */
+body {
+    font-family: 'Arial', sans-serif;
+    color: #333;
+    background-color: #f0f2f6;
+}
+
+.stApp {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+h1, h2, h3 {
+    color: #2c3e50;
+}
+
+.stButton>button {
+    background-color: #3498db;
+    color: white;
+    font-weight: bold;
+}
+
+.stTextInput>div>div>input, .stTextArea textarea {
+    background-color: white;
+    border: 1px solid #bdc3c7;
+}
+
+.stExpander {
+    background-color: white;
+    border: 1px solid #ecf0f1;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+}
+
+.stDataFrame {
+    border: 1px solid #bdc3c7;
+}
+
+.css-1v0mbdj {
+    width: 100%;
+}

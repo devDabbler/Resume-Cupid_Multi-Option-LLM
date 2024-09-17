@@ -31,6 +31,9 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from functools import lru_cache
 from config_settings import Config
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
 
 # Load spaCy model lazily using a singleton pattern
 @lru_cache(maxsize=1)
@@ -167,89 +170,102 @@ def generate_job_requirements(job_description):
         'industry_keywords': industry_keywords
     }
     
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
-    st.header("Stack Ranking of Candidates")
-    
+    st.header("Candidate Evaluation Results")
+
     # Sort results by match score in descending order
     sorted_results = sorted(evaluation_results, key=lambda x: x['match_score'], reverse=True)
 
+    # Create a summary dataframe
     df = pd.DataFrame(sorted_results)
     df['Rank'] = range(1, len(df) + 1)
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
-    
-    def color_scale(val):
-        if val < 30:
-            color = 'red'
-        elif val < 50:
-            color = 'orange'
-        elif val < 70:
-            color = 'yellow'
-        elif val < 85:
-            color = 'lightgreen'
-        else:
-            color = 'green'
-        return f'background-color: {color}'
-    
-    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'})
-                   .applymap(color_scale, subset=['Match Score (%)']))
 
+    # Display summary table with custom styling
+    st.subheader("Candidate Summary")
+    st.dataframe(
+        df.style.format({'Match Score (%)': '{:.0f}'})
+        .background_gradient(subset=['Match Score (%)'], cmap='RdYlGn', vmin=0, vmax=100)
+        .set_properties(**{'text-align': 'left'})
+        .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+    )
+
+    # Create a download button for the PDF report
     st.download_button(
-        label="Download PDF Report",
+        label="Download Detailed PDF Report",
         data=generate_pdf_report(evaluation_results, run_id),
         file_name=f"evaluation_report_{run_id}.pdf",
         mime="application/pdf"
     )
 
+    # Display detailed results for each candidate
     for i, result in enumerate(sorted_results, 1):
-        with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis"):
-            col1, col2 = st.columns(2)
+        with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis", expanded=i == 1):
+            col1, col2 = st.columns([2, 1])
+            
             with col1:
-                st.metric("Match Score", f"{result['match_score']}%")
+                st.subheader("Candidate Overview")
+                st.write(result['brief_summary'])
+                
+                st.subheader("Key Strengths")
+                for strength in result['key_strengths']:
+                    st.write(f"- {strength}")
+                
+                st.subheader("Areas for Improvement")
+                for area in result['areas_for_improvement']:
+                    st.write(f"- {area}")
+            
             with col2:
+                # Create a gauge chart for the match score
+                fig = go.Figure(go.Indicator(
+                    mode = "gauge+number",
+                    value = result['match_score'],
+                    domain = {'x': [0, 1], 'y': [0, 1]},
+                    title = {'text': "Match Score", 'font': {'size': 24}},
+                    gauge = {
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                        'bar': {'color': "darkblue"},
+                        'bgcolor': "white",
+                        'borderwidth': 2,
+                        'bordercolor': "gray",
+                        'steps': [
+                            {'range': [0, 50], 'color': 'red'},
+                            {'range': [50, 75], 'color': 'yellow'},
+                            {'range': [75, 100], 'color': 'green'}
+                        ],
+                    }
+                ))
+                st.plotly_chart(fig, use_container_width=True)
+                
                 st.info(f"Recommendation: {result['recommendation']}")
 
-            st.subheader("Brief Summary")
-            st.write(result['brief_summary'])
-
             st.subheader("Experience and Project Relevance")
-            st.write(result['experience_and_project_relevance'])
+            relevance = result['experience_and_project_relevance']
+            st.write(f"**Relevance Score:** {relevance['relevance_score']}")
+            st.write("**Strengths:**")
+            for strength in relevance['strengths']:
+                st.write(f"- {strength}")
+            if relevance['weaknesses']:
+                st.write("**Weaknesses:**")
+                for weakness in relevance['weaknesses']:
+                    st.write(f"- {weakness}")
 
             st.subheader("Skills Gap")
-            st.write(result['skills_gap'])
+            for skill in result['skills_gap']:
+                st.write(f"- {skill}")
 
-            st.subheader("Key Strengths")
-            strengths = result.get('key_strengths', [])
-            if isinstance(strengths, list) and len(strengths) > 0 and not (len(strengths) == 1 and strengths[0].get('category') == 'General'):
-                for strength in strengths:
-                    if isinstance(strength, dict):
-                        st.write(f"**{strength['category']}:**")
-                        for point in strength['points']:
-                            st.write(f"- {point}")
-                    else:
-                        st.write(f"- {strength}")
-            else:
-                st.write("Key strengths could not be extracted. Please review the candidate's experience and skills manually.")
-
-            st.subheader("Areas for Improvement")
-            improvements = result.get('areas_for_improvement', [])
-            if isinstance(improvements, list) and len(improvements) > 0 and not (len(improvements) == 1 and improvements[0].get('category') == 'General'):
-                for improvement in improvements:
-                    if isinstance(improvement, dict):
-                        st.write(f"**{improvement['category']}:**")
-                        for point in improvement['points']:
-                            st.write(f"- {point}")
-                    else:
-                        st.write(f"- {improvement}")
-            else:
-                st.write("Areas for improvement could not be extracted. Please review the candidate's skills gap and experience to identify potential areas for growth.")
-
-            st.subheader("Recruiter Questions")
+            st.subheader("Recommended Interview Questions")
             for question in result['recruiter_questions']:
                 st.write(f"- {question}")
 
+            # Feedback form
+            st.subheader("Provide Feedback")
             with st.form(key=f'feedback_form_{run_id}_{i}'):
-                st.subheader("Provide Feedback")
                 accuracy_rating = st.slider("Accuracy of the evaluation:", 1, 5, 3)
                 content_rating = st.slider("Quality of the report content:", 1, 5, 3)
                 suggestions = st.text_area("Please provide any suggestions for improvement:")
@@ -261,7 +277,7 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                     else:
                         st.error("Failed to save feedback. Please try again.")
 
-    st.progress(100)  # Show completion of analysis
+    st.success("Evaluation complete!")
     
 def display_nested_content(content):
     if isinstance(content, dict):
