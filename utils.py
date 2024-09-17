@@ -162,7 +162,7 @@ def generate_job_requirements(job_description):
         'industry_keywords': industry_keywords
     }
 
-def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
+def display_simplified_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Candidate Evaluation Results")
 
     # Sort results by match score in descending order
@@ -174,95 +174,25 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
 
-    # Display summary table with custom styling
+    # Display summary table
     st.subheader("Candidate Summary")
+    st.dataframe(df)
 
-    # Custom styling function
-    def color_match_score(val):
-        color = 'red' if val < 50 else 'yellow' if val < 75 else 'green'
-        return f'background-color: {color}'
-
-    # Apply custom styling
-    styled_df = df.style.format({'Match Score (%)': '{:.0f}'}) \
-        .applymap(color_match_score, subset=['Match Score (%)']) \
-        .set_properties(**{'text-align': 'left'}) \
-        .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
-
-    st.dataframe(styled_df)
-
-    # Create a download button for the PDF report
-    st.download_button(
-        label="Download Detailed PDF Report",
-        data=generate_pdf_report(evaluation_results, run_id),
-        file_name=f"evaluation_report_{run_id}.pdf",
-        mime="application/pdf"
-    )
-
-    # Display detailed results for each candidate
+    # Display simplified detailed results for each candidate
     for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis", expanded=i == 1):
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                st.subheader("Candidate Overview")
-                st.write(result['brief_summary'])
-                
-                st.subheader("Key Strengths")
-                for strength in result['key_strengths']:
-                    st.write(f"**{strength['category']}:**")
-                    for point in strength['points']:
-                        st.write(f"- {point}")
-                
-                st.subheader("Areas for Improvement")
-                for area in result['areas_for_improvement']:
-                    st.write(f"**{area['category']}:**")
-                    for point in area['points']:
-                        st.write(f"- {point}")
-            
-            with col2:
-                # Create a gauge chart for the match score
-                fig = go.Figure(go.Indicator(
-                    mode = "gauge+number",
-                    value = result['match_score'],
-                    domain = {'x': [0, 1], 'y': [0, 1]},
-                    title = {'text': "Match Score", 'font': {'size': 24}},
-                    gauge = {
-                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-                        'bar': {'color': "darkblue"},
-                        'bgcolor': "white",
-                        'borderwidth': 2,
-                        'bordercolor': "gray",
-                        'steps': [
-                            {'range': [0, 50], 'color': 'red'},
-                            {'range': [50, 75], 'color': 'yellow'},
-                            {'range': [75, 100], 'color': 'green'}
-                        ],
-                    }
-                ))
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.info(f"Recommendation: {result['recommendation']}")
+            st.write(f"**Match Score**: {result['match_score']}%")
+            st.write(f"**Recommendation**: {result['recommendation']}")
 
+            # Simplified experience and project relevance
             st.subheader("Experience and Project Relevance")
-            relevance = result['experience_and_project_relevance']
-            if isinstance(relevance, dict):
-                st.write(f"**Relevance Score:** {relevance.get('relevance_score', 'N/A')}")
-                st.write("**Strengths:**")
-                for strength in relevance.get('strengths', []):
-                    st.write(f"- {strength}")
-                if relevance.get('weaknesses'):
-                    st.write("**Weaknesses:**")
-                    for weakness in relevance['weaknesses']:
-                        st.write(f"- {weakness}")
-            else:
-                st.write(f"**Relevance Information:** {relevance}")  # Display the relevance information as is if it's not a dictionary
+            exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
+            st.write(exp_relevance if isinstance(exp_relevance, str) else str(exp_relevance)[:100] + '...')
 
+            # Simplified skills gap
             st.subheader("Skills Gap")
-            st.write(f"**Skills Gap:** {result['skills_gap']}")
-
-            st.subheader("Recommended Interview Questions")
-            for question in result['recruiter_questions']:
-                st.write(f"- {question}")
+            skills_gap = result.get('skills_gap', 'Not provided')
+            st.write(skills_gap if isinstance(skills_gap, str) else str(skills_gap)[:100] + '...')
 
             # Feedback form
             st.subheader("Provide Feedback")
@@ -533,21 +463,25 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
     ]))
     elements.append(table)
 
+    # Reduce the amount of detailed content
     for result in evaluation_results:
         elements.append(Paragraph(f"\n\n{result['file_name']}", styles['Heading2']))
         elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
         elements.append(Paragraph(f"Recommendation: {result['recommendation']}", styles['Normal']))
 
+        # Brief summary is kept simple
         elements.append(Paragraph("Brief Summary:", styles['Heading3']))
-        brief_summary = dict_to_string(result['brief_summary']) if isinstance(result['brief_summary'], dict) else str(result['brief_summary'])
+        brief_summary = str(result['brief_summary'])[:150] + '...'  # Limiting to 150 characters
         elements.append(Paragraph(brief_summary, styles['Normal']))
 
+        # Condensed Experience and Project Relevance
         elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
-        exp_relevance = dict_to_string(result['experience_and_project_relevance']) if isinstance(result['experience_and_project_relevance'], dict) else str(result['experience_and_project_relevance'])
+        exp_relevance = str(result.get('experience_and_project_relevance', 'Not provided'))[:100] + '...'  # Limiting to 100 characters
         elements.append(Paragraph(exp_relevance, styles['Normal']))
 
+        # Skills Gap (optional section)
         elements.append(Paragraph("Skills Gap:", styles['Heading3']))
-        skills_gap = dict_to_string(result['skills_gap']) if isinstance(result['skills_gap'], dict) else str(result['skills_gap'])
+        skills_gap = str(result.get('skills_gap', 'Not provided'))[:100] + '...'
         elements.append(Paragraph(skills_gap, styles['Normal']))
 
     doc.build(elements)
@@ -623,9 +557,14 @@ def extract_job_description(url):
 def adjust_match_score(original_score, result, importance_factors, job_requirements):
     logger.debug(f"Adjusting match score. Original score: {original_score}")
     
-    skills_weight = importance_factors.get('technical_skills', 0.3)
-    experience_weight = importance_factors.get('experience', 0.3)
-    education_weight = importance_factors.get('education', 0.2)
+    # New weightings to influence stronger candidates to score higher
+    weight_experience = 0.35
+    weight_skills = 0.45
+    weight_projects = 0.2
+
+    skills_weight = importance_factors.get('technical_skills', weight_skills)
+    experience_weight = importance_factors.get('experience', weight_experience)
+    education_weight = importance_factors.get('education', weight_projects)  # Adjusting for project-based weight
     industry_weight = importance_factors.get('industry_knowledge', 0.2)
     
     try:
