@@ -170,9 +170,11 @@ def generate_job_requirements(job_description):
         'industry_keywords': industry_keywords
     }
     
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
+try:
+    import matplotlib
+    matplotlib_available = True
+except ImportError:
+    matplotlib_available = False
 
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Candidate Evaluation Results")
@@ -188,12 +190,20 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     # Display summary table with custom styling
     st.subheader("Candidate Summary")
-    st.dataframe(
-        df.style.format({'Match Score (%)': '{:.0f}'})
-        .background_gradient(subset=['Match Score (%)'], cmap='RdYlGn', vmin=0, vmax=100)
-        .set_properties(**{'text-align': 'left'})
-        .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
-    )
+    if matplotlib_available:
+        st.dataframe(
+            df.style.format({'Match Score (%)': '{:.0f}'})
+            .background_gradient(subset=['Match Score (%)'], cmap='RdYlGn', vmin=0, vmax=100)
+            .set_properties(**{'text-align': 'left'})
+            .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+        )
+    else:
+        # Fallback option without background gradient
+        st.dataframe(
+            df.style.format({'Match Score (%)': '{:.0f}'})
+            .set_properties(**{'text-align': 'left'})
+            .set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+        )
 
     # Create a download button for the PDF report
     st.download_button(
