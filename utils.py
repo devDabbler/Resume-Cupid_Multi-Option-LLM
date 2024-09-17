@@ -191,10 +191,20 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             st.write("**Fit Summary:**", result.get('fit_summary', 'No fit summary available.'))
 
             st.subheader("Experience and Project Relevance")
-            st.write(result.get('experience_and_project_relevance', 'Not provided'))
+            exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
+            if isinstance(exp_relevance, dict):
+                for key, value in exp_relevance.items():
+                    st.write(f"**{key}:** {value}")
+            else:
+                st.write(exp_relevance)
 
             st.subheader("Skills Gap")
-            st.write(result.get('skills_gap', 'Not provided'))
+            skills_gap = result.get('skills_gap', 'Not provided')
+            if isinstance(skills_gap, dict):
+                for key, value in skills_gap.items():
+                    st.write(f"**{key}:** {value}")
+            else:
+                st.write(skills_gap)
 
             st.subheader("Key Strengths")
             for strength in result.get('key_strengths', []):
@@ -205,8 +215,12 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                 st.write(f"**{area['category']}:** {', '.join(area['points'])}")
 
             st.subheader("Recommended Interview Questions")
-            for question in result.get('recruiter_questions', []):
-                st.write(f"- {question}")
+            questions = result.get('recruiter_questions', [])
+            if isinstance(questions, list) and len(questions) > 0:
+                for question in questions:
+                    st.write(f"- {question}")
+            else:
+                st.write("No specific questions generated.")
 
             # Feedback form
             st.subheader("Provide Feedback")
@@ -397,7 +411,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         strengths_and_improvements = get_strengths_and_improvements(resume_text, job_description, llm)
         
         # Ensure recruiter questions are present
-        if not result.get('recruiter_questions'):
+        if not result.get('recruiter_questions') or len(result.get('recruiter_questions', [])) == 0:
             result['recruiter_questions'] = generate_generic_questions(job_title)
         
         # Format recruiter questions
@@ -440,13 +454,7 @@ def format_nested_structure(data):
         return str(data)
 
 def format_recruiter_questions(questions):
-    formatted = []
-    for q in questions:
-        if isinstance(q, dict):
-            formatted.append(q.get('question', ''))
-        else:
-            formatted.append(str(q))
-    return formatted[:5]  # Limit to 5 questions
+    return [str(q) for q in questions[:5]]  # Limit to 5 questions and ensure they're strings
 
 def get_strengths_and_improvements(resume_text, job_description, llm):
     prompt = f"""
