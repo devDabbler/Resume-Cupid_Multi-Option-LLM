@@ -198,6 +198,11 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             skills_gap = result.get('skills_gap', 'Not provided')
             st.write(format_nested_structure(skills_gap))
 
+            # Add recruiter questions
+            st.subheader("Recommended Interview Questions")
+            recruiter_questions = result.get('recruiter_questions', ['No questions generated'])
+            st.write(format_nested_structure(recruiter_questions))
+
             # Feedback form
             st.subheader("Provide Feedback")
             with st.form(key=f'feedback_form_{run_id}_{i}'):
@@ -508,6 +513,11 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
         elements.append(Paragraph("Skills Gap:", styles['Heading3']))
         skills_gap = format_nested_structure(result.get('skills_gap', 'Not provided'))
         elements.append(Paragraph(skills_gap, styles['Normal']))
+
+        # Add recruiter questions
+        elements.append(Paragraph("Recommended Interview Questions:", styles['Heading3']))
+        recruiter_questions = format_nested_structure(result.get('recruiter_questions', ['No questions generated']))
+        elements.append(Paragraph(recruiter_questions, styles['Normal']))
 
     doc.build(elements)
     buffer.seek(0)
