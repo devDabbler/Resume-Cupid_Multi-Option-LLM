@@ -162,7 +162,7 @@ def generate_job_requirements(job_description):
         'industry_keywords': industry_keywords
     }
 
-def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
+def display_simplified_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Candidate Evaluation Results")
 
     # Sort results by match score in descending order
@@ -183,6 +183,10 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
         with st.expander(f"Rank {i}: {result['file_name']} - Detailed Analysis", expanded=i == 1):
             st.write(f"**Match Score**: {result['match_score']}%")
             st.write(f"**Recommendation**: {result['recommendation']}")
+
+            # Add a concise summary of why the candidate is a fit, not a fit, or borderline
+            fit_summary = generate_fit_summary(result)
+            st.write(f"**Fit Summary**: {fit_summary}")
 
             # Cleaned experience and project relevance
             st.subheader("Experience and Project Relevance")
@@ -208,8 +212,30 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
                     else:
                         st.error("Failed to save feedback. Please try again.")
 
+    # Add the PDF download button to the Streamlit UI
+    pdf_data = generate_pdf_report(evaluation_results, run_id)
+
+    st.download_button(
+        label="Download Detailed PDF Report",
+        data=pdf_data,
+        file_name=f"evaluation_report_{run_id}.pdf",
+        mime="application/pdf"
+    )
+
     st.success("Evaluation complete!")
 
+# Function to generate a fit summary based on evaluation results
+def generate_fit_summary(result):
+    score = result['match_score']
+    if score >= 80:
+        return "The candidate is a strong fit for the role, meeting or exceeding most of the required skills and experience."
+    elif 60 <= score < 80:
+        return "The candidate shows potential for the role but may have some minor gaps in key areas."
+    elif 40 <= score < 60:
+        return "The candidate may be a partial fit but has significant gaps that would require further assessment."
+    else:
+        return "The candidate is not a strong fit, with considerable gaps in required skills and experience."
+    
 # Utility function to format nested data
 def display_nested_content(data):
     """
@@ -432,7 +458,6 @@ def get_strengths_and_improvements(resume_text, job_description, llm):
     
     return strengths_and_improvements
 
-# PDF report function
 def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -466,10 +491,9 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
         elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
         elements.append(Paragraph(f"Recommendation: {result['recommendation']}", styles['Normal']))
 
-        # Brief summary
-        elements.append(Paragraph("Brief Summary:", styles['Heading3']))
-        brief_summary = str(result['brief_summary'])[:150] + '...'  # Limit to 150 characters
-        elements.append(Paragraph(brief_summary, styles['Normal']))
+        # Add the fit summary for each candidate
+        fit_summary = generate_fit_summary(result)
+        elements.append(Paragraph(f"Fit Summary: {fit_summary}", styles['Normal']))
 
         # Cleaned experience and project relevance
         elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
