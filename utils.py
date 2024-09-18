@@ -391,9 +391,9 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             logger.error(f"Unexpected result type: {type(result)}")
             return _generate_error_result(resume_file.name, "Unexpected result type")
         
-        # Ensure a minimum score of 1 to avoid 0% match
+        # Adjust the match score less aggressively
         original_score = max(1, result.get('match_score', 1))
-        adjusted_score = max(1, min(100, int(original_score * 0.9)))  # Reduce by 10% and ensure it's between 1 and 100
+        adjusted_score = max(1, min(100, int(original_score * 0.95)))  # Reduce by 5% instead of 10%
         
         logger.debug(f"Original score: {original_score}, Adjusted score: {adjusted_score}")
         
@@ -402,15 +402,16 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         result['fit_summary'] = generate_fit_summary(result)
         
         # Ensure experience_and_project_relevance is not empty
-        if not result.get('experience_and_project_relevance'):
+        if not result.get('experience_and_project_relevance') or result['experience_and_project_relevance'] == "Unable to complete analysis due to an error":
             result['experience_and_project_relevance'] = analyze_experience_relevance(resume_text, job_description, llm)
         
-        # Ensure skills_gap is not empty
-        if not result.get('skills_gap'):
+        # Ensure skills_gap is not empty and contains actual skill gaps
+        if not result.get('skills_gap') or isinstance(result['skills_gap'], str):
             result['skills_gap'] = analyze_skills_gap(resume_text, job_description, key_skills, llm)
         
         strengths_and_improvements = get_strengths_and_improvements(resume_text, job_description, llm)
         
+        # Generate recruiter questions if they're missing or empty
         if not result.get('recruiter_questions') or len(result.get('recruiter_questions', [])) == 0:
             result['recruiter_questions'] = generate_specific_questions(resume_text, job_description, job_title, llm)
         
@@ -480,10 +481,15 @@ def analyze_skills_gap(resume_text, job_description, key_skills, llm):
     Key Skills Required:
     {', '.join(key_skills)}
 
-    List the important skills or qualifications mentioned in the job description that the candidate lacks.
+    List the important skills or qualifications mentioned in the job description that the candidate lacks. 
+    Return the result as a JSON array of strings.
     """
     response = llm.analyze(prompt)
-    return response.get('brief_summary', "Unable to analyze skills gap")
+    skills_gap = response.get('skills_gap', [])
+    if isinstance(skills_gap, list):
+        return skills_gap
+    else:
+        return ["Unable to determine specific skills gap"]
 
 def generate_specific_questions(resume_text, job_description, job_title, llm):
     prompt = f"""
@@ -496,13 +502,22 @@ def generate_specific_questions(resume_text, job_description, job_title, llm):
     {job_description}
 
     Create questions that explore the candidate's experience, skills, and potential gaps related to this specific role.
+    Return the result as a JSON array of strings.
     """
     response = llm.analyze(prompt)
     questions = response.get('recruiter_questions', [])
-    return questions if questions else generate_generic_questions(job_title)
+    if isinstance(questions, list) and len(questions) > 0:
+        return questions
+    else:
+        return generate_generic_questions(job_title)
 
 def format_recruiter_questions(questions):
-    return [str(q) for q in questions[:5]]  # Limit to 5 questions and ensure they're strings
+    if isinstance(questions, list):
+        return [q.get('question', q) if isinstance(q, dict) else q for q in questions[:5]]
+    elif isinstance(questions, str):
+        return [questions]
+    else:
+        return ["No specific questions generated"]
 
 def get_strengths_and_improvements(resume_text, job_description, llm):
     prompt = f"""
