@@ -247,18 +247,6 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     st.success("Evaluation complete!")
 
-# Function to generate a fit summary based on evaluation results
-def generate_fit_summary(result):
-    score = result['match_score']
-    if score >= 80:
-        return "The candidate is a strong fit for the role, meeting or exceeding most of the required skills and experience."
-    elif 60 <= score < 80:
-        return "The candidate shows potential for the role but may have some minor gaps in key areas."
-    elif 40 <= score < 60:
-        return "The candidate may be a partial fit but has significant gaps that would require further assessment."
-    else:
-        return "The candidate is not a strong fit, with considerable gaps in required skills and experience."
-
 # Utility function to format nested data
 def display_nested_content(data):
     """
@@ -393,7 +381,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         
         # Adjust the match score less aggressively
         original_score = max(1, result.get('match_score', 1))
-        adjusted_score = max(1, min(100, int(original_score * 0.95)))  # Reduce by 5% instead of 10%
+        adjusted_score = max(1, min(100, int(original_score * 0.98)))  # Reduce by 2% instead of 5%
         
         logger.debug(f"Original score: {original_score}, Adjusted score: {adjusted_score}")
         
@@ -436,23 +424,6 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
 
-def generate_generic_questions(job_title):
-    return [
-        f"Can you describe your experience that's most relevant to the {job_title} role?",
-        f"What challenges have you faced in previous roles similar to {job_title}, and how did you overcome them?",
-        "How do you stay updated with the latest technologies and best practices in your field?",
-        "Can you give an example of a complex problem you've solved and the approach you took?",
-        "How do you handle high-pressure situations or tight deadlines?"
-    ]
-
-def format_nested_structure(data):
-    if isinstance(data, dict):
-        return "\n".join([f"{k}: {format_nested_structure(v)}" for k, v in data.items()])
-    elif isinstance(data, list):
-        return "\n".join([f"- {format_nested_structure(item)}" for item in data])
-    else:
-        return str(data)
-
 def analyze_experience_relevance(resume_text, job_description, llm):
     prompt = f"""
     Analyze the candidate's experience and project relevance based on the following resume and job description:
@@ -463,10 +434,14 @@ def analyze_experience_relevance(resume_text, job_description, llm):
     Job Description:
     {job_description}
 
-    Provide a brief analysis of how the candidate's experience and projects align with the job requirements.
+    Provide a detailed analysis of how the candidate's experience and projects align with the job requirements. 
+    Focus on specific skills, technologies, and achievements mentioned in the resume that are relevant to the job.
+    Do not mention any match score or overall fit in this analysis.
+
+    Return the result as a string.
     """
     response = llm.analyze(prompt)
-    return response.get('brief_summary', "Unable to analyze experience relevance")
+    return response.get('experience_and_project_relevance', "Unable to analyze experience relevance")
 
 def analyze_skills_gap(resume_text, job_description, key_skills, llm):
     prompt = f"""
@@ -481,7 +456,8 @@ def analyze_skills_gap(resume_text, job_description, key_skills, llm):
     Key Skills Required:
     {', '.join(key_skills)}
 
-    List the important skills or qualifications mentioned in the job description that the candidate lacks. 
+    List the important skills or qualifications mentioned in the job description that the candidate lacks or hasn't explicitly demonstrated in their resume. 
+    Be sure to cross-check with the resume to avoid listing skills that the candidate has clearly mentioned.
     Return the result as a JSON array of strings.
     """
     response = llm.analyze(prompt)
@@ -490,6 +466,53 @@ def analyze_skills_gap(resume_text, job_description, key_skills, llm):
         return skills_gap
     else:
         return ["Unable to determine specific skills gap"]
+
+def get_strengths_and_improvements(resume_text, job_description, llm):
+    prompt = f"""
+    Analyze the following resume and job description, then provide a structured summary of the candidate's key strengths and areas for improvement. Focus on the most impactful points relevant to the job.
+
+    Resume:
+    {resume_text}
+
+    Job Description:
+    {job_description}
+
+    Provide a JSON object with the following structure:
+    {{
+        "strengths": [
+            {{ "category": "Technical Skills", "points": ["...", "..."] }},
+            {{ "category": "Experience", "points": ["...", "..."] }},
+            {{ "category": "Soft Skills", "points": ["...", "..."] }}
+        ],
+        "improvements": [
+            {{ "category": "Skills Gap", "points": ["...", "..."] }},
+            {{ "category": "Experience", "points": ["...", "..."] }},
+            {{ "category": "Industry Knowledge", "points": ["...", "..."] }}
+        ]
+    }}
+
+    Each category should have 2-3 specific points (1-2 sentences each) directly related to the candidate's resume and the job requirements.
+    """
+    
+    try:
+        response = llm.analyze(prompt)
+        strengths_and_improvements = json.loads(response.get('strengths_and_improvements', '{}'))
+    except:
+        # Fallback data if analysis fails
+        strengths_and_improvements = {
+            'strengths': [
+                {'category': 'Technical Skills', 'points': ['Candidate possesses relevant technical skills for the role']},
+                {'category': 'Experience', 'points': ['Candidate has experience in related fields']},
+                {'category': 'Soft Skills', 'points': ['Candidate likely has essential soft skills for the position']}
+            ],
+            'improvements': [
+                {'category': 'Skills Gap', 'points': ['Consider assessing any potential skill gaps during the interview']},
+                {'category': 'Experience', 'points': ['Explore depth of experience in specific areas during the interview']},
+                {'category': 'Industry Knowledge', 'points': ['Evaluate industry-specific knowledge in the interview process']}
+            ]
+        }
+    
+    return strengths_and_improvements
 
 def generate_specific_questions(resume_text, job_description, job_title, llm):
     prompt = f"""
@@ -519,52 +542,57 @@ def format_recruiter_questions(questions):
     else:
         return ["No specific questions generated"]
 
-def get_strengths_and_improvements(resume_text, job_description, llm):
-    prompt = f"""
-    Analyze the following resume and job description, then provide a structured summary of the candidate's key strengths and areas for improvement. Focus on the most impactful points relevant to the job.
+def generate_brief_summary(score: int, job_title: str) -> str:
+    if score < 30:
+        return f"The candidate shows limited alignment with the {job_title} role requirements. With a match score of {score}%, there are significant areas for improvement."
+    elif 30 <= score < 50:
+        return f"The candidate demonstrates some potential for the {job_title} role. With a match score of {score}%, there are areas that require further evaluation."
+    elif 50 <= score < 70:
+        return f"The candidate shows good potential for the {job_title} role. With a match score of {score}%, they meet many of the key requirements, though some areas may need development."
+    elif 70 <= score < 85:
+        return f"The candidate is a strong fit for the {job_title} role. With a match score of {score}%, they demonstrate solid alignment with the required skills and experience."
+    else:
+        return f"The candidate is an excellent match for the {job_title} role. With a match score of {score}%, they exceed expectations in meeting the required skills and experience."
 
-    Resume:
-    {resume_text}
+def generate_fit_summary(result: Dict[str, Any]) -> str:
+    score = result['match_score']
+    if score < 50:
+        return "The candidate shows potential but has significant areas for development relative to the job requirements."
+    elif 50 <= score < 70:
+        return "The candidate is a good fit, meeting many of the job requirements with some areas for growth."
+    elif 70 <= score < 85:
+        return "The candidate is a strong fit, aligning well with most job requirements and showing potential in others."
+    else:
+        return "The candidate is an excellent fit, meeting or exceeding most job requirements."
 
-    Job Description:
-    {job_description}
+def get_recommendation(match_score: int) -> str:
+    if match_score < 30:
+        return "Consider for different roles that better match the candidate's current skill set"
+    elif 30 <= match_score < 50:
+        return "Potential for interview, but prepare to discuss skill gaps and development areas"
+    elif 50 <= match_score < 70:
+        return "Recommend for interview with some reservations"
+    elif 70 <= match_score < 85:
+        return "Strongly recommend for interview"
+    else:
+        return "Highly recommend for interview as a top candidate"
 
-    Provide a JSON object with the following structure:
-    {{
-        "strengths": [
-            {{ "category": "Technical Skills", "points": ["...", "..."] }},
-            {{ "category": "Experience", "points": ["...", "..."] }},
-            {{ "category": "Soft Skills", "points": ["...", "..."] }}
-        ],
-        "improvements": [
-            {{ "category": "Skills Gap", "points": ["...", "..."] }},
-            {{ "category": "Experience", "points": ["...", "..."] }},
-            {{ "category": "Industry Knowledge", "points": ["...", "..."] }}
-        ]
-    }}
+def generate_generic_questions(job_title):
+    return [
+        f"Can you describe your experience that's most relevant to the {job_title} role?",
+        f"What challenges have you faced in previous roles similar to {job_title}, and how did you overcome them?",
+        "How do you stay updated with the latest technologies and best practices in your field?",
+        "Can you give an example of a complex problem you've solved and the approach you took?",
+        "How do you handle high-pressure situations or tight deadlines?"
+    ]
 
-    Each category should have 2-3 concise points (1-2 sentences each).
-    """
-    
-    try:
-        response = llm.analyze_match(resume_text, prompt, {}, "Structured Strengths and Improvements Analysis")
-        strengths_and_improvements = json.loads(response['brief_summary'])
-    except:
-        # Fallback data if analysis fails
-        strengths_and_improvements = {
-            'strengths': [
-                {'category': 'Technical Skills', 'points': ['Candidate possesses relevant technical skills for the role']},
-                {'category': 'Experience', 'points': ['Candidate has experience in related fields']},
-                {'category': 'Soft Skills', 'points': ['Candidate likely has essential soft skills for the position']}
-            ],
-            'improvements': [
-                {'category': 'Skills Gap', 'points': ['Consider assessing any potential skill gaps during the interview']},
-                {'category': 'Experience', 'points': ['Explore depth of experience in specific areas during the interview']},
-                {'category': 'Industry Knowledge', 'points': ['Evaluate industry-specific knowledge in the interview process']}
-            ]
-        }
-    
-    return strengths_and_improvements
+def format_nested_structure(data):
+    if isinstance(data, dict):
+        return "\n".join([f"{k}: {format_nested_structure(v)}" for k, v in data.items()])
+    elif isinstance(data, list):
+        return "\n".join([f"- {format_nested_structure(item)}" for item in data])
+    else:
+        return str(data)
 
 def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
     try:
@@ -822,31 +850,3 @@ def evaluate_industry_knowledge(result, industry_keywords):
     
     keyword_density = keyword_count / total_words if total_words > 0 else 0
     return min(keyword_density * 200, 100)  # Cap at 100%
-
-def get_recommendation(match_score: int) -> str:
-    if match_score < 30:
-        return "Do not recommend for interview (not suitable for the role)"
-    elif 30 <= match_score < 50:
-        return "Do not recommend for interview (significant skill gaps)"
-    elif 50 <= match_score < 65:
-        return "Consider for interview only if making a career transition; review with a lead"
-    elif 65 <= match_score < 80:
-        return "Recommend for interview with minor reservations"
-    elif 80 <= match_score < 90:
-        return "Recommend for interview"
-    else:
-        return "Highly recommend for interview"
-    
-def generate_brief_summary(score, job_title):
-    if score < 30:
-        return f"The candidate is not a strong fit for the {job_title} role. With a match score of {score}%, there are significant gaps in required skills and experience for this position."
-    elif 30 <= score < 50:
-        return f"The candidate shows limited potential for the {job_title} role. With a match score of {score}%, there are considerable gaps in meeting the requirements. Further evaluation is needed."
-    elif 50 <= score < 65:
-        return f"The candidate shows some potential for the {job_title} role, but with a match score of {score}%, there are gaps in meeting the requirements. Further evaluation is recommended."
-    elif 65 <= score < 80:
-        return f"The candidate is a good fit for the {job_title} role. With a match score of {score}%, they demonstrate alignment with many of the required skills and experience for this position."
-    else:
-        return f"The candidate is an excellent fit for the {job_title} role. With a match score of {score}%, they demonstrate strong alignment with the required skills and experience for this position."
-
-# Add any additional utility functions here as needed
