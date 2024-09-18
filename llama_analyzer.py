@@ -2,10 +2,11 @@ import requests
 import logging
 import json
 import re
-from typing import Dict, Any
+from typing import Dict, Any, List
 from logger import get_logger
 from groq import Groq
 import os
+from utils import extract_text_from_file, generate_brief_summary, generate_fit_summary, format_nested_structure, get_recommendation, generate_generic_questions, format_recruiter_questions
 
 logger = get_logger(__name__)
 
@@ -19,6 +20,22 @@ class LlamaAPI:
             "Content-Type": "application/json"
         }
         logger.info(f"Initialized LlamaAPI with API key: {api_key[:5]}...")
+
+    def generate_recruiter_questions_with_llm(self, resume_text, job_description):
+        prompt = f"""
+        You are an expert recruiter. Based on the following resume and job description, generate four insightful and role-specific interview questions.
+        
+        Resume:
+        {resume_text}
+
+        Job Description:
+        {job_description}
+
+        Ensure the questions explore the candidate's fit for the role, technical skills, soft skills, and any gaps in experience.
+        """
+        
+        recruiter_questions = self.analyze(prompt)
+        return recruiter_questions.get("choices", ["No questions generated"])
 
     def analyze(self, prompt: str) -> Dict[str, Any]:
         try:
@@ -51,9 +68,8 @@ class LlamaAPI:
 
             logger.info(f"Analysis completed successfully for prompt: {prompt[:50]}...")
             return processed_content
-
         except Exception as e:
-            logger.error(f"Llama API request failed: {str(e)}", exc_info=True)
+            logger.error(f"Error during analysis: {str(e)}")
             return self._generate_error_response(str(e))
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
@@ -78,13 +94,11 @@ class LlamaAPI:
         logger.debug(f"Processing parsed content: {parsed_content}")
         processed_content = {}
 
-        # Process keys and normalize them
         for key, value in parsed_content.items():
             processed_key = key.lower().replace(' ', '_')
             processed_content[processed_key] = value
             logger.debug(f"Processed key-value pair: {processed_key} = {value}")
 
-        # Required fields to check and fill in if missing
         required_fields = [
             'brief_summary', 'match_score', 'recommendation_for_interview',
             'experience_and_project_relevance', 'skills_gap', 'recruiter_questions'
@@ -96,44 +110,34 @@ class LlamaAPI:
                 logger.warning(f"Generated fallback content for missing field: {field}")
 
         try:
-            # Process 'match_score'
             match_score = processed_content.get('match_score')
             if isinstance(match_score, dict):
-            # Calculate a weighted average if 'match_score' is a dictionary
                 total_score = sum(match_score.values())
                 total_weight = len(match_score)
                 processed_content['match_score'] = int(total_score / total_weight)
             elif isinstance(match_score, str):
-                # Try to extract a number from the string
                 match = re.search(r'\d+', match_score)
                 if match:
                     processed_content['match_score'] = int(match.group())
                 else:
                     processed_content['match_score'] = 0
             elif match_score is None or match_score == 0:
-                # If 'match_score' is None or 0, calculate based on other factors
-                # Safely extract 'overall_relevance' from 'experience_and_project_relevance'
                 exp_proj_relevance = processed_content.get('experience_and_project_relevance', {})
                 if isinstance(exp_proj_relevance, dict):
                     relevance = exp_proj_relevance.get('overall_relevance', 0)
                 else:
-                    # Attempt to extract a number from the string
                     match = re.search(r'\d+', str(exp_proj_relevance))
                     relevance = int(match.group()) if match else 0
 
-                # Safely extract 'overall_gap' from 'skills_gap'
                 skills_gap = processed_content.get('skills_gap', {})
                 if isinstance(skills_gap, dict):
                     gap = skills_gap.get('overall_gap', 100)
                 else:
-                    # Attempt to extract a number from the string
                     match = re.search(r'\d+', str(skills_gap))
                     gap = int(match.group()) if match else 100
 
-                # Calculate 'match_score' based on relevance and skills gap
                 processed_content['match_score'] = int((relevance * 0.7 + (100 - gap) * 0.3))
 
-            # Ensure 'match_score' is an integer between 0 and 100
             processed_content['match_score'] = int(float(processed_content['match_score']))
             processed_content['match_score'] = max(0, min(100, processed_content['match_score']))
             logger.debug(f"Processed match_score: {processed_content['match_score']}")
@@ -142,11 +146,9 @@ class LlamaAPI:
             logger.error(f"Invalid match_score value: {processed_content.get('match_score')}")
             processed_content['match_score'] = 0
 
-        # Generate recommendation based on 'match_score'
         processed_content['recommendation'] = self._get_recommendation(processed_content['match_score'])
         logger.debug(f"Generated recommendation: {processed_content['recommendation']}")
 
-        # Update 'brief_summary' based on 'match_score'
         match_score = processed_content['match_score']
         if match_score < 50:
             processed_content['brief_summary'] = (
@@ -200,15 +202,15 @@ class LlamaAPI:
     
         try:
             prompt = f"""
-            Analyze the fit between the following resume and job description for the role of {job_title}. 
-            Provide a detailed evaluation covering these key areas:
+            Analyze the following resume against the provided job description for a Data Scientist role. Provide a detailed evaluation covering:
 
-            1. Brief Summary: Provide a concise overview of the candidate's fit for the role in 2-3 sentences.
-            2. Match Score: Assign a percentage (0-100%) indicating how well the candidate matches the job requirements.
-            3. Recommendation for Interview: Based on the analysis, provide a clear recommendation.
-            4. Experience and Project Relevance: Analyze how the candidate's past experiences and projects align with the job requirements.
-            5. Skills Gap: Identify any important skills or qualifications mentioned in the job description that the candidate lacks.
-            6. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements.
+            1. Match Score (0-100): Assess how well the candidate's skills and experience match the job requirements.
+            2. Brief Summary: Provide a 2-3 sentence overview of the candidate's fit for the role.
+            3. Experience and Project Relevance: Analyze how the candidate's past experiences and projects align with the job requirements.
+            4. Skills Gap: Identify any important skills or qualifications mentioned in the job description that the candidate lacks.
+            5. Key Strengths: List 3-5 specific strengths of the candidate relevant to this role.
+            6. Areas for Improvement: Suggest 2-3 areas where the candidate could improve to better fit the role.
+            7. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements.
 
             Resume:
             {resume}
@@ -217,9 +219,9 @@ class LlamaAPI:
             {job_description}
 
             Provide your analysis in a structured JSON format with the following keys:
-            "brief_summary", "match_score", "recommendation_for_interview", "experience_and_project_relevance", "skills_gap", "recruiter_questions"
+            "match_score", "brief_summary", "experience_and_project_relevance", "skills_gap", "key_strengths", "areas_for_improvement", "recruiter_questions"
             """
-
+            
             logger.debug(f"Prompt length: {len(prompt)}")
         
             result = self.analyze(prompt)
@@ -246,13 +248,108 @@ class LlamaAPI:
         pass
 
 def initialize_llm():
-    """
-    Initializes and returns the LlamaAPI instance.
-    
-    Returns:
-    - LlamaAPI: An instance of the LlamaAPI class.
-    """
     llama_api_key = os.getenv("LLAMA_API_KEY")
     if not llama_api_key:
         raise ValueError("LLAMA_API_KEY is not set in the environment variables.")
     return LlamaAPI(api_key=llama_api_key)
+
+def generate_error_result(file_name: str, error_message: str) -> Dict[str, Any]:
+    return {
+        'file_name': file_name,
+        'brief_summary': f"Error occurred during analysis: {error_message}",
+        'fit_summary': "Unable to generate fit summary due to an error",
+        'match_score': 0,
+        'experience_and_project_relevance': "Unable to assess due to an error",
+        'skills_gap': "Unable to determine skills gap due to an error",
+        'key_strengths': [],
+        'areas_for_improvement': [],
+        'recruiter_questions': ["Unable to generate recruiter questions due to an error"],
+        'recommendation': "Unable to provide a recommendation due to an error"
+    }
+
+def get_strengths_and_improvements(resume_text: str, job_description: str, llm: LlamaAPI) -> Dict[str, List[Dict[str, Any]]]:
+    prompt = f"""
+    Analyze the following resume and job description, then provide a structured summary of the candidate's key strengths and areas for improvement. Focus on the most impactful points relevant to the job.
+
+    Resume:
+    {resume_text}
+
+    Job Description:
+    {job_description}
+
+    Provide a JSON object with the following structure:
+    {{
+        "strengths": [
+            {{ "category": "Technical Skills", "points": ["...", "..."] }},
+            {{ "category": "Experience", "points": ["...", "..."] }},
+            {{ "category": "Soft Skills", "points": ["...", "..."] }}
+        ],
+        "improvements": [
+            {{ "category": "Skills Gap", "points": ["...", "..."] }},
+            {{ "category": "Experience", "points": ["...", "..."] }},
+            {{ "category": "Industry Knowledge", "points": ["...", "..."] }}
+        ]
+    }}
+
+    Each category should have 2-3 concise points (1-2 sentences each).
+    """
+    
+    try:
+        response = llm.analyze(prompt)
+        strengths_and_improvements = json.loads(response.get('brief_summary', '{}'))
+    except:
+        # Fallback data if analysis fails
+        strengths_and_improvements = {
+            'strengths': [
+                {'category': 'Technical Skills', 'points': ['Candidate possesses relevant technical skills for the role']},
+                {'category': 'Experience', 'points': ['Candidate has experience in related fields']},
+                {'category': 'Soft Skills', 'points': ['Candidate likely has essential soft skills for the position']}
+            ],
+            'improvements': [
+                {'category': 'Skills Gap', 'points': ['Consider assessing any potential skill gaps during the interview']},
+                {'category': 'Experience', 'points': ['Explore depth of experience in specific areas during the interview']},
+                {'category': 'Industry Knowledge', 'points': ['Evaluate industry-specific knowledge in the interview process']}
+            ]
+        }
+    
+    return strengths_and_improvements
+
+# You may need to import these functions from utils.py or define them here if they're not already imported
+def generate_brief_summary(score: int, job_title: str) -> str:
+    if score < 30:
+        return f"The candidate is not a strong fit for the {job_title} role. With a match score of {score}%, there are significant gaps in required skills and experience for this position."
+    elif 30 <= score < 50:
+        return f"The candidate shows limited potential for the {job_title} role. With a match score of {score}%, there are considerable gaps in meeting the requirements. Further evaluation is needed."
+    elif 50 <= score < 65:
+        return f"The candidate shows some potential for the {job_title} role, but with a match score of {score}%, there are gaps in meeting the requirements. Further evaluation is recommended."
+    elif 65 <= score < 80:
+        return f"The candidate is a good fit for the {job_title} role. With a match score of {score}%, they demonstrate alignment with many of the required skills and experience for this position."
+    else:
+        return f"The candidate is an excellent fit for the {job_title} role. With a match score of {score}%, they demonstrate strong alignment with the required skills and experience for this position."
+
+def generate_fit_summary(result: Dict[str, Any]) -> str:
+    score = result['match_score']
+    if score < 50:
+        return "The candidate is not a strong fit, with considerable gaps in required skills and experience."
+    elif 50 <= score < 65:
+        return "The candidate shows potential but has significant gaps that would require further assessment."
+    elif 65 <= score < 80:
+        return "The candidate is a good fit, meeting many of the job requirements with some minor gaps."
+    else:
+        return "The candidate is an excellent fit, meeting or exceeding most job requirements."
+
+def format_nested_structure(data: Any) -> str:
+    if isinstance(data, dict):
+        return "\n".join([f"{k}: {format_nested_structure(v)}" for k, v in data.items()])
+    elif isinstance(data, list):
+        return "\n".join([f"- {format_nested_structure(item)}" for item in data])
+    else:
+        return str(data)
+
+def format_recruiter_questions(questions: List[str]) -> List[str]:
+    return [str(q) for q in questions[:5]]  # Limit to 5 questions and ensure they're strings
+
+# Main execution
+if __name__ == "__main__":
+    llm = initialize_llm()
+    # You can add any test or example usage here

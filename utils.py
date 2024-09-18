@@ -387,42 +387,30 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
         logger.debug(f"Initial analysis result: {json.dumps(result, indent=2)}")
         
-        # Ensure result is a dictionary
         if not isinstance(result, dict):
             logger.error(f"Unexpected result type: {type(result)}")
             return _generate_error_result(resume_file.name, "Unexpected result type")
         
-        # Slightly lower the original match score
         original_score = result.get('match_score', 0)
-        adjusted_score = max(0, min(100, int(original_score * 0.9)))  # Reduce by 10% and ensure it's between 0 and 100
+        adjusted_score = max(0, min(100, int(original_score * 0.9)))
         
         logger.debug(f"Original score: {original_score}, Adjusted score: {adjusted_score}")
         
-        # Update the result with the adjusted score
         result['match_score'] = adjusted_score
-        
-        # Generate a new brief summary based on the adjusted score
         result['brief_summary'] = generate_brief_summary(adjusted_score, job_title)
-        
-        # Generate fit summary
         result['fit_summary'] = generate_fit_summary(result)
         
-        # Format experience and project relevance
         exp_relevance = result.get('experience_and_project_relevance', {})
         formatted_exp_relevance = format_nested_structure(exp_relevance)
         
-        # Format skills gap
         skills_gap = result.get('skills_gap', {})
         formatted_skills_gap = format_nested_structure(skills_gap)
         
-        # Extract key strengths and areas for improvement using LLM
         strengths_and_improvements = get_strengths_and_improvements(resume_text, job_description, llm)
         
-        # Ensure recruiter questions are present
         if not result.get('recruiter_questions') or len(result.get('recruiter_questions', [])) == 0:
             result['recruiter_questions'] = generate_generic_questions(job_title)
         
-        # Format recruiter questions
         formatted_questions = format_recruiter_questions(result.get('recruiter_questions', []))
         
         processed_result = {
@@ -682,8 +670,9 @@ def adjust_match_score(original_score, result, importance_factors, job_requireme
         logger.error(f"Error in adjust_match_score: {str(e)}")
         final_score = original_score  # Use original score if there's an error
     
-    return min(max(int(final_score), 0), 100)  # Ensure score is between 0 and 100
-
+        logger.debug(f"Adjusted score: {adjusted_score}")
+        return min(max(int(adjusted_score), 0), 100)  # Ensure score is between 0 and 100
+    
 def evaluate_skills(skills_gap, required_skills):
     logger.debug(f"Evaluating skills. Skills gap: {skills_gap}, Required skills: {required_skills}")
     
