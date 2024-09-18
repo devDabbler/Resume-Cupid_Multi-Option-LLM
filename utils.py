@@ -69,6 +69,11 @@ class ThreadSafeLogger(logging.Logger):
 
 logging.setLoggerClass(ThreadSafeLogger)
 
+def get_db_connection():
+    conn = sqlite3.connect(Config.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 @st.cache_data
 def extract_text_from_pdf(file_content: bytes) -> str:
     logger.debug("Extracting text from PDF...")
