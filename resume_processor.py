@@ -174,14 +174,19 @@ class ResumeProcessor:
                 return [clean_and_format(item) for item in value]
             elif isinstance(value, dict):
                 return {k: clean_and_format(v) for k, v in value.items()}
-            return str(value)
+            return value  # Return the value as is if it's not a string, list, or dict
+
+        try:
+            match_score = int(raw_analysis.get('match_score', 0))
+        except (ValueError, TypeError):
+            match_score = 0
 
         standardized = {
             'file_name': raw_analysis.get('file_name', 'Unknown'),
-            'match_score': int(raw_analysis.get('match_score', 0)),
+            'match_score': match_score,
             'years_of_experience': self._extract_years_of_experience(resume),
             'brief_summary': clean_and_format(raw_analysis.get('brief_summary', 'No summary available')),
-            'fit_summary': clean_and_format(self._generate_fit_summary(raw_analysis.get('match_score', 0), job_title)),
+            'fit_summary': clean_and_format(self._generate_fit_summary(match_score, job_title)),
             'recommendation': clean_and_format(raw_analysis.get('recommendation', 'No recommendation available')),
             'experience_and_project_relevance': clean_and_format(raw_analysis.get('experience_and_project_relevance', 'No relevance analysis available')),
             'skills_gap': clean_and_format(raw_analysis.get('skills_gap', [])),
@@ -193,14 +198,14 @@ class ResumeProcessor:
         return standardized
 
     def _generate_fit_summary(self, match_score: int, job_title: str) -> str:
-        if match_score >= 80:
-            return f"The candidate is a strong fit for the {job_title} role, meeting or exceeding most of the required skills and experience."
-        elif 60 <= match_score < 80:
-            return f"The candidate shows good potential for the {job_title} role but may have some minor gaps in key areas."
-        elif 40 <= match_score < 60:
-            return f"The candidate may be a partial fit for the {job_title} role but has significant gaps that would require further assessment."
-        else:
+        if match_score < 50:
             return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
+        elif 50 <= match_score < 70:
+            return f"The candidate shows potential for the {job_title} role but has some gaps that would require further assessment."
+        elif 70 <= match_score < 85:
+            return f"The candidate is a good fit for the {job_title} role, meeting many of the job requirements with some minor gaps."
+        else:
+            return f"The candidate is an excellent fit for the {job_title} role, meeting or exceeding most job requirements."
 
     def _format_strengths_and_improvements(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         formatted = []

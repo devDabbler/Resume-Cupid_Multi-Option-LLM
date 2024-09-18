@@ -375,7 +375,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         result = {
             'file_name': resume_file.name,
             'brief_summary': result.get('brief_summary', "No summary available"),
-            'match_score': result.get('match_score', 0),
+            'match_score': int(result.get('match_score', 0)),
             'recommendation': result.get('recommendation', "No recommendation available"),
             'experience_and_project_relevance': result.get('experience_and_project_relevance', "No relevance information available"),
             'skills_gap': result.get('skills_gap', []),
