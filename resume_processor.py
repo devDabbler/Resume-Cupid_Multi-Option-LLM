@@ -167,25 +167,27 @@ class ResumeProcessor:
             return self._generate_error_result(str(e))
 
     def _standardize_analysis(self, raw_analysis: Dict[str, Any], resume: str, job_title: str) -> Dict[str, Any]:
-        def format_list(items: List[str]) -> List[str]:
-            return [clean_text(item) for item in items if item.strip()]
-
-        def extract_years_of_experience(text: str) -> int:
-            matches = re.findall(r'\b(\d+)\s*(?:years?|yrs?)\b', text, re.IGNORECASE)
-            return max(map(int, matches)) if matches else 0
+        def clean_and_format(value):
+            if isinstance(value, str):
+                return clean_text(value)
+            elif isinstance(value, list):
+                return [clean_and_format(item) for item in value]
+            elif isinstance(value, dict):
+                return {k: clean_and_format(v) for k, v in value.items()}
+            return str(value)
 
         standardized = {
             'file_name': raw_analysis.get('file_name', 'Unknown'),
             'match_score': int(raw_analysis.get('match_score', 0)),
-            'years_of_experience': extract_years_of_experience(resume),
-            'brief_summary': clean_text(raw_analysis.get('brief_summary', 'No summary available')),
-            'fit_summary': clean_text(self._generate_fit_summary(raw_analysis.get('match_score', 0), job_title)),
-            'recommendation': clean_text(raw_analysis.get('recommendation', 'No recommendation available')),
-            'experience_and_project_relevance': clean_text(raw_analysis.get('experience_and_project_relevance', 'No relevance analysis available')),
-            'skills_gap': format_list(raw_analysis.get('skills_gap', [])),
-            'key_strengths': self._format_strengths_and_improvements(raw_analysis.get('key_strengths', [])),
-            'areas_for_improvement': self._format_strengths_and_improvements(raw_analysis.get('areas_for_improvement', [])),
-            'recruiter_questions': format_list(raw_analysis.get('recruiter_questions', []))[:5],  # Limit to 5 questions
+            'years_of_experience': self._extract_years_of_experience(resume),
+            'brief_summary': clean_and_format(raw_analysis.get('brief_summary', 'No summary available')),
+            'fit_summary': clean_and_format(self._generate_fit_summary(raw_analysis.get('match_score', 0), job_title)),
+            'recommendation': clean_and_format(raw_analysis.get('recommendation', 'No recommendation available')),
+            'experience_and_project_relevance': clean_and_format(raw_analysis.get('experience_and_project_relevance', 'No relevance analysis available')),
+            'skills_gap': clean_and_format(raw_analysis.get('skills_gap', [])),
+            'key_strengths': clean_and_format(raw_analysis.get('key_strengths', [])),
+            'areas_for_improvement': clean_and_format(raw_analysis.get('areas_for_improvement', [])),
+            'recruiter_questions': clean_and_format(raw_analysis.get('recruiter_questions', []))[:5],  # Limit to 5 questions
         }
 
         return standardized

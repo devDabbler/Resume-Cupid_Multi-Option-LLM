@@ -63,8 +63,10 @@ class LlamaAPI:
             'match_score': self._process_match_score(parsed_content.get('match_score', 0)),
             'recommendation_for_interview': parsed_content.get('recommendation_for_interview', "Unable to provide a recommendation"),
             'experience_and_project_relevance': parsed_content.get('experience_and_project_relevance', "No relevance information available"),
-            'skills_gap': parsed_content.get('skills_gap', "Unable to determine skills gap"),
-            'recruiter_questions': parsed_content.get('recruiter_questions', ["No recruiter questions generated"])
+            'skills_gap': parsed_content.get('skills_gap', []),
+            'key_strengths': parsed_content.get('key_strengths', []),
+            'areas_for_improvement': parsed_content.get('areas_for_improvement', []),
+            'recruiter_questions': parsed_content.get('recruiter_questions', [])
         }
 
         processed_content['recommendation'] = self._get_recommendation(processed_content['match_score'])

@@ -371,14 +371,14 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             logger.error(f"Unexpected result type: {type(result)}")
             return _generate_error_result(resume_file.name, "Unexpected result type")
         
-        # Ensure all required keys are present with default values
+        # Ensure all required fields are present
         result = {
             'file_name': resume_file.name,
             'brief_summary': result.get('brief_summary', "No summary available"),
             'match_score': result.get('match_score', 0),
             'recommendation': result.get('recommendation', "No recommendation available"),
             'experience_and_project_relevance': result.get('experience_and_project_relevance', "No relevance information available"),
-            'skills_gap': result.get('skills_gap', "Unable to determine skills gap"),
+            'skills_gap': result.get('skills_gap', []),
             'key_strengths': result.get('key_strengths', []),
             'areas_for_improvement': result.get('areas_for_improvement', []),
             'recruiter_questions': result.get('recruiter_questions', [])
