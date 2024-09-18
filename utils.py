@@ -633,34 +633,40 @@ def extract_job_description(url):
 def adjust_match_score(original_score, result, importance_factors, job_requirements):
     logger.debug(f"Adjusting match score. Original score: {original_score}")
     
-    # New weightings to influence stronger candidates to score higher
+    # Weightings
     weight_experience = 0.35
     weight_skills = 0.45
-    weight_projects = 0.2
+    weight_education = 0.1
+    weight_industry = 0.1
 
     skills_weight = importance_factors.get('technical_skills', weight_skills)
     experience_weight = importance_factors.get('experience', weight_experience)
-    education_weight = importance_factors.get('education', weight_projects)  # Adjusting for project-based weight
-    industry_weight = importance_factors.get('industry_knowledge', 0.2)
+    education_weight = importance_factors.get('education', weight_education)
+    industry_weight = importance_factors.get('industry_knowledge', weight_industry)
     
     try:
         skills_score = evaluate_skills(result.get('skills_gap', []), job_requirements.get('required_skills', []))
-        experience_score = evaluate_experience(result.get('experience_and_project_relevance', {}), job_requirements.get('years_of_experience', 0))
+        
+        # Split experience into professional and academic
+        professional_experience = result.get('professional_experience', {})
+        academic_experience = result.get('academic_experience', {})
+        experience_score = evaluate_experience(professional_experience, academic_experience, job_requirements.get('years_of_experience', 0))
+        
         education_score = evaluate_education(result, job_requirements.get('education_level', 'Bachelor'))
         industry_score = evaluate_industry_knowledge(result, job_requirements.get('industry_keywords', []))
     
         logger.debug(f"Component scores - Skills: {skills_score}, Experience: {experience_score}, Education: {education_score}, Industry: {industry_score}")
     
         adjusted_score = (
-            original_score * 0.6 +  # Base score weight
-            skills_score * skills_weight * 0.1 +
-            experience_score * experience_weight * 0.1 +
+            original_score * 0.4 +  # Reduced base score weight
+            skills_score * skills_weight * 0.2 +
+            experience_score * experience_weight * 0.2 +
             education_score * education_weight * 0.1 +
             industry_score * industry_weight * 0.1
         )
     
         # Cap the maximum adjustment
-        max_adjustment = 15  # Maximum 15 point increase
+        max_adjustment = 20  # Increased maximum adjustment
         final_score = min(original_score + max_adjustment, adjusted_score)
     
         logger.debug(f"Adjusted score: {final_score}")
@@ -706,22 +712,32 @@ def evaluate_skills(skills_gap, required_skills):
     score = max(100 - (len(missing_skills) / len(required_skills)) * 100, 0)
     logger.debug(f"Skills evaluation score: {score}")
     return score
-
-def evaluate_experience(experience_relevance, years_required):
+def evaluate_experience(professional_experience, academic_experience, years_required):
     try:
-        if not isinstance(experience_relevance, dict):
-            logger.warning(f"Unexpected experience_relevance type: {type(experience_relevance)}")
-            return 0
+        # Calculate total years of experience
+        total_professional_years = sum(float(years) for _, years in professional_experience.items() if isinstance(years, (int, float)))
+        total_academic_years = sum(float(years) for _, years in academic_experience.items() if isinstance(years, (int, float)))
         
-        total_years = sum(float(years) for _, years in experience_relevance.items() if isinstance(years, (int, float)))
+        # Calculate relevant years of experience (relevance >= 0.7)
+        relevant_professional_years = sum(float(years) for relevance, years in professional_experience.items() if isinstance(relevance, (int, float)) and relevance >= 0.7)
+        relevant_academic_years = sum(float(years) for relevance, years in academic_experience.items() if isinstance(relevance, (int, float)) and relevance >= 0.7)
         
-        relevant_years = sum(float(years) for relevance, years in experience_relevance.items() if isinstance(relevance, (int, float)) and relevance >= 0.7)
+        # Weight professional experience more heavily
+        weighted_total_years = total_professional_years * 1.5 + total_academic_years * 0.5
+        weighted_relevant_years = relevant_professional_years * 1.5 + relevant_academic_years * 0.5
         
-        years_factor = min(total_years / years_required, 1) if years_required > 0 else 1
-        relevance_factor = relevant_years / total_years if total_years > 0 else 0
+        # Calculate factors
+        years_factor = min(weighted_total_years / years_required, 1) if years_required > 0 else 1
+        relevance_factor = weighted_relevant_years / weighted_total_years if weighted_total_years > 0 else 0
         
-        # Ensure balanced contribution from both factors
-        return (years_factor * 0.6 + relevance_factor * 0.4) * 100
+        # Calculate final score
+        experience_score = (years_factor * 0.6 + relevance_factor * 0.4) * 100
+        
+        logger.debug(f"Experience evaluation - Professional: {total_professional_years} years, Academic: {total_academic_years} years")
+        logger.debug(f"Weighted total years: {weighted_total_years}, Weighted relevant years: {weighted_relevant_years}")
+        logger.debug(f"Experience score: {experience_score}")
+        
+        return experience_score
     except (ValueError, TypeError) as e:
         logger.error(f"Error processing experience relevance: {str(e)}")
         return 0
