@@ -174,7 +174,7 @@ class ResumeProcessor:
                 return [clean_and_format(item) for item in value]
             elif isinstance(value, dict):
                 return {k: clean_and_format(v) for k, v in value.items()}
-            return value  # Return the value as is if it's not a string, list, or dict
+            return value
 
         try:
             match_score = int(raw_analysis.get('match_score', 0))
@@ -184,7 +184,6 @@ class ResumeProcessor:
         standardized = {
             'file_name': raw_analysis.get('file_name', 'Unknown'),
             'match_score': match_score,
-            'years_of_experience': self._extract_years_of_experience(resume),
             'brief_summary': clean_and_format(raw_analysis.get('brief_summary', 'No summary available')),
             'fit_summary': clean_and_format(self._generate_fit_summary(match_score, job_title)),
             'recommendation': clean_and_format(raw_analysis.get('recommendation', 'No recommendation available')),
