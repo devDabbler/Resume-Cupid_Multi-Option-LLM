@@ -50,6 +50,7 @@ class LlamaAPI:
         except json.JSONDecodeError:
             logger.error(f"JSON parsing error. Attempting to clean and parse.")
             try:
+                # Remove any text before the first '{' and after the last '}'
                 cleaned_json = re.search(r'\{.*\}', response, re.DOTALL)
                 if cleaned_json:
                     return json.loads(cleaned_json.group())

@@ -306,7 +306,6 @@ def process_resumes_logic(resume_files, resume_processor, llm):
         progress_bar.empty()
         status_text.empty()
 
-
 def handle_save_role_logic():
     save_button = False
     save_role_option = st.checkbox("Save this role for future use")
