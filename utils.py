@@ -173,52 +173,42 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df['Rank'] = range(1, len(df) + 1)
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
-    df = df.set_index('Rank')  # Set 'Rank' as index to avoid showing a separate index column
+    df = df.set_index('Rank')
 
     # Display summary table
     st.subheader("Candidate Summary")
     st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
 
-    # Display detailed results for each candidate in a more readable format
+    # Display detailed results for each candidate
     for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result.get('file_name', 'Unknown')} - Detailed Analysis", expanded=i == 1):
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Match Score", f"{result.get('match_score', 0)}%")
             with col2:
-                st.write("**Recommendation:**", result.get('recommendation', 'N/A'))
+                st.write("**Recommendation:**", format_output(result.get('recommendation', 'N/A')))
 
-            st.write("**Fit Summary:**", result.get('fit_summary', 'No fit summary available.'))
+            st.write("**Fit Summary:**", format_output(result.get('fit_summary', 'No fit summary available.')))
 
             st.subheader("Experience and Project Relevance")
-            exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
-            if isinstance(exp_relevance, dict):
-                for key, value in exp_relevance.items():
-                    st.write(f"**{key}:** {value}")
-            else:
-                st.write(exp_relevance)
+            st.write(display_nested_content(result.get('experience_and_project_relevance', 'Not provided')))
 
             st.subheader("Skills Gap")
-            skills_gap = result.get('skills_gap', 'Not provided')
-            if isinstance(skills_gap, dict):
-                for key, value in skills_gap.items():
-                    st.write(f"**{key}:** {value}")
-            else:
-                st.write(skills_gap)
+            st.write(display_nested_content(result.get('skills_gap', 'Not provided')))
 
             st.subheader("Key Strengths")
             for strength in result.get('key_strengths', []):
-                st.write(f"**{strength['category']}:** {', '.join(strength['points'])}")
+                st.write(f"**{strength['category']}:** {', '.join(format_output(strength['points']))}")
 
             st.subheader("Areas for Improvement")
             for area in result.get('areas_for_improvement', []):
-                st.write(f"**{area['category']}:** {', '.join(area['points'])}")
+                st.write(f"**{area['category']}:** {', '.join(format_output(area['points']))}")
 
             st.subheader("Recommended Interview Questions")
             questions = result.get('recruiter_questions', [])
             if isinstance(questions, list) and len(questions) > 0:
                 for question in questions:
-                    st.write(f"- {question}")
+                    st.write(f"- {format_output(question)}")
             else:
                 st.write("No specific questions generated.")
 
@@ -263,7 +253,7 @@ def generate_fit_summary(result):
         return "The candidate may be a partial fit but has significant gaps that would require further assessment."
     else:
         return "The candidate is not a strong fit, with considerable gaps in required skills and experience."
-    
+
 # Utility function to format nested data
 def display_nested_content(data):
     """
@@ -279,6 +269,19 @@ def display_nested_content(data):
         # For any other types (including strings), return as string
         return str(data)
 
+def format_output(content):
+    if isinstance(content, str):
+        # Capitalize the first letter of each sentence
+        sentences = content.split('. ')
+        formatted_sentences = [s.capitalize() for s in sentences]
+        return '. '.join(formatted_sentences)
+    elif isinstance(content, list):
+        return [format_output(item) for item in content]
+    elif isinstance(content, dict):
+        return {k: format_output(v) for k, v in content.items()}
+    else:
+        return content
+        
 # Function to get available API keys
 def get_available_api_keys() -> Dict[str, str]:
     api_keys = {}

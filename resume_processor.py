@@ -1,40 +1,29 @@
 import logging
 import os
+import re
 import time
-from functools import lru_cache
 import random
-from typing import List, Dict, Any
-import tiktoken
-import spacy
-from utils import get_logger
-from claude_analyzer import ClaudeAPI
-from llama_analyzer import LlamaAPI
-from gpt4o_mini_analyzer import GPT4oMiniAPI
 import json
 import hashlib
 import sqlite3
 import traceback
-from config_settings import Config  # Change this line
-from utils import get_logger
+from functools import lru_cache
+from typing import List, Dict, Any
+import tiktoken
+import spacy
+from utils import get_logger, get_db_connection
+from claude_analyzer import ClaudeAPI
+from llama_analyzer import LlamaAPI
+from gpt4o_mini_analyzer import GPT4oMiniAPI
+from config_settings import Config
 
 logger = get_logger(__name__)
-
 nlp = spacy.load("en_core_web_md")
 
-def get_db_connection():
-    db_path = Config.DB_PATH
-    
-    logger.info(f"Current working directory: {os.getcwd()}")
-    logger.info(f"Database path: {db_path}")
-    
-    try:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        logger.info("Database connection successful")
-        return conn
-    except Exception as e:
-        logger.error(f"Error connecting to database: {e}")
-        raise
+def clean_text(text: str) -> str:
+    # Remove extra whitespace and capitalize sentences
+    cleaned = re.sub(r'\s+', ' ', text).strip()
+    return '. '.join(sentence.capitalize() for sentence in cleaned.split('. '))
 
 class ResumeProcessor:
     def __init__(self, api_key: str, backend: str):
@@ -162,9 +151,64 @@ class ResumeProcessor:
         }
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
-        logger.debug(f"Arguments for analyze_match: resume={resume[:20]}..., job_description={job_description[:20]}..., candidate_data={candidate_data}, job_title={job_title}")
-        logger.debug(f"Number of arguments: {len([resume, job_description, candidate_data, job_title])}")
-        return self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
+        logger.debug(f"Analyzing match for resume length: {len(resume)}, job description length: {len(job_description)}, job title: {job_title}")
+        
+        try:
+            raw_analysis = self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
+            logger.debug(f"Raw analysis result: {json.dumps(raw_analysis, indent=2)}")
+            
+            # Standardize and clean the analysis results
+            standardized_result = self._standardize_analysis(raw_analysis, resume, job_title)
+            logger.debug(f"Standardized analysis result: {json.dumps(standardized_result, indent=2)}")
+            
+            return standardized_result
+        except Exception as e:
+            logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
+            return self._generate_error_result(str(e))
+
+    def _standardize_analysis(self, raw_analysis: Dict[str, Any], resume: str, job_title: str) -> Dict[str, Any]:
+        def format_list(items: List[str]) -> List[str]:
+            return [clean_text(item) for item in items if item.strip()]
+
+        def extract_years_of_experience(text: str) -> int:
+            matches = re.findall(r'\b(\d+)\s*(?:years?|yrs?)\b', text, re.IGNORECASE)
+            return max(map(int, matches)) if matches else 0
+
+        standardized = {
+            'file_name': raw_analysis.get('file_name', 'Unknown'),
+            'match_score': int(raw_analysis.get('match_score', 0)),
+            'years_of_experience': extract_years_of_experience(resume),
+            'brief_summary': clean_text(raw_analysis.get('brief_summary', 'No summary available')),
+            'fit_summary': clean_text(self._generate_fit_summary(raw_analysis.get('match_score', 0), job_title)),
+            'recommendation': clean_text(raw_analysis.get('recommendation', 'No recommendation available')),
+            'experience_and_project_relevance': clean_text(raw_analysis.get('experience_and_project_relevance', 'No relevance analysis available')),
+            'skills_gap': format_list(raw_analysis.get('skills_gap', [])),
+            'key_strengths': self._format_strengths_and_improvements(raw_analysis.get('key_strengths', [])),
+            'areas_for_improvement': self._format_strengths_and_improvements(raw_analysis.get('areas_for_improvement', [])),
+            'recruiter_questions': format_list(raw_analysis.get('recruiter_questions', []))[:5],  # Limit to 5 questions
+        }
+
+        return standardized
+
+    def _generate_fit_summary(self, match_score: int, job_title: str) -> str:
+        if match_score >= 80:
+            return f"The candidate is a strong fit for the {job_title} role, meeting or exceeding most of the required skills and experience."
+        elif 60 <= match_score < 80:
+            return f"The candidate shows good potential for the {job_title} role but may have some minor gaps in key areas."
+        elif 40 <= match_score < 60:
+            return f"The candidate may be a partial fit for the {job_title} role but has significant gaps that would require further assessment."
+        else:
+            return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
+
+    def _format_strengths_and_improvements(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        formatted = []
+        for item in items:
+            if isinstance(item, dict) and 'category' in item and 'points' in item:
+                formatted.append({
+                    'category': item['category'].capitalize(),
+                    'points': [clean_text(point) for point in item['points'] if point.strip()]
+                })
+        return formatted
 
     def _invalidate_cache(self, cache_key: str):
         conn = get_db_connection()
@@ -190,13 +234,6 @@ class ResumeProcessor:
         conn.commit()
         conn.close()
         logger.debug("Cleared all entries from resume_cache")
-
-    def _extract_years_of_experience(self, resume_text: str) -> int:
-        import re
-        experience_matches = re.findall(r'(\d+)\s*(?:years?|yrs?)', resume_text, re.IGNORECASE)
-        if experience_matches:
-            return max(map(int, experience_matches))
-        return 0
 
     def _get_cached_result(self, cache_key: str) -> Dict[str, Any]:
         conn = get_db_connection()
@@ -258,8 +295,7 @@ def init_resume_cache():
     
     conn.commit()
     conn.close()
-    logger.info("Initialized resume cache table")
+    logger.info("Initialized resume cache")
 
 # Initialize the resume cache table when this module is imported
 init_resume_cache()
-
