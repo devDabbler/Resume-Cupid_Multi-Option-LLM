@@ -391,8 +391,9 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             logger.error(f"Unexpected result type: {type(result)}")
             return _generate_error_result(resume_file.name, "Unexpected result type")
         
-        original_score = result.get('match_score', 0)
-        adjusted_score = max(0, min(100, int(original_score * 0.9)))
+        # Ensure a minimum score of 1 to avoid 0% match
+        original_score = max(1, result.get('match_score', 1))
+        adjusted_score = max(1, min(100, int(original_score * 0.9)))  # Reduce by 10% and ensure it's between 1 and 100
         
         logger.debug(f"Original score: {original_score}, Adjusted score: {adjusted_score}")
         
@@ -400,16 +401,18 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
         result['brief_summary'] = generate_brief_summary(adjusted_score, job_title)
         result['fit_summary'] = generate_fit_summary(result)
         
-        exp_relevance = result.get('experience_and_project_relevance', {})
-        formatted_exp_relevance = format_nested_structure(exp_relevance)
+        # Ensure experience_and_project_relevance is not empty
+        if not result.get('experience_and_project_relevance'):
+            result['experience_and_project_relevance'] = analyze_experience_relevance(resume_text, job_description, llm)
         
-        skills_gap = result.get('skills_gap', {})
-        formatted_skills_gap = format_nested_structure(skills_gap)
+        # Ensure skills_gap is not empty
+        if not result.get('skills_gap'):
+            result['skills_gap'] = analyze_skills_gap(resume_text, job_description, key_skills, llm)
         
         strengths_and_improvements = get_strengths_and_improvements(resume_text, job_description, llm)
         
         if not result.get('recruiter_questions') or len(result.get('recruiter_questions', [])) == 0:
-            result['recruiter_questions'] = generate_generic_questions(job_title)
+            result['recruiter_questions'] = generate_specific_questions(resume_text, job_description, job_title, llm)
         
         formatted_questions = format_recruiter_questions(result.get('recruiter_questions', []))
         
@@ -418,8 +421,8 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             'brief_summary': result['brief_summary'],
             'fit_summary': result['fit_summary'],
             'match_score': adjusted_score,
-            'experience_and_project_relevance': formatted_exp_relevance,
-            'skills_gap': formatted_skills_gap,
+            'experience_and_project_relevance': result['experience_and_project_relevance'],
+            'skills_gap': result['skills_gap'],
             'key_strengths': strengths_and_improvements['strengths'],
             'areas_for_improvement': strengths_and_improvements['improvements'],
             'recruiter_questions': formatted_questions,
@@ -448,6 +451,55 @@ def format_nested_structure(data):
         return "\n".join([f"- {format_nested_structure(item)}" for item in data])
     else:
         return str(data)
+
+def analyze_experience_relevance(resume_text, job_description, llm):
+    prompt = f"""
+    Analyze the candidate's experience and project relevance based on the following resume and job description:
+
+    Resume:
+    {resume_text}
+
+    Job Description:
+    {job_description}
+
+    Provide a brief analysis of how the candidate's experience and projects align with the job requirements.
+    """
+    response = llm.analyze(prompt)
+    return response.get('brief_summary', "Unable to analyze experience relevance")
+
+def analyze_skills_gap(resume_text, job_description, key_skills, llm):
+    prompt = f"""
+    Identify the skills gap between the candidate's resume and the job requirements:
+
+    Resume:
+    {resume_text}
+
+    Job Description:
+    {job_description}
+
+    Key Skills Required:
+    {', '.join(key_skills)}
+
+    List the important skills or qualifications mentioned in the job description that the candidate lacks.
+    """
+    response = llm.analyze(prompt)
+    return response.get('brief_summary', "Unable to analyze skills gap")
+
+def generate_specific_questions(resume_text, job_description, job_title, llm):
+    prompt = f"""
+    Generate 5 specific interview questions for a {job_title} role based on the following resume and job description:
+
+    Resume:
+    {resume_text}
+
+    Job Description:
+    {job_description}
+
+    Create questions that explore the candidate's experience, skills, and potential gaps related to this specific role.
+    """
+    response = llm.analyze(prompt)
+    questions = response.get('recruiter_questions', [])
+    return questions if questions else generate_generic_questions(job_title)
 
 def format_recruiter_questions(questions):
     return [str(q) for q in questions[:5]]  # Limit to 5 questions and ensure they're strings
