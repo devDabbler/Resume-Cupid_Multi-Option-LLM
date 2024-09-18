@@ -516,38 +516,41 @@ def format_recruiter_questions(questions):
 
 def generate_brief_summary(score: int, job_title: str) -> str:
     if score < 30:
-        return f"The candidate shows limited alignment with the {job_title} role requirements. With a match score of {score}%, there are significant areas for improvement."
+        return (f"The candidate shows limited alignment with the {job_title} role requirements. "
+                f"With a match score of {score}%, there are significant areas for improvement.")
     elif 30 <= score < 50:
-        return f"The candidate demonstrates some potential for the {job_title} role. With a match score of {score}%, there are areas that require further evaluation."
+        return (f"The candidate demonstrates some potential for the {job_title} role. "
+                f"With a match score of {score}%, there are notable gaps in required skills.")
     elif 50 <= score < 70:
-        return f"The candidate shows good potential for the {job_title} role. With a match score of {score}%, they meet many of the key requirements, though some areas may need development."
+        return (f"The candidate shows moderate potential for the {job_title} role. "
+                f"With a match score of {score}%, they meet some key requirements but may need development in others.")
     elif 70 <= score < 85:
-        return f"The candidate is a strong fit for the {job_title} role. With a match score of {score}%, they demonstrate solid alignment with the required skills and experience."
+        return (f"The candidate is a strong fit for the {job_title} role. "
+                f"With a match score of {score}%, they demonstrate solid alignment with the required skills and experience.")
     else:
-        return f"The candidate is an excellent match for the {job_title} role. With a match score of {score}%, they exceed expectations in meeting the required skills and experience."
+        return (f"The candidate is an excellent match for the {job_title} role. "
+                f"With a match score of {score}%, they exceed expectations in meeting the required skills and experience.")
 
 def generate_fit_summary(result: Dict[str, Any]) -> str:
     score = result['match_score']
     if score < 50:
-        return "The candidate shows potential but has significant areas for development relative to the job requirements."
+        return ("The candidate does not sufficiently meet the job requirements and is not recommended for further consideration.")
     elif 50 <= score < 70:
-        return "The candidate is a good fit, meeting many of the job requirements with some areas for growth."
+        return ("The candidate meets some job requirements but has areas for growth.")
     elif 70 <= score < 85:
-        return "The candidate is a strong fit, aligning well with most job requirements and showing potential in others."
+        return ("The candidate aligns well with most job requirements and shows potential in others.")
     else:
-        return "The candidate is an excellent fit, meeting or exceeding most job requirements."
+        return ("The candidate is an excellent fit, meeting or exceeding most job requirements.")
 
 def get_recommendation(match_score: int) -> str:
-    if match_score < 30:
-        return "Consider for different roles that better match the candidate's current skill set"
-    elif 30 <= match_score < 50:
-        return "Potential for interview, but prepare to discuss skill gaps and development areas"
+    if match_score < 50:
+        return ("Do not recommend for interview; the candidate does not sufficiently meet the role requirements.")
     elif 50 <= match_score < 70:
-        return "Recommend for interview with some reservations"
+        return ("Consider for interview with reservations; be prepared to discuss areas for improvement.")
     elif 70 <= match_score < 85:
-        return "Strongly recommend for interview"
+        return ("Recommend for interview; the candidate is a strong fit.")
     else:
-        return "Highly recommend for interview as a top candidate"
+        return ("Highly recommend for interview; the candidate is an excellent match.")
 
 def generate_generic_questions(job_title):
     return [
