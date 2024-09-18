@@ -191,45 +191,37 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             with col1:
                 st.metric("Match Score", f"{result.get('match_score', 0)}%")
             with col2:
-                st.write("**Recommendation:**", format_output(result.get('recommendation', 'N/A')))
+                st.write("**Recommendation:**", result.get('recommendation', 'N/A'))
 
-            st.write("**Fit Summary:**", format_output(result.get('fit_summary', 'No fit summary available.')))
+            st.write("**Brief Summary:**", result.get('brief_summary', 'No summary available.'))
 
             st.subheader("Experience and Project Relevance")
-            st.write(display_nested_content(result.get('experience_and_project_relevance', 'Not provided')))
+            st.write(result.get('experience_and_project_relevance', 'Not provided'))
 
             st.subheader("Skills Gap")
-            st.write(display_nested_content(result.get('skills_gap', 'Not provided')))
+            st.write(result.get('skills_gap', 'Not provided'))
 
             st.subheader("Key Strengths")
             for strength in result.get('key_strengths', []):
-                st.write(f"**{strength['category']}:** {', '.join(format_output(strength['points']))}")
+                if isinstance(strength, dict):
+                    st.write(f"**{strength.get('category', 'Strength')}:** {', '.join(strength.get('points', []))}")
+                else:
+                    st.write(strength)
 
             st.subheader("Areas for Improvement")
             for area in result.get('areas_for_improvement', []):
-                st.write(f"**{area['category']}:** {', '.join(format_output(area['points']))}")
+                if isinstance(area, dict):
+                    st.write(f"**{area.get('category', 'Area')}:** {', '.join(area.get('points', []))}")
+                else:
+                    st.write(area)
 
             st.subheader("Recommended Interview Questions")
             questions = result.get('recruiter_questions', [])
             if isinstance(questions, list) and len(questions) > 0:
                 for question in questions:
-                    st.write(f"- {format_output(question)}")
+                    st.write(f"- {question}")
             else:
                 st.write("No specific questions generated.")
-
-            # Feedback form
-            st.subheader("Provide Feedback")
-            with st.form(key=f'feedback_form_{run_id}_{i}'):
-                accuracy_rating = st.slider("Accuracy of the evaluation:", 1, 5, 3)
-                content_rating = st.slider("Quality of the report content:", 1, 5, 3)
-                suggestions = st.text_area("Please provide any suggestions for improvement:")
-                submit_feedback = st.form_submit_button("Submit Feedback")
-
-                if submit_feedback:
-                    if save_feedback_func(run_id, result['file_name'], accuracy_rating, content_rating, suggestions):
-                        st.success("Thank you for your feedback!")
-                    else:
-                        st.error("Failed to save feedback. Please try again.")
 
     # Add the PDF download button to the Streamlit UI
     try:
@@ -379,47 +371,27 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             logger.error(f"Unexpected result type: {type(result)}")
             return _generate_error_result(resume_file.name, "Unexpected result type")
         
-        # Adjust the match score less aggressively
-        original_score = max(1, result.get('match_score', 1))
-        adjusted_score = max(1, min(100, int(original_score * 0.98)))  # Reduce by 2% instead of 5%
-        
-        logger.debug(f"Original score: {original_score}, Adjusted score: {adjusted_score}")
-        
-        result['match_score'] = adjusted_score
-        result['brief_summary'] = generate_brief_summary(adjusted_score, job_title)
-        result['fit_summary'] = generate_fit_summary(result)
-        
-        # Ensure experience_and_project_relevance is not empty
-        if not result.get('experience_and_project_relevance') or result['experience_and_project_relevance'] == "Unable to complete analysis due to an error":
-            result['experience_and_project_relevance'] = analyze_experience_relevance(resume_text, job_description, llm)
-        
-        # Ensure skills_gap is not empty and contains actual skill gaps
-        if not result.get('skills_gap') or isinstance(result['skills_gap'], str):
-            result['skills_gap'] = analyze_skills_gap(resume_text, job_description, key_skills, llm)
-        
-        strengths_and_improvements = get_strengths_and_improvements(resume_text, job_description, llm)
-        
-        # Generate recruiter questions if they're missing or empty
-        if not result.get('recruiter_questions') or len(result.get('recruiter_questions', [])) == 0:
-            result['recruiter_questions'] = generate_specific_questions(resume_text, job_description, job_title, llm)
-        
-        formatted_questions = format_recruiter_questions(result.get('recruiter_questions', []))
-        
-        processed_result = {
+        # Ensure all required keys are present with default values
+        result = {
             'file_name': resume_file.name,
-            'brief_summary': result['brief_summary'],
-            'fit_summary': result['fit_summary'],
-            'match_score': adjusted_score,
-            'experience_and_project_relevance': result['experience_and_project_relevance'],
-            'skills_gap': result['skills_gap'],
-            'key_strengths': strengths_and_improvements['strengths'],
-            'areas_for_improvement': strengths_and_improvements['improvements'],
-            'recruiter_questions': formatted_questions,
-            'recommendation': get_recommendation(adjusted_score)
+            'brief_summary': result.get('brief_summary', "No summary available"),
+            'match_score': result.get('match_score', 0),
+            'recommendation': result.get('recommendation', "No recommendation available"),
+            'experience_and_project_relevance': result.get('experience_and_project_relevance', "No relevance information available"),
+            'skills_gap': result.get('skills_gap', "Unable to determine skills gap"),
+            'key_strengths': result.get('key_strengths', []),
+            'areas_for_improvement': result.get('areas_for_improvement', []),
+            'recruiter_questions': result.get('recruiter_questions', [])
         }
         
-        logger.debug(f"Final processed result: {json.dumps(processed_result, indent=2)}")
-        return processed_result
+        # Generate additional content if missing
+        if not result['brief_summary']:
+            result['brief_summary'] = generate_brief_summary(result['match_score'], job_title)
+        if not result['recommendation']:
+            result['recommendation'] = get_recommendation(result['match_score'])
+        
+        logger.debug(f"Final processed result: {json.dumps(result, indent=2)}")
+        return result
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
