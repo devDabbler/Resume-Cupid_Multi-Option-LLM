@@ -165,7 +165,6 @@ class ResumeProcessor:
             logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
             return self._generate_error_result(str(e))
 
-    
     def _standardize_analysis(self, raw_analysis: Dict[str, Any], resume: str, job_title: str) -> Dict[str, Any]:
         def clean_and_format(value):
             if isinstance(value, str):
@@ -181,17 +180,39 @@ class ResumeProcessor:
         except (ValueError, TypeError):
             match_score = 0
 
+        experience_and_project_relevance = raw_analysis.get('experience_and_project_relevance', {})
+        if not isinstance(experience_and_project_relevance, dict):
+            experience_and_project_relevance = {'description': str(experience_and_project_relevance)}
+
+        skills_gap = raw_analysis.get('skills_gap', {})
+        if isinstance(skills_gap, dict) and 'gaps' in skills_gap:
+            skills_gap = skills_gap['gaps']
+        elif not isinstance(skills_gap, list):
+            skills_gap = [str(skills_gap)]
+
+        key_strengths = raw_analysis.get('key_strengths', [])
+        if not isinstance(key_strengths, list):
+            key_strengths = [str(key_strengths)]
+
+        areas_for_improvement = raw_analysis.get('areas_for_improvement', [])
+        if not isinstance(areas_for_improvement, list):
+            areas_for_improvement = [str(areas_for_improvement)]
+
+        recruiter_questions = raw_analysis.get('recruiter_questions', [])
+        if not isinstance(recruiter_questions, list):
+            recruiter_questions = [str(recruiter_questions)]
+
         standardized = {
             'file_name': raw_analysis.get('file_name', 'Unknown'),
             'match_score': match_score,
             'brief_summary': clean_and_format(raw_analysis.get('brief_summary', 'No summary available')),
             'fit_summary': clean_and_format(self._generate_fit_summary(match_score, job_title)),
             'recommendation': clean_and_format(raw_analysis.get('recommendation', 'No recommendation available')),
-            'experience_and_project_relevance': clean_and_format(raw_analysis.get('experience_and_project_relevance', {})),
-            'skills_gap': clean_and_format(raw_analysis.get('skills_gap', {}).get('gaps', [])),
-            'key_strengths': clean_and_format(raw_analysis.get('key_strengths', [])),
-            'areas_for_improvement': clean_and_format(raw_analysis.get('areas_for_improvement', [])),
-            'recruiter_questions': clean_and_format(raw_analysis.get('recruiter_questions', []))[:5],  # Limit to 5 questions
+            'experience_and_project_relevance': clean_and_format(experience_and_project_relevance),
+            'skills_gap': clean_and_format(skills_gap),
+            'key_strengths': clean_and_format(key_strengths),
+            'areas_for_improvement': clean_and_format(areas_for_improvement),
+            'recruiter_questions': clean_and_format(recruiter_questions)[:5],  # Limit to 5 questions
         }
 
         return standardized
