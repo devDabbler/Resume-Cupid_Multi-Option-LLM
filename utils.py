@@ -186,50 +186,37 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             st.write("**Fit Summary:**", result.get('fit_summary', 'No fit summary available.'))
 
             st.subheader("Experience and Project Relevance")
-            exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
-            if isinstance(exp_relevance, list):
-                for item in exp_relevance:
-                    st.write(f"- **{item.get('experience', '')}** (Relevance: {item.get('relevance', 'N/A')})")
-                    st.write(f"  {item.get('description', '')}")
-            else:
-                st.write(exp_relevance)
+            exp_relevance = result.get('experience_and_project_relevance', {})
+            st.write(f"**Alignment:** {exp_relevance.get('alignment', 'N/A')}")
+            st.write(f"**Relevance:** {exp_relevance.get('relevance', 'N/A')}")
+            st.write(f"**Description:** {exp_relevance.get('description', 'N/A')}")
+            
+            if 'projects' in exp_relevance:
+                st.write("**Projects:**")
+                for project in exp_relevance['projects']:
+                    st.write(f"- {project.get('project_name', 'Unnamed Project')}")
+                    st.write(f"  Alignment: {project.get('alignment', 'N/A')}, Relevance: {project.get('relevance', 'N/A')}")
 
             st.subheader("Skills Gap")
-            skills_gap = result.get('skills_gap', 'Not provided')
-            if isinstance(skills_gap, list):
-                for item in skills_gap:
-                    st.write(f"- **{item.get('skill', '')}** (Relevance: {item.get('relevance', 'N/A')})")
-                    st.write(f"  {item.get('description', '')}")
-            else:
-                st.write(skills_gap)
+            skills_gap = result.get('skills_gap', [])
+            for skill in skills_gap:
+                st.write(f"- **{skill.get('skill', 'Unnamed Skill')}:** {skill.get('description', 'N/A')}")
 
             st.subheader("Key Strengths")
             strengths = result.get('key_strengths', [])
-            if strengths:
-                for strength in strengths:
-                    st.write(f"- {strength}")
-            else:
-                st.write("No key strengths provided.")
+            for strength in strengths:
+                st.write(f"- **{strength.get('strength', 'Unnamed Strength')}:** {strength.get('description', 'N/A')}")
 
             st.subheader("Areas for Improvement")
             improvements = result.get('areas_for_improvement', [])
-            if improvements:
-                for area in improvements:
-                    st.write(f"- {area}")
-            else:
-                st.write("No areas for improvement provided.")
+            for area in improvements:
+                st.write(f"- **{area.get('area', 'Unnamed Area')}:** {area.get('description', 'N/A')}")
 
             st.subheader("Recommended Interview Questions")
             questions = result.get('recruiter_questions', [])
-            if questions:
-                for question in questions:
-                    if isinstance(question, dict):
-                        st.write(f"- {question.get('question', '')}")
-                        st.write(f"  *Reason:* {question.get('description', '')}")
-                    else:
-                        st.write(f"- {question}")
-            else:
-                st.write("No specific questions generated.")
+            for question in questions:
+                st.write(f"- **Q:** {question.get('question', 'N/A')}")
+                st.write(f"  **Reason:** {question.get('description', 'N/A')}")
 
     try:
         pdf_data = generate_pdf_report(evaluation_results, run_id)

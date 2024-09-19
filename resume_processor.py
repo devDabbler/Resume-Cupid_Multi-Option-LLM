@@ -187,17 +187,12 @@ class ResumeProcessor:
             'brief_summary': clean_and_format(raw_analysis.get('brief_summary', 'No summary available')),
             'fit_summary': clean_and_format(self._generate_fit_summary(match_score, job_title)),
             'recommendation': clean_and_format(raw_analysis.get('recommendation', 'No recommendation available')),
-            'experience_and_project_relevance': clean_and_format(raw_analysis.get('experience_and_project_relevance', [])),
-            'skills_gap': clean_and_format(raw_analysis.get('skills_gap', [])),
+            'experience_and_project_relevance': clean_and_format(raw_analysis.get('experience_and_project_relevance', {})),
+            'skills_gap': clean_and_format(raw_analysis.get('skills_gap', {}).get('gaps', [])),
             'key_strengths': clean_and_format(raw_analysis.get('key_strengths', [])),
             'areas_for_improvement': clean_and_format(raw_analysis.get('areas_for_improvement', [])),
             'recruiter_questions': clean_and_format(raw_analysis.get('recruiter_questions', []))[:5],  # Limit to 5 questions
         }
-
-        # Ensure all list fields have at least one item
-        for field in ['experience_and_project_relevance', 'skills_gap', 'key_strengths', 'areas_for_improvement', 'recruiter_questions']:
-            if not standardized[field]:
-                standardized[field] = ['No information provided']
 
         return standardized
 
