@@ -133,30 +133,21 @@ def extract_text_from_file(file) -> str:
         raise ValueError(f"Failed to extract text from {file.name}: {str(e)}")
 
 def generate_job_requirements(job_description):
-    # Process the job description with spaCy
+    """
+    Generate job requirements by processing the job description with spaCy and extracting relevant information.
+    """
     nlp = get_spacy_model()
     doc = nlp(job_description)
     
-    # Extract required skills
-    required_skills = set()
-    for ent in doc.ents:
-        if ent.label_ in ["SKILL", "PRODUCT", "ORG"]:
-            required_skills.add(ent.text.lower())
+    required_skills = {ent.text.lower() for ent in doc.ents if ent.label_ in ["SKILL", "PRODUCT", "ORG"]}
     
-    # Extract years of experience
     experience_pattern = r'\b(\d+)(?:\+)?\s*(?:years?|yrs?)\b.*?experience'
     experience_matches = re.findall(experience_pattern, job_description, re.IGNORECASE)
     years_of_experience = max(map(int, experience_matches)) if experience_matches else 0
     
-    # Extract education level
     education_levels = ["high school", "associate", "bachelor", "master", "phd", "doctorate"]
-    education_level = "Not specified"
-    for level in education_levels:
-        if level in job_description.lower():
-            education_level = level.title()
-            break
+    education_level = next((level.title() for level in education_levels if level in job_description.lower()), "Not specified")
     
-    # Extract industry keywords
     industry_keywords = [token.text.lower() for token in doc if token.pos_ in ["NOUN", "PROPN"] and len(token.text) > 2]
     industry_keywords = [kw for kw, count in Counter(industry_keywords).most_common(10)]
     
@@ -170,21 +161,17 @@ def generate_job_requirements(job_description):
 def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_feedback_func):
     st.header("Candidate Evaluation Results")
 
-    # Sort results by match score in descending order
     sorted_results = sorted(evaluation_results, key=lambda x: x.get('match_score', 0), reverse=True)
 
-    # Create a summary dataframe
     df = pd.DataFrame(sorted_results)
     df['Rank'] = range(1, len(df) + 1)
     df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
     df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
     df = df.set_index('Rank')
 
-    # Display summary table
     st.subheader("Candidate Summary")
     st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
 
-    # Display detailed results for each candidate
     for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result.get('file_name', 'Unknown')} - Detailed Analysis", expanded=i == 1):
             col1, col2 = st.columns(2)
@@ -223,7 +210,6 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
             else:
                 st.write("No specific questions generated.")
 
-    # Add the PDF download button to the Streamlit UI
     try:
         pdf_data = generate_pdf_report(evaluation_results, run_id)
 
@@ -239,7 +225,6 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     st.success("Evaluation complete!")
 
-# Utility function to format nested data
 def display_nested_content(data):
     """
     Simplifies nested structures (dictionaries/lists) into human-readable strings.
@@ -248,15 +233,12 @@ def display_nested_content(data):
     if isinstance(data, dict):
         return '\n'.join(f"{k.capitalize()}: {v}" for k, v in data.items())
     elif isinstance(data, list):
-        # Ensure list is converted to a string of items separated by commas
         return ', '.join(str(item) for item in data)
     else:
-        # For any other types (including strings), return as string
         return str(data)
 
 def format_output(content):
     if isinstance(content, str):
-        # Capitalize the first letter of each sentence
         sentences = content.split('. ')
         formatted_sentences = [s.capitalize() for s in sentences]
         return '. '.join(formatted_sentences)
@@ -266,8 +248,7 @@ def format_output(content):
         return {k: format_output(v) for k, v in content.items()}
     else:
         return content
-        
-# Function to get available API keys
+
 def get_available_api_keys() -> Dict[str, str]:
     api_keys = {}
     backend = "llama"
@@ -288,7 +269,6 @@ def calculate_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> floa
         logger.error(f"Error calculating similarity: {str(e)}")
         raise ValueError(f"Error calculating similarity: {str(e)}")
 
-# Async batch processing of resumes
 async def process_batch(batch: List, resume_processor, job_description: str, importance_factors: Dict[str, float], candidate_data_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     with ThreadPoolExecutor() as executor:
         loop = asyncio.get_event_loop()
@@ -371,7 +351,6 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             logger.error(f"Unexpected result type: {type(result)}")
             return _generate_error_result(resume_file.name, "Unexpected result type")
         
-        # Ensure all required fields are present
         result = {
             'file_name': resume_file.name,
             'brief_summary': result.get('brief_summary', "No summary available"),
@@ -384,7 +363,6 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             'recruiter_questions': result.get('recruiter_questions', [])
         }
         
-        # Generate additional content if missing
         if not result['brief_summary']:
             result['brief_summary'] = generate_brief_summary(result['match_score'], job_title)
         if not result['recommendation']:
@@ -470,7 +448,6 @@ def get_strengths_and_improvements(resume_text, job_description, llm):
         response = llm.analyze(prompt)
         strengths_and_improvements = json.loads(response.get('strengths_and_improvements', '{}'))
     except:
-        # Fallback data if analysis fails
         strengths_and_improvements = {
             'strengths': [
                 {'category': 'Technical Skills', 'points': ['Candidate possesses relevant technical skills for the role']},
@@ -578,7 +555,6 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
         styles = getSampleStyleSheet()
         elements.append(Paragraph(f"Evaluation Report (Run ID: {run_id})", styles['Heading1']))
 
-        # Create summary table
         data = [['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']]
         for i, result in enumerate(evaluation_results, 1):
             data.append([
@@ -597,27 +573,22 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
         ]))
         elements.append(table)
 
-        # Adding details for each result
         for result in evaluation_results:
             elements.append(Paragraph(f"\n\n{result.get('file_name', 'Unknown')}", styles['Heading2']))
             elements.append(Paragraph(f"Match Score: {result.get('match_score', 0)}%", styles['Normal']))
             elements.append(Paragraph(f"Recommendation: {result.get('recommendation', 'N/A')}", styles['Normal']))
 
-            # Add the fit summary for each candidate
             fit_summary = result.get('fit_summary', 'No fit summary available.')
             elements.append(Paragraph(f"Fit Summary: {fit_summary}", styles['Normal']))
 
-            # Experience and project relevance
             elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
             exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
             elements.append(Paragraph(str(exp_relevance), styles['Normal']))
 
-            # Skills gap
             elements.append(Paragraph("Skills Gap:", styles['Heading3']))
             skills_gap = result.get('skills_gap', 'Not provided')
             elements.append(Paragraph(str(skills_gap), styles['Normal']))
 
-            # Recruiter questions
             elements.append(Paragraph("Recommended Interview Questions:", styles['Heading3']))
             recruiter_questions = result.get('recruiter_questions', ['No questions generated'])
             for question in recruiter_questions:
@@ -699,7 +670,6 @@ def extract_job_description(url):
 def adjust_match_score(original_score, result, importance_factors, job_requirements):
     logger.debug(f"Adjusting match score. Original score: {original_score}")
     
-    # Weightings
     weight_experience = 0.35
     weight_skills = 0.45
     weight_education = 0.1
@@ -713,7 +683,6 @@ def adjust_match_score(original_score, result, importance_factors, job_requireme
     try:
         skills_score = evaluate_skills(result.get('skills_gap', []), job_requirements.get('required_skills', []))
         
-        # Split experience into professional and academic
         professional_experience = result.get('professional_experience', {})
         academic_experience = result.get('academic_experience', {})
         experience_score = evaluate_experience(professional_experience, academic_experience, job_requirements.get('years_of_experience', 0))
@@ -740,13 +709,11 @@ def adjust_match_score(original_score, result, importance_factors, job_requireme
         logger.error(f"Error in adjust_match_score: {str(e)}")
         final_score = original_score  # Use original score if there's an error
     
-        logger.debug(f"Adjusted score: {adjusted_score}")
-        return min(max(int(adjusted_score), 0), 100)  # Ensure score is between 0 and 100
-    
+    return min(max(int(final_score), 0), 100)  # Ensure score is between 0 and 100
+
 def evaluate_skills(skills_gap, required_skills):
     logger.debug(f"Evaluating skills. Skills gap: {skills_gap}, Required skills: {required_skills}")
     
-    # Handle both list and dictionary inputs for skills_gap
     if isinstance(skills_gap, dict):
         candidate_skills = skills_gap.get('key_skills', [])
         if isinstance(candidate_skills, str):
@@ -758,18 +725,15 @@ def evaluate_skills(skills_gap, required_skills):
     
     logger.debug(f"Candidate skills: {candidate_skills}")
     
-    # Ensure required_skills is a list
     if isinstance(required_skills, str):
         required_skills = [required_skills]
     elif not isinstance(required_skills, list):
         required_skills = []
     
-    # Check how many required skills are missing
     missing_skills = [skill for skill in required_skills if skill.lower() not in [s.lower() for s in candidate_skills]]
     
     logger.debug(f"Missing skills: {missing_skills}")
     
-    # Max score based on total required skills
     max_possible_score = len(required_skills) * 10  # e.g., 10 points per skill
     
     if max_possible_score == 0:
@@ -779,25 +743,21 @@ def evaluate_skills(skills_gap, required_skills):
     score = max(100 - (len(missing_skills) / len(required_skills)) * 100, 0)
     logger.debug(f"Skills evaluation score: {score}")
     return score
+
 def evaluate_experience(professional_experience, academic_experience, years_required):
     try:
-        # Calculate total years of experience
         total_professional_years = sum(float(years) for _, years in professional_experience.items() if isinstance(years, (int, float)))
         total_academic_years = sum(float(years) for _, years in academic_experience.items() if isinstance(years, (int, float)))
         
-        # Calculate relevant years of experience (relevance >= 0.7)
         relevant_professional_years = sum(float(years) for relevance, years in professional_experience.items() if isinstance(relevance, (int, float)) and relevance >= 0.7)
         relevant_academic_years = sum(float(years) for relevance, years in academic_experience.items() if isinstance(relevance, (int, float)) and relevance >= 0.7)
         
-        # Weight professional experience more heavily
         weighted_total_years = total_professional_years * 1.5 + total_academic_years * 0.5
         weighted_relevant_years = relevant_professional_years * 1.5 + relevant_academic_years * 0.5
         
-        # Calculate factors
         years_factor = min(weighted_total_years / years_required, 1) if years_required > 0 else 1
         relevance_factor = weighted_relevant_years / weighted_total_years if weighted_total_years > 0 else 0
         
-        # Calculate final score
         experience_score = (years_factor * 0.6 + relevance_factor * 0.4) * 100
         
         logger.debug(f"Experience evaluation - Professional: {total_professional_years} years, Academic: {total_academic_years} years")
