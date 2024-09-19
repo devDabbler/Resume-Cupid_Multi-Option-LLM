@@ -27,8 +27,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY
 from functools import lru_cache
 from config_settings import Config
 import plotly.graph_objects as go
@@ -182,31 +183,51 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
             st.write("**Brief Summary:**", result.get('brief_summary', 'No summary available.'))
 
+            st.write("**Fit Summary:**", result.get('fit_summary', 'No fit summary available.'))
+
             st.subheader("Experience and Project Relevance")
-            st.write(result.get('experience_and_project_relevance', 'Not provided'))
+            exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
+            if isinstance(exp_relevance, list):
+                for item in exp_relevance:
+                    st.write(f"- **{item.get('experience', '')}** (Relevance: {item.get('relevance', 'N/A')})")
+                    st.write(f"  {item.get('description', '')}")
+            else:
+                st.write(exp_relevance)
 
             st.subheader("Skills Gap")
-            st.write(result.get('skills_gap', 'Not provided'))
+            skills_gap = result.get('skills_gap', 'Not provided')
+            if isinstance(skills_gap, list):
+                for item in skills_gap:
+                    st.write(f"- **{item.get('skill', '')}** (Relevance: {item.get('relevance', 'N/A')})")
+                    st.write(f"  {item.get('description', '')}")
+            else:
+                st.write(skills_gap)
 
             st.subheader("Key Strengths")
-            for strength in result.get('key_strengths', []):
-                if isinstance(strength, dict):
-                    st.write(f"**{strength.get('category', 'Strength')}:** {', '.join(strength.get('points', []))}")
-                else:
-                    st.write(strength)
+            strengths = result.get('key_strengths', [])
+            if strengths:
+                for strength in strengths:
+                    st.write(f"- {strength}")
+            else:
+                st.write("No key strengths provided.")
 
             st.subheader("Areas for Improvement")
-            for area in result.get('areas_for_improvement', []):
-                if isinstance(area, dict):
-                    st.write(f"**{area.get('category', 'Area')}:** {', '.join(area.get('points', []))}")
-                else:
-                    st.write(area)
+            improvements = result.get('areas_for_improvement', [])
+            if improvements:
+                for area in improvements:
+                    st.write(f"- {area}")
+            else:
+                st.write("No areas for improvement provided.")
 
             st.subheader("Recommended Interview Questions")
             questions = result.get('recruiter_questions', [])
-            if isinstance(questions, list) and len(questions) > 0:
+            if questions:
                 for question in questions:
-                    st.write(f"- {question}")
+                    if isinstance(question, dict):
+                        st.write(f"- {question.get('question', '')}")
+                        st.write(f"  *Reason:* {question.get('description', '')}")
+                    else:
+                        st.write(f"- {question}")
             else:
                 st.write("No specific questions generated.")
 
@@ -547,59 +568,116 @@ def format_nested_structure(data):
         return str(data)
 
 def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
-    try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        elements = []
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    elements = []
 
-        styles = getSampleStyleSheet()
-        elements.append(Paragraph(f"Evaluation Report (Run ID: {run_id})", styles['Heading1']))
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
 
-        data = [['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']]
-        for i, result in enumerate(evaluation_results, 1):
-            data.append([
-                i,
-                result.get('file_name', 'Unknown'),
-                result.get('match_score', 0),
-                result.get('recommendation', 'N/A')
-            ])
+    elements.append(Paragraph(f"Evaluation Report (Run ID: {run_id})", styles['Heading1']))
+    elements.append(Spacer(1, 12))
 
-        table = Table(data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        elements.append(table)
+    # Summary table
+    data = [['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']]
+    for i, result in enumerate(sorted(evaluation_results, key=lambda x: x.get('match_score', 0), reverse=True), 1):
+        data.append([
+            i,
+            result.get('file_name', 'Unknown'),
+            result.get('match_score', 0),
+            result.get('recommendation', 'N/A')
+        ])
 
-        for result in evaluation_results:
-            elements.append(Paragraph(f"\n\n{result.get('file_name', 'Unknown')}", styles['Heading2']))
-            elements.append(Paragraph(f"Match Score: {result.get('match_score', 0)}%", styles['Normal']))
-            elements.append(Paragraph(f"Recommendation: {result.get('recommendation', 'N/A')}", styles['Normal']))
+    table = Table(data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 12),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 12))
 
-            fit_summary = result.get('fit_summary', 'No fit summary available.')
-            elements.append(Paragraph(f"Fit Summary: {fit_summary}", styles['Normal']))
+    for result in evaluation_results:
+        elements.append(Paragraph(f"{result.get('file_name', 'Unknown')}", styles['Heading2']))
+        elements.append(Paragraph(f"Match Score: {result.get('match_score', 0)}%", styles['Normal']))
+        elements.append(Paragraph(f"Recommendation: {result.get('recommendation', 'N/A')}", styles['Normal']))
+        elements.append(Spacer(1, 12))
 
-            elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
-            exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
-            elements.append(Paragraph(str(exp_relevance), styles['Normal']))
+        elements.append(Paragraph("Brief Summary:", styles['Heading3']))
+        elements.append(Paragraph(result.get('brief_summary', 'No summary available.'), styles['Justify']))
+        elements.append(Spacer(1, 12))
 
-            elements.append(Paragraph("Skills Gap:", styles['Heading3']))
-            skills_gap = result.get('skills_gap', 'Not provided')
-            elements.append(Paragraph(str(skills_gap), styles['Normal']))
+        elements.append(Paragraph("Fit Summary:", styles['Heading3']))
+        elements.append(Paragraph(result.get('fit_summary', 'No fit summary available.'), styles['Justify']))
+        elements.append(Spacer(1, 12))
 
-            elements.append(Paragraph("Recommended Interview Questions:", styles['Heading3']))
-            recruiter_questions = result.get('recruiter_questions', ['No questions generated'])
-            for question in recruiter_questions:
-                elements.append(Paragraph(f"• {question}", styles['Normal']))
+        elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
+        exp_relevance = result.get('experience_and_project_relevance', 'Not provided')
+        if isinstance(exp_relevance, list):
+            for item in exp_relevance:
+                elements.append(Paragraph(f"- {item.get('experience', '')} (Relevance: {item.get('relevance', 'N/A')})", styles['Normal']))
+                elements.append(Paragraph(f"  {item.get('description', '')}", styles['Justify']))
+        else:
+            elements.append(Paragraph(str(exp_relevance), styles['Justify']))
+        elements.append(Spacer(1, 12))
 
-        doc.build(elements)
-        buffer.seek(0)
-        return buffer.getvalue()
-    except Exception as e:
-        logger.error(f"Error generating PDF report: {str(e)}", exc_info=True)
-        raise
+        elements.append(Paragraph("Skills Gap:", styles['Heading3']))
+        skills_gap = result.get('skills_gap', 'Not provided')
+        if isinstance(skills_gap, list):
+            for item in skills_gap:
+                elements.append(Paragraph(f"- {item.get('skill', '')} (Relevance: {item.get('relevance', 'N/A')})", styles['Normal']))
+                elements.append(Paragraph(f"  {item.get('description', '')}", styles['Justify']))
+        else:
+            elements.append(Paragraph(str(skills_gap), styles['Justify']))
+        elements.append(Spacer(1, 12))
+
+        elements.append(Paragraph("Key Strengths:", styles['Heading3']))
+        strengths = result.get('key_strengths', [])
+        if strengths:
+            for strength in strengths:
+                elements.append(Paragraph(f"- {strength}", styles['Normal']))
+        else:
+            elements.append(Paragraph("No key strengths provided.", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+        elements.append(Paragraph("Areas for Improvement:", styles['Heading3']))
+        improvements = result.get('areas_for_improvement', [])
+        if improvements:
+            for area in improvements:
+                elements.append(Paragraph(f"- {area}", styles['Normal']))
+        else:
+            elements.append(Paragraph("No areas for improvement provided.", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+        elements.append(Paragraph("Recommended Interview Questions:", styles['Heading3']))
+        questions = result.get('recruiter_questions', [])
+        if questions:
+            for question in questions:
+                if isinstance(question, dict):
+                    elements.append(Paragraph(f"- {question.get('question', '')}", styles['Normal']))
+                    elements.append(Paragraph(f"  Reason: {question.get('description', '')}", styles['Justify']))
+                else:
+                    elements.append(Paragraph(f"- {question}", styles['Normal']))
+        else:
+            elements.append(Paragraph("No specific questions generated.", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+        elements.append(Paragraph("", styles['Normal']))  # Add a blank line between candidates
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
     
 def dict_to_string(d):
     return '\n'.join(f"{k}: {v}" for k, v in d.items())

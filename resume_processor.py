@@ -136,36 +136,36 @@ class ResumeProcessor:
 
     def _generate_error_result(self, error_message: str) -> Dict[str, Any]:
         return {
-            'file_name': '',
-            'error': error_message,
+            'file_name': 'Error',
             'match_score': 0,
-            'years_of_experience': 0,
-            'brief_summary': 'Error occurred during analysis',
-            'experience_and_project_relevance': 'Unable to complete analysis due to an error',
-            'strengths': [],
-            'areas_for_improvement': [],
-            'skills_gap': [],
+            'brief_summary': 'An error occurred during analysis',
+            'fit_summary': 'Unable to generate fit summary due to an error',
             'recommendation': 'Unable to provide a recommendation due to an error',
-            'recruiter_questions': [],
-            'project_relevance': 'Unable to analyze project relevance due to an error'
+            'experience_and_project_relevance': ['Unable to analyze experience and project relevance due to an error'],
+            'skills_gap': ['Unable to determine skills gap due to an error'],
+            'key_strengths': ['Unable to identify key strengths due to an error'],
+            'areas_for_improvement': ['Unable to identify areas for improvement due to an error'],
+            'recruiter_questions': ['Unable to generate recruiter questions due to an error'],
+            'error': error_message
         }
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
         logger.debug(f"Analyzing match for resume length: {len(resume)}, job description length: {len(job_description)}, job title: {job_title}")
-        
+    
         try:
             raw_analysis = self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
             logger.debug(f"Raw analysis result: {json.dumps(raw_analysis, indent=2)}")
-            
+        
             # Standardize and clean the analysis results
             standardized_result = self._standardize_analysis(raw_analysis, resume, job_title)
             logger.debug(f"Standardized analysis result: {json.dumps(standardized_result, indent=2)}")
-            
+        
             return standardized_result
         except Exception as e:
             logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
             return self._generate_error_result(str(e))
 
+    
     def _standardize_analysis(self, raw_analysis: Dict[str, Any], resume: str, job_title: str) -> Dict[str, Any]:
         def clean_and_format(value):
             if isinstance(value, str):
@@ -187,12 +187,17 @@ class ResumeProcessor:
             'brief_summary': clean_and_format(raw_analysis.get('brief_summary', 'No summary available')),
             'fit_summary': clean_and_format(self._generate_fit_summary(match_score, job_title)),
             'recommendation': clean_and_format(raw_analysis.get('recommendation', 'No recommendation available')),
-            'experience_and_project_relevance': clean_and_format(raw_analysis.get('experience_and_project_relevance', 'No relevance analysis available')),
+            'experience_and_project_relevance': clean_and_format(raw_analysis.get('experience_and_project_relevance', [])),
             'skills_gap': clean_and_format(raw_analysis.get('skills_gap', [])),
             'key_strengths': clean_and_format(raw_analysis.get('key_strengths', [])),
             'areas_for_improvement': clean_and_format(raw_analysis.get('areas_for_improvement', [])),
             'recruiter_questions': clean_and_format(raw_analysis.get('recruiter_questions', []))[:5],  # Limit to 5 questions
         }
+
+        # Ensure all list fields have at least one item
+        for field in ['experience_and_project_relevance', 'skills_gap', 'key_strengths', 'areas_for_improvement', 'recruiter_questions']:
+            if not standardized[field]:
+                standardized[field] = ['No information provided']
 
         return standardized
 
