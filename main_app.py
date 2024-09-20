@@ -26,6 +26,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 claude_api_key = Config.CLAUDE_API_KEY
 gpt4o_mini_api_key = Config.GPT4O_MINI_API_KEY
 llama_api_key = Config.LLAMA_API_KEY
+logger.debug(f"Llama API Key (first 5 chars): {llama_api_key[:5] if llama_api_key else 'Not set'}")
 
 # Initialize API clients
 try:
@@ -117,9 +118,14 @@ def main_app():
 
     st.session_state.backend = selected_backend
     resume_processor = st.session_state.resume_processor
-
-    # Initialize the LlamaAPI instance here
-    llm = initialize_llm()
+    
+    try:
+        llm = initialize_llm()
+        logger.info("LlamaAPI initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize LlamaAPI: {str(e)}", exc_info=True)
+        st.error("Failed to initialize LlamaAPI. Please check your configuration and API key.")
+        return
 
     if not hasattr(resume_processor, 'analyze_match'):
         raise AttributeError(f"ResumeProcessor for backend '{selected_backend}' does not have the 'analyze_match' method")

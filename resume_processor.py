@@ -165,15 +165,16 @@ class ResumeProcessor:
         logger.debug(f"Analyzing match for resume length: {len(resume)}, job description length: {len(job_description)}, job title: {job_title}")
 
         try:
+            logger.debug("Calling analyzer.analyze_match")
             raw_analysis = self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
             logger.debug(f"Raw analysis result: {json.dumps(raw_analysis, indent=2)}")
-    
+
             standardized_result = self._standardize_analysis(raw_analysis, resume, job_title)
             logger.debug(f"Standardized analysis result: {json.dumps(standardized_result, indent=2)}")
-    
+
             if not self._meets_minimum_requirements(standardized_result, job_title):
                 standardized_result['recommendation'] = "Do not recommend for interview"
-    
+
             return standardized_result
         except Exception as e:
             logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
