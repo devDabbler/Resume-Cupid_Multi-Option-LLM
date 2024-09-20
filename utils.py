@@ -167,7 +167,6 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
     df = pd.DataFrame(sorted_results)
     df['Rank'] = range(1, len(df) + 1)
     
-    # Check if 'confidence_score' exists in the results
     columns_to_display = ['Rank', 'file_name', 'match_score', 'recommendation']
     column_names = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
     
@@ -197,11 +196,14 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
             st.subheader("Experience and Project Relevance")
             relevance = result.get('experience_and_project_relevance', {})
-            st.write(f"**Overall Relevance:** {relevance.get('overall_relevance', 0)}")
-            st.write(f"**Relevant Experience:** {relevance.get('relevant_experience', 0)}")
-            st.write(f"**Project Relevance:** {relevance.get('project_relevance', 0)}")
-            st.write(f"**Technical Skills Relevance:** {relevance.get('technical_skills_relevance', 0)}")
-            st.write(relevance.get('description', 'No description available.'))
+            if isinstance(relevance, dict):
+                st.write(f"**Overall Relevance:** {relevance.get('overall_relevance', 0)}")
+                st.write(f"**Relevant Experience:** {relevance.get('relevant_experience', 0)}")
+                st.write(f"**Project Relevance:** {relevance.get('project_relevance', 0)}")
+                st.write(f"**Technical Skills Relevance:** {relevance.get('technical_skills_relevance', 0)}")
+                st.write(relevance.get('description', 'No description available.'))
+            else:
+                st.write(relevance)
 
             st.subheader("Skills Gap")
             skills_gap = result.get('skills_gap', {})
@@ -356,7 +358,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             logger.warning(f"Empty content extracted from {resume_file.name}")
             return _generate_error_result(resume_file.name, "Empty content extracted")
         
-        result = resume_processor.analyze_match(resume_text, job_description, job_title)
+        result = resume_processor.analyze_match(resume_text, job_description, {}, job_title)
         logger.debug(f"Initial analysis result: {json.dumps(result, indent=2)}")
         
         if not isinstance(result, dict):
