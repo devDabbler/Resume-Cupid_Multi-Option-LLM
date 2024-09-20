@@ -16,12 +16,12 @@ class LlamaAPI:
     @lru_cache(maxsize=100)
     def analyze(self, prompt: str) -> Dict[str, Any]:
         try:
-            logger.debug(f"Sending request to Llama API with prompt: {prompt[:100]}...")
+            logger.debug(f"Sending request to Llama API with prompt: {prompt[:500]}...")
             completion = self.client.chat.completions.create(
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an AI assistant specialized in analyzing resumes and job descriptions for Machine Learning Operations Engineering roles. Always provide your responses in JSON format. Use the full range of scores from 0 to 100, and be very critical in your evaluations.",
+                        "content": "You are an AI assistant specialized in analyzing resumes and job descriptions. Provide detailed and accurate analyses, ensuring all fields are populated with relevant information. Use the full range of scores from 0 to 100, and be critical yet fair in your evaluations.",
                     },
                     {
                         "role": "user",
@@ -30,7 +30,7 @@ class LlamaAPI:
                 ],
                 model="llama-3.1-8b-instant",
                 max_tokens=4000,
-                temperature=0.5,
+                temperature=0.7,
             )
             result = completion.choices[0].message.content
             logger.debug(f"Raw response from Llama: {result}")

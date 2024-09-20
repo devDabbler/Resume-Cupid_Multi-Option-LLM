@@ -358,33 +358,30 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             logger.warning(f"Empty content extracted from {resume_file.name}")
             return _generate_error_result(resume_file.name, "Empty content extracted")
         
+        logger.debug(f"Extracted resume text (first 500 chars): {resume_text[:500]}...")
+        logger.debug(f"Job description (first 500 chars): {job_description[:500]}...")
+        logger.debug(f"Job title: {job_title}")
+        
         result = resume_processor.analyze_match(resume_text, job_description, {}, job_title)
-        logger.debug(f"Initial analysis result: {json.dumps(result, indent=2)}")
+        logger.debug(f"Raw analysis result: {json.dumps(result, indent=2)}")
         
-        if not isinstance(result, dict):
-            logger.error(f"Unexpected result type: {type(result)}")
-            return _generate_error_result(resume_file.name, "Unexpected result type")
+        # Process the result
+        processed_result = {
+            'file_name': resume_file.name,
+            'brief_summary': result.get('brief_summary', "No summary available"),
+            'match_score': int(result.get('match_score', 0)),
+            'recommendation': result.get('recommendation', "No recommendation available"),
+            'experience_and_project_relevance': result.get('experience_and_project_relevance', "No relevance information available"),
+            'skills_gap': result.get('skills_gap', {"missing_skills": [], "description": "Unable to assess skills gap"}),
+            'key_strengths': result.get('key_strengths', []),
+            'areas_for_improvement': result.get('areas_for_improvement', []),
+            'recruiter_questions': result.get('recruiter_questions', []),
+            'confidence_score': result.get('confidence_score', 0)
+        }
         
-        result = {
-        'file_name': resume_file.name,
-        'brief_summary': result.get('brief_summary', "No summary available"),
-        'match_score': int(result.get('match_score', 0)),
-        'recommendation': result.get('recommendation', "No recommendation available"),
-        'experience_and_project_relevance': result.get('experience_and_project_relevance', "No relevance information available"),
-        'skills_gap': result.get('skills_gap', []),
-        'key_strengths': result.get('key_strengths', []),
-        'areas_for_improvement': result.get('areas_for_improvement', []),
-        'recruiter_questions': result.get('recruiter_questions', []),
-        'confidence_score': result.get('confidence_score', 0) 
-    }
-        
-        if not result['brief_summary']:
-            result['brief_summary'] = generate_brief_summary(result['match_score'], job_title)
-        if not result['recommendation']:
-            result['recommendation'] = get_recommendation(result['match_score'])
-        
-        logger.debug(f"Final processed result: {json.dumps(result, indent=2)}")
-        return result
+        logger.debug(f"Processed result: {json.dumps(processed_result, indent=2)}")
+        return processed_result
+
     except Exception as e:
         logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
         return _generate_error_result(resume_file.name, str(e))
