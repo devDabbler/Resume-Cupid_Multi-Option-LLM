@@ -166,8 +166,17 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     df = pd.DataFrame(sorted_results)
     df['Rank'] = range(1, len(df) + 1)
-    df = df[['Rank', 'file_name', 'match_score', 'recommendation', 'confidence_score']]
-    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation', 'Confidence Score']
+    
+    # Check if 'confidence_score' exists in the results
+    columns_to_display = ['Rank', 'file_name', 'match_score', 'recommendation']
+    column_names = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
+    
+    if 'confidence_score' in df.columns:
+        columns_to_display.append('confidence_score')
+        column_names.append('Confidence Score')
+    
+    df = df[columns_to_display]
+    df.columns = column_names
     df = df.set_index('Rank')
 
     st.subheader("Candidate Summary")
@@ -355,16 +364,17 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             return _generate_error_result(resume_file.name, "Unexpected result type")
         
         result = {
-            'file_name': resume_file.name,
-            'brief_summary': result.get('brief_summary', "No summary available"),
-            'match_score': int(result.get('match_score', 0)),
-            'recommendation': result.get('recommendation', "No recommendation available"),
-            'experience_and_project_relevance': result.get('experience_and_project_relevance', "No relevance information available"),
-            'skills_gap': result.get('skills_gap', []),
-            'key_strengths': result.get('key_strengths', []),
-            'areas_for_improvement': result.get('areas_for_improvement', []),
-            'recruiter_questions': result.get('recruiter_questions', [])
-        }
+        'file_name': resume_file.name,
+        'brief_summary': result.get('brief_summary', "No summary available"),
+        'match_score': int(result.get('match_score', 0)),
+        'recommendation': result.get('recommendation', "No recommendation available"),
+        'experience_and_project_relevance': result.get('experience_and_project_relevance', "No relevance information available"),
+        'skills_gap': result.get('skills_gap', []),
+        'key_strengths': result.get('key_strengths', []),
+        'areas_for_improvement': result.get('areas_for_improvement', []),
+        'recruiter_questions': result.get('recruiter_questions', []),
+        'confidence_score': result.get('confidence_score', 0) 
+    }
         
         if not result['brief_summary']:
             result['brief_summary'] = generate_brief_summary(result['match_score'], job_title)
