@@ -28,9 +28,6 @@ gpt4o_mini_api_key = Config.GPT4O_MINI_API_KEY
 llama_api_key = Config.LLAMA_API_KEY
 logger.debug(f"Llama API Key (first 5 chars): {llama_api_key[:5] if llama_api_key else 'Not set'}")
 
-llama_api_key = os.getenv('LLAMA_API_KEY')
-logger.debug(f"Llama API Key (first 5 chars): {llama_api_key[:5] if llama_api_key else 'Not set'}")
-
 # Initialize API clients
 try:
     claude_api = ClaudeAPI(claude_api_key) if claude_api_key else None
@@ -46,19 +43,14 @@ except Exception as e:
 ENVIRONMENT = Config.ENVIRONMENT
 
 def test_llama_api(llm):
-        try:
-            test_prompt = "Please analyze this simple sentence: 'The quick brown fox jumps over the lazy dog.'"
-            result = llm.analyze(test_prompt)
-            logger.info(f"Test Llama API call result: {json.dumps(result, indent=2)}")
-            return True
-        except Exception as e:
-            logger.error(f"Test Llama API call failed: {str(e)}", exc_info=True)
+    try:
+        test_prompt = "Please analyze this simple sentence: 'The quick brown fox jumps over the lazy dog.'"
+        result = llm.analyze(test_prompt)
+        logger.info(f"Test Llama API call result: {json.dumps(result, indent=2)}")
+        return True
+    except Exception as e:
+        logger.error(f"Test Llama API call failed: {str(e)}", exc_info=True)
         return False
-
-    # Add this before processing resumes
-        if not test_llama_api(llm):
-            st.error("Failed to connect to Llama API. Please check your configuration and API key.")
-            return
 
 # Session State Initialization
 if 'importance_factors' not in st.session_state:
@@ -143,6 +135,10 @@ def main_app():
     except Exception as e:
         logger.error(f"Failed to initialize LlamaAPI: {str(e)}", exc_info=True)
         st.error("Failed to initialize LlamaAPI. Please check your configuration and API key.")
+        return
+
+    if not test_llama_api(llm):
+        st.error("Failed to connect to Llama API. Please check your configuration and API key.")
         return
 
     if not hasattr(resume_processor, 'analyze_match'):

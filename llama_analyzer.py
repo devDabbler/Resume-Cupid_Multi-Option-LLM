@@ -116,7 +116,9 @@ class LlamaAPI:
             return f"The candidate is a good fit for the role. With a match score of {match_score}%, they demonstrate strong alignment with the required skills and experience."
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
+        logger.debug(f"Entering analyze_match method in LlamaAPI")
         if not resume or not job_description:
+            logger.error("Empty resume or job description provided")
             return self._generate_error_response("Empty resume or job description provided")
 
         prompt = f"""
@@ -142,7 +144,9 @@ class LlamaAPI:
         """
 
         try:
+            logger.debug("Calling self.analyze method")
             result = self.analyze(prompt)
+            logger.debug(f"Result from self.analyze: {json.dumps(result, indent=2)}")
             result['file_name'] = candidate_data.get('file_name', 'Unknown')
             return result
         except Exception as e:

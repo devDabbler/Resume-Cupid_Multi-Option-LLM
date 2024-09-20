@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 # Load API keys
 claude_api_key = os.getenv('CLAUDE_API_KEY')
 llama_api_key = os.getenv('LLAMA_API_KEY')
+if llama_api_key:
+    logger.debug(f"Llama API Key (first 5 chars): {llama_api_key[:5]}")
+    logger.debug(f"Llama API Key length: {len(llama_api_key)}")
+else:
+    logger.error("LLAMA_API_KEY not set in environment variables")
 gpt4o_mini_api_key = os.getenv('GPT4O_MINI_API_KEY')
 
 # Debugging: Log each variable individually
