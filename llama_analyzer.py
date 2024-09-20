@@ -36,12 +36,14 @@ class LlamaAPI:
             logger.debug(f"Raw response from Llama: {result}")
 
             parsed_content = self._parse_json_response(result)
-            processed_content = self._process_parsed_content(parsed_content)
+            logger.debug(f"Parsed content: {json.dumps(parsed_content, indent=2)}")
 
-            logger.info(f"Analysis completed successfully for prompt: {prompt[:50]}...")
+            processed_content = self._process_parsed_content(parsed_content)
+            logger.debug(f"Processed content: {json.dumps(processed_content, indent=2)}")
+
             return processed_content
         except Exception as e:
-            logger.error(f"Error during analysis: {str(e)}")
+            logger.error(f"Error during analysis: {str(e)}", exc_info=True)
             return self._generate_error_response(str(e))
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:

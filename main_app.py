@@ -218,28 +218,27 @@ def main_app():
 
         job_requirements = generate_job_requirements(st.session_state.job_description)
 
-        for i, resume_file in enumerate(resume_files):
-            status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
-            try:
-                result = process_resume(
-                    resume_file, 
-                    resume_processor, 
-                    st.session_state.job_description, 
-                    st.session_state.importance_factors,
-                    st.session_state.job_title, 
-                    st.session_state.key_skills, 
-                    llm, 
-                    job_requirements
-                )
-                evaluation_results.append(result)
-                progress_bar.progress((i + 1) / len(resume_files))
-                
-                # Log the result for each resume
-                logger.info(f"Processed resume: {resume_file.name}")
-                logger.info(f"Result: {json.dumps(result, indent=2)}")
-            except Exception as e:
-                logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
-                st.error(f"Error processing resume {resume_file.name}: {str(e)}")
+    for i, resume_file in enumerate(resume_files):
+        status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
+        try:
+            logger.info(f"Starting to process resume: {resume_file.name}")
+            result = process_resume(
+                resume_file, 
+                resume_processor, 
+                st.session_state.job_description, 
+                st.session_state.importance_factors,
+                st.session_state.job_title, 
+                st.session_state.key_skills, 
+                llm, 
+                job_requirements
+            )
+            logger.info(f"Finished processing resume: {resume_file.name}")
+            logger.debug(f"Result for {resume_file.name}: {json.dumps(result, indent=2)}")
+            evaluation_results.append(result)
+            progress_bar.progress((i + 1) / len(resume_files))
+        except Exception as e:
+            logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
+            st.error(f"Error processing resume {resume_file.name}: {str(e)}")
 
         if evaluation_results:
             st.success("Evaluation complete!")
