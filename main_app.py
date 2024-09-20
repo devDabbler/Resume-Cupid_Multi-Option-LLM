@@ -226,7 +226,6 @@ def main_app():
                     resume_processor, 
                     st.session_state.job_description, 
                     st.session_state.importance_factors,
-                    {}, # Empty dict for candidate_data as it's not being used
                     st.session_state.job_title, 
                     st.session_state.key_skills, 
                     llm, 
