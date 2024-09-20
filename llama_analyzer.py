@@ -109,19 +109,15 @@ class LlamaAPI:
         if not resume or not job_description:
             return self._generate_error_response("Empty resume or job description provided")
 
-        prompt = self._generate_analysis_prompt(resume, job_description, job_title)
-        result = self.analyze(prompt)
-        result['file_name'] = candidate_data.get('file_name', 'Unknown')
-        return result
+        prompt = f"""
+        Analyze the following resume against the provided job description for a {job_title} role. 
+        Pay special attention to the candidate's experience and skills related to AI and machine learning, as these are critical for this role.
 
-    def _generate_analysis_prompt(self, resume: str, job_description: str, job_title: str) -> str:
-        return f"""
-        Analyze the following resume against the provided job description for a {job_title} role. Provide a detailed evaluation covering:
-
-        1. Match Score (0-100): Assess how well the candidate's skills and experience match the job requirements.
+        Provide a detailed analysis covering:
+        1. Match Score (0-100): Assess how well the candidate's skills and experience match the job requirements. Be very critical in your scoring.
         2. Brief Summary: Provide a 2-3 sentence overview of the candidate's fit for the role.
-        3. Experience and Project Relevance: Analyze how the candidate's past experiences and projects align with the job requirements.
-        4. Skills Gap: Identify any important skills or qualifications mentioned in the job description that the candidate lacks.
+        3. Experience and Project Relevance: Analyze how the candidate's past experiences and projects align with the job requirements. Provide numerical scores for overall relevance, relevant experience, project relevance, and technical skills relevance.
+        4. Skills Gap: Identify any important skills or qualifications mentioned in the job description that the candidate lacks. This is crucial for determining the candidate's suitability.
         5. Key Strengths: List 3-5 specific strengths of the candidate relevant to this role.
         6. Areas for Improvement: Suggest 2-3 areas where the candidate could improve to better fit the role.
         7. Recruiter Questions: Suggest 3-5 specific questions for the recruiter to ask the candidate based on their resume and the job requirements.
@@ -132,9 +128,16 @@ class LlamaAPI:
         Job Description:
         {job_description}
 
-        Provide your analysis in a structured JSON format with the following keys:
-        "match_score", "brief_summary", "experience_and_project_relevance", "skills_gap", "key_strengths", "areas_for_improvement", "recruiter_questions"
+        Provide your analysis in a structured JSON format.
         """
+
+        try:
+            result = self.analyze(prompt)
+            result['file_name'] = candidate_data.get('file_name', 'Unknown')
+            return result
+        except Exception as e:
+            logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
+            return self._generate_error_response(f"Error in analyze_match: {str(e)}")
 
     def _generate_error_response(self, error_message: str) -> Dict[str, Any]:
         logger.warning(f"Generating error response: {error_message}")

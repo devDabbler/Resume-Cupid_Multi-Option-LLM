@@ -5,7 +5,6 @@ import streamlit as st
 from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results, extract_text_from_file, generate_job_requirements
 from database import init_db, insert_run_log, save_role, delete_saved_role, get_saved_roles, save_feedback
 from resume_processor import create_resume_processor
-from candidate_data import get_candidate_data
 import os
 from claude_analyzer import ClaudeAPI
 from gpt4o_mini_analyzer import GPT4oMiniAPI
@@ -272,9 +271,6 @@ def process_resumes_logic(resume_files, resume_processor, llm):
     insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
     logger.info("Processing resumes...")
 
-    candidates = get_candidate_data()
-    candidate_data_list = [next((c for c in candidates if c['candidate'] == file.name), {}) for file in resume_files]
-
     progress_bar = st.progress(0)
     status_text = st.empty()
 
@@ -283,11 +279,17 @@ def process_resumes_logic(resume_files, resume_processor, llm):
     evaluation_results = []
     try:
         with st.spinner('Processing resumes...'):
-            for i, (resume_file, candidate_data) in enumerate(zip(resume_files, candidate_data_list)):
+            for i, resume_file in enumerate(resume_files):
                 status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
                 result = process_resume(
-                    resume_file, resume_processor, st.session_state.job_description, st.session_state.importance_factors,
-                    candidate_data, st.session_state.job_title, st.session_state.key_skills, llm, job_requirements
+                    resume_file, 
+                    resume_processor, 
+                    st.session_state.job_description, 
+                    st.session_state.importance_factors,
+                    st.session_state.job_title, 
+                    st.session_state.key_skills, 
+                    llm, 
+                    job_requirements
                 )
                 evaluation_results.append(result)
                 progress_bar.progress((i + 1) / len(resume_files))

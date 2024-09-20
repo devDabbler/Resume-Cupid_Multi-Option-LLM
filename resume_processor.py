@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import yaml
 import time
 import random
 import json
@@ -26,9 +27,10 @@ def clean_text(text: str) -> str:
     return '. '.join(sentence.capitalize() for sentence in cleaned.split('. '))
 
 class ResumeProcessor:
-    def __init__(self, api_key: str, backend: str):
+    def __init__(self, api_key: str, backend: str, job_roles_file: str = 'job_roles.yaml'):
         logger.info(f"Initializing ResumeProcessor with backend: {backend}")
         self.backend = backend
+        
         if backend == "claude":
             logger.info("Initializing ClaudeAPI")
             self.analyzer = ClaudeAPI(api_key)
@@ -46,7 +48,17 @@ class ResumeProcessor:
         self.token_bucket = self.token_limit
         self.last_refill = time.time()
         self.encoder = tiktoken.encoding_for_model("gpt-4")
-        logger.info(f"ResumeProcessor initialized with {backend} backend")
+        
+        # Load job roles
+        try:
+            with open(job_roles_file, 'r') as file:
+                self.job_roles = yaml.safe_load(file)
+            logger.info(f"Job roles loaded from {job_roles_file}")
+        except Exception as e:
+            logger.error(f"Error loading job roles from {job_roles_file}: {str(e)}")
+            self.job_roles = {}
+        
+        logger.info(f"ResumeProcessor initialized with {backend} backend and job roles")
 
     def estimate_tokens(self, text: str) -> int:
         return len(self.encoder.encode(text))
@@ -151,15 +163,17 @@ class ResumeProcessor:
 
     def analyze_match(self, resume: str, job_description: str, candidate_data: Dict[str, Any], job_title: str) -> Dict[str, Any]:
         logger.debug(f"Analyzing match for resume length: {len(resume)}, job description length: {len(job_description)}, job title: {job_title}")
-    
+
         try:
             raw_analysis = self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
             logger.debug(f"Raw analysis result: {json.dumps(raw_analysis, indent=2)}")
-        
-            # Standardize and clean the analysis results
+    
             standardized_result = self._standardize_analysis(raw_analysis, resume, job_title)
             logger.debug(f"Standardized analysis result: {json.dumps(standardized_result, indent=2)}")
-        
+    
+            if not self._meets_minimum_requirements(standardized_result, job_title):
+                standardized_result['recommendation'] = "Do not recommend for interview"
+    
             return standardized_result
         except Exception as e:
             logger.error(f"Error in analyze_match: {str(e)}", exc_info=True)
@@ -180,42 +194,88 @@ class ResumeProcessor:
         except (ValueError, TypeError):
             match_score = 0
 
-        experience_and_project_relevance = raw_analysis.get('experience_and_project_relevance', {})
-        if not isinstance(experience_and_project_relevance, dict):
-            experience_and_project_relevance = {'description': str(experience_and_project_relevance)}
-
-        skills_gap = raw_analysis.get('skills_gap', {})
-        if isinstance(skills_gap, dict) and 'gaps' in skills_gap:
-            skills_gap = skills_gap['gaps']
-        elif not isinstance(skills_gap, list):
-            skills_gap = [str(skills_gap)]
-
-        key_strengths = raw_analysis.get('key_strengths', [])
-        if not isinstance(key_strengths, list):
-            key_strengths = [str(key_strengths)]
-
-        areas_for_improvement = raw_analysis.get('areas_for_improvement', [])
-        if not isinstance(areas_for_improvement, list):
-            areas_for_improvement = [str(areas_for_improvement)]
-
-        recruiter_questions = raw_analysis.get('recruiter_questions', [])
-        if not isinstance(recruiter_questions, list):
-            recruiter_questions = [str(recruiter_questions)]
-
         standardized = {
             'file_name': raw_analysis.get('file_name', 'Unknown'),
             'match_score': match_score,
             'brief_summary': clean_and_format(raw_analysis.get('brief_summary', 'No summary available')),
             'fit_summary': clean_and_format(self._generate_fit_summary(match_score, job_title)),
-            'recommendation': clean_and_format(raw_analysis.get('recommendation', 'No recommendation available')),
-            'experience_and_project_relevance': clean_and_format(experience_and_project_relevance),
-            'skills_gap': clean_and_format(skills_gap),
-            'key_strengths': clean_and_format(key_strengths),
-            'areas_for_improvement': clean_and_format(areas_for_improvement),
-            'recruiter_questions': clean_and_format(recruiter_questions)[:5],  # Limit to 5 questions
+            'recommendation': self._generate_recommendation(match_score),
+            'experience_and_project_relevance': self._standardize_relevance(raw_analysis.get('experience_and_project_relevance', {})),
+            'skills_gap': self._standardize_skills_gap(raw_analysis.get('skills_gap', {})),
+            'key_strengths': clean_and_format(raw_analysis.get('key_strengths', [])),
+            'areas_for_improvement': clean_and_format(raw_analysis.get('areas_for_improvement', [])),
+            'recruiter_questions': clean_and_format(raw_analysis.get('recruiter_questions', []))[:5],  # Limit to 5 questions
+            'confidence_score': self._calculate_confidence_score(raw_analysis)
         }
 
         return standardized
+
+    def _meets_minimum_requirements(self, result: Dict[str, Any], job_title: str) -> bool:
+        logger.debug(f"Checking minimum requirements for {job_title}")
+        job_role = self.job_roles.get(job_title.lower().replace(' ', '_'))
+        if not job_role:
+            logger.warning(f"No job role found for {job_title}. Using default minimum requirements.")
+            return True  # Default to True if we don't have specific requirements
+
+        min_requirements = job_role.get('minimum_requirements', {})
+        min_score = min_requirements.get('min_score', 0)
+        critical_skills = min_requirements.get('critical_skills', [])
+        min_experience_years = min_requirements.get('min_experience_years', 0)
+
+        if result['match_score'] < min_score:
+            logger.info(f"Candidate does not meet minimum score requirement. Score: {result['match_score']}, Required: {min_score}")
+            return False
+
+        missing_critical_skills = [skill for skill in critical_skills 
+                               if skill.lower() not in [s.lower() for s in result['skills_gap'].get('missing_skills', [])]]
+        if missing_critical_skills:
+            logger.info(f"Candidate is missing critical skills: {', '.join(missing_critical_skills)}")
+            return False
+
+        candidate_experience = result.get('years_of_experience', 0)
+        if candidate_experience < min_experience_years:
+            logger.info(f"Candidate does not meet minimum years of experience. Years: {candidate_experience}, Required: {min_experience_years}")
+            return False
+
+        return True
+
+    def _generate_recommendation(self, match_score: int) -> str:
+        if match_score >= 85:
+            return "Highly recommend for interview"
+        elif 70 <= match_score < 85:
+            return "Recommend for interview"
+        elif 50 <= match_score < 70:
+            return "Consider for interview with reservations"
+        else:
+            return "Do not recommend for interview"
+
+    def _standardize_relevance(self, relevance_data: Dict[str, Any]) -> Dict[str, Any]:
+        if isinstance(relevance_data, dict):
+            return {
+                'overall_relevance': relevance_data.get('relevance', 0),
+                'description': relevance_data.get('description', 'No description available'),
+                'relevant_experience': relevance_data.get('relevant_experience', 0),
+                'project_relevance': relevance_data.get('project_relevance', 0),
+                'technical_skills_relevance': relevance_data.get('technical_skills', 0)
+            }
+            return {'overall_relevance': 0, 'description': 'Unable to assess relevance'}
+
+    def _standardize_skills_gap(self, skills_gap: Dict[str, Any]) -> Dict[str, Any]:
+        if isinstance(skills_gap, dict):
+            if 'skills' in skills_gap:
+                return {
+                    'missing_skills': skills_gap['skills'],
+                    'description': skills_gap.get('description', 'No description available')
+                }
+            else:
+                return {k: v for k, v in skills_gap.items() if k != 'description'}
+        return {'missing_skills': [], 'description': 'Unable to assess skills gap'}
+
+    def _calculate_confidence_score(self, raw_analysis: Dict[str, Any]) -> float:
+        # This is a simple implementation. You may want to develop a more sophisticated method.
+        required_fields = ['match_score', 'brief_summary', 'experience_and_project_relevance', 'skills_gap', 'key_strengths']
+        filled_fields = sum(1 for field in required_fields if raw_analysis.get(field))
+        return filled_fields / len(required_fields)
 
     def _generate_fit_summary(self, match_score: int, job_title: str) -> str:
         if match_score < 50:

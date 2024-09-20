@@ -166,74 +166,52 @@ def display_results(evaluation_results: List[Dict[str, Any]], run_id: str, save_
 
     df = pd.DataFrame(sorted_results)
     df['Rank'] = range(1, len(df) + 1)
-    df = df[['Rank', 'file_name', 'match_score', 'recommendation']]
-    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']
+    df = df[['Rank', 'file_name', 'match_score', 'recommendation', 'confidence_score']]
+    df.columns = ['Rank', 'Candidate', 'Match Score (%)', 'Recommendation', 'Confidence Score']
     df = df.set_index('Rank')
 
     st.subheader("Candidate Summary")
-    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}'}))
+    st.dataframe(df.style.format({'Match Score (%)': '{:.0f}', 'Confidence Score': '{:.2f}'}))
 
     for i, result in enumerate(sorted_results, 1):
         with st.expander(f"Rank {i}: {result.get('file_name', 'Unknown')} - Detailed Analysis", expanded=i == 1):
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Match Score", f"{result.get('match_score', 0)}%")
             with col2:
+                st.metric("Confidence Score", f"{result.get('confidence_score', 0):.2f}")
+            with col3:
                 st.write("**Recommendation:**", result.get('recommendation', 'N/A'))
 
             st.write("**Brief Summary:**", result.get('brief_summary', 'No summary available.'))
-
             st.write("**Fit Summary:**", result.get('fit_summary', 'No fit summary available.'))
 
             st.subheader("Experience and Project Relevance")
-            exp_relevance = result.get('experience_and_project_relevance', {})
-            if isinstance(exp_relevance, dict):
-                st.write(f"**Alignment:** {exp_relevance.get('alignment', 'N/A')}")
-                st.write(f"**Relevance:** {exp_relevance.get('relevance', 'N/A')}")
-                st.write(f"**Description:** {exp_relevance.get('description', 'N/A')}")
-                
-                if 'projects' in exp_relevance:
-                    st.write("**Projects:**")
-                    for project in exp_relevance['projects']:
-                        st.write(f"- {project.get('project_name', 'Unnamed Project')}")
-                        st.write(f"  Alignment: {project.get('alignment', 'N/A')}, Relevance: {project.get('relevance', 'N/A')}")
-            else:
-                st.write(exp_relevance)
+            relevance = result.get('experience_and_project_relevance', {})
+            st.write(f"**Overall Relevance:** {relevance.get('overall_relevance', 0)}")
+            st.write(f"**Relevant Experience:** {relevance.get('relevant_experience', 0)}")
+            st.write(f"**Project Relevance:** {relevance.get('project_relevance', 0)}")
+            st.write(f"**Technical Skills Relevance:** {relevance.get('technical_skills_relevance', 0)}")
+            st.write(relevance.get('description', 'No description available.'))
 
             st.subheader("Skills Gap")
-            skills_gap = result.get('skills_gap', [])
-            if isinstance(skills_gap, dict) and 'gaps' in skills_gap:
-                skills_gap = skills_gap['gaps']
-            for skill in skills_gap:
-                if isinstance(skill, dict):
-                    st.write(f"- **{skill.get('skill', 'Unnamed Skill')}:** {skill.get('description', 'N/A')}")
-                else:
-                    st.write(f"- {skill}")
+            skills_gap = result.get('skills_gap', {})
+            st.write("**Missing Skills:**")
+            for skill in skills_gap.get('missing_skills', []):
+                st.write(f"- {skill}")
+            st.write(skills_gap.get('description', 'No description available.'))
 
             st.subheader("Key Strengths")
-            strengths = result.get('key_strengths', [])
-            for strength in strengths:
-                if isinstance(strength, dict):
-                    st.write(f"- **{strength.get('strength', 'Unnamed Strength')}:** {strength.get('description', 'N/A')}")
-                else:
-                    st.write(f"- {strength}")
+            for strength in result.get('key_strengths', []):
+                st.write(f"- {strength}")
 
             st.subheader("Areas for Improvement")
-            improvements = result.get('areas_for_improvement', [])
-            for area in improvements:
-                if isinstance(area, dict):
-                    st.write(f"- **{area.get('area', 'Unnamed Area')}:** {area.get('description', 'N/A')}")
-                else:
-                    st.write(f"- {area}")
+            for area in result.get('areas_for_improvement', []):
+                st.write(f"- {area}")
 
             st.subheader("Recommended Interview Questions")
-            questions = result.get('recruiter_questions', [])
-            for question in questions:
-                if isinstance(question, dict):
-                    st.write(f"- **Q:** {question.get('question', 'N/A')}")
-                    st.write(f"  **Reason:** {question.get('description', 'N/A')}")
-                else:
-                    st.write(f"- {question}")
+            for question in result.get('recruiter_questions', []):
+                st.write(f"- {question}")
 
     try:
         pdf_data = generate_pdf_report(evaluation_results, run_id)
@@ -360,7 +338,7 @@ def process_resumes_sequentially(resume_files, resume_processor, job_description
             results.append(_generate_error_result(file.name, str(e)))
     return results
 
-def process_resume(resume_file, resume_processor, job_description, importance_factors, candidate_data, job_title, key_skills, llm, job_requirements):
+def process_resume(resume_file, resume_processor, job_description, importance_factors, job_title, key_skills, llm, job_requirements):
     logger = get_logger(__name__)
     logger.debug(f"Processing resume: {resume_file.name} with {resume_processor.backend} backend")
     try:
@@ -369,7 +347,7 @@ def process_resume(resume_file, resume_processor, job_description, importance_fa
             logger.warning(f"Empty content extracted from {resume_file.name}")
             return _generate_error_result(resume_file.name, "Empty content extracted")
         
-        result = resume_processor.analyze_match(resume_text, job_description, candidate_data, job_title)
+        result = resume_processor.analyze_match(resume_text, job_description, job_title)
         logger.debug(f"Initial analysis result: {json.dumps(result, indent=2)}")
         
         if not isinstance(result, dict):
