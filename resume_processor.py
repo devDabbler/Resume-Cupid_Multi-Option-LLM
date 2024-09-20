@@ -169,6 +169,10 @@ class ResumeProcessor:
             raw_analysis = self.analyzer.analyze_match(resume, job_description, candidate_data, job_title)
             logger.debug(f"Raw analysis result: {json.dumps(raw_analysis, indent=2)}")
 
+            if 'error' in raw_analysis:
+                logger.error(f"Error in Llama API analysis: {raw_analysis['error']}")
+                return self._generate_error_result(raw_analysis['error'])
+
             standardized_result = self._standardize_analysis(raw_analysis, resume, job_title)
             logger.debug(f"Standardized analysis result: {json.dumps(standardized_result, indent=2)}")
 

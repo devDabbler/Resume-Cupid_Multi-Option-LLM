@@ -17,6 +17,8 @@ class LlamaAPI:
     def analyze(self, prompt: str) -> Dict[str, Any]:
         try:
             logger.debug(f"Sending request to Llama API with prompt: {prompt[:500]}...")
+            logger.debug(f"API Key: {self.client.api_key[:5]}...")  # Log first 5 characters of API key
+        
             completion = self.client.chat.completions.create(
                 messages=[
                     {
@@ -32,6 +34,12 @@ class LlamaAPI:
                 max_tokens=4000,
                 temperature=0.7,
             )
+        
+            logger.debug(f"Received response from Llama API: {completion}")
+        
+            if not completion.choices:
+                raise ValueError("No choices returned from Llama API")
+        
             result = completion.choices[0].message.content
             logger.debug(f"Raw response from Llama: {result}")
 
@@ -43,7 +51,7 @@ class LlamaAPI:
 
             return processed_content
         except Exception as e:
-            logger.error(f"Error during analysis: {str(e)}", exc_info=True)
+            logger.error(f"Error during Llama API analysis: {str(e)}", exc_info=True)
             return self._generate_error_response(str(e))
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
