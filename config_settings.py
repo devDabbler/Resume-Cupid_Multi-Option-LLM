@@ -64,11 +64,6 @@ if llama_api_key is None:
 else:
     logger.debug(f"LLAMA_API_KEY: {llama_api_key}")
 
-if llama_api_key is None:
-    logger.error("LLAMA_API_KEY not found in environment variables.")
-else:
-    logger.debug(f"LLAMA_API_KEY: {llama_api_key}")
-
 # Config class with fallback values
 class Config:
     API_URL = os.getenv('API_URL', 'http://localhost:8501')
