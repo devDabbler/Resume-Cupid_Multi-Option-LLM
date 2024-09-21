@@ -2,31 +2,30 @@ import os
 from dotenv import load_dotenv
 import logging
 
-# Load environment variables from the .env.production file in the same directory
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env.production'))
+environment = os.getenv('ENVIRONMENT', 'development')
+env_file = '.env.production' if environment == 'production' else '.env.development'
+env_path = os.path.join(os.path.dirname(__file__), env_file)
 
-import logging
+load_dotenv(dotenv_path=env_path)
 
 # Set up logging
 logging.basicConfig(
-    level=logging.ERROR,  # Change DEBUG to INFO or WARNING
+    level=logging.ERROR,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('app.log', mode='a'),  # Log to file
-        logging.StreamHandler()  # Log to console
+        logging.FileHandler('app.log', mode='a'),
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
 # Load API keys
-claude_api_key = os.getenv('CLAUDE_API_KEY')
 llama_api_key = os.getenv('LLAMA_API_KEY')
 if llama_api_key:
     logger.debug(f"Llama API Key (first 5 chars): {llama_api_key[:5]}")
     logger.debug(f"Llama API Key length: {len(llama_api_key)}")
 else:
     logger.error("LLAMA_API_KEY not set in environment variables")
-gpt4o_mini_api_key = os.getenv('GPT4O_MINI_API_KEY')
 
 # Debugging: Log each variable individually
 smtp_server = os.getenv('SMTP_SERVER')
@@ -60,15 +59,10 @@ if from_email is None:
 else:
     logger.debug(f"FROM_EMAIL: {from_email}")
 
-if claude_api_key is None:
-    logger.error("CLAUDE_API_KEY not found in environment variables.")
+if llama_api_key is None:
+    logger.error("LLAMA_API_KEY not found in environment variables.")
 else:
-    logger.debug(f"CLAUDE_API_KEY: {claude_api_key}")
-
-if gpt4o_mini_api_key is None:
-    logger.error("GPT4O_MINI_API_KEY not found in environment variables.")
-else:
-    logger.debug(f"GPT4O_MINI_API_KEY: {gpt4o_mini_api_key}")
+    logger.debug(f"LLAMA_API_KEY: {llama_api_key}")
 
 if llama_api_key is None:
     logger.error("LLAMA_API_KEY not found in environment variables.")
@@ -89,8 +83,6 @@ class Config:
     LOG_FILE = os.getenv('LOG_FILE', './logs/app.log')
     BERT_MODEL_NAME = os.getenv('BERT_MODEL_NAME', 'all-MiniLM-L6-v2')
     ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
-    CLAUDE_API_KEY = claude_api_key if claude_api_key else 'default_claude_api_key'
-    GPT4O_MINI_API_KEY = gpt4o_mini_api_key if gpt4o_mini_api_key else 'default_gpt4o_mini_api_key'
     LLAMA_API_KEY = llama_api_key if llama_api_key else 'default_llama_api_key'
 
     @staticmethod
@@ -107,3 +99,5 @@ class Config:
 # Log the final SMTP configuration
 smtp_config = Config.get_smtp_config()
 logger.debug(f"SMTP Configuration: SERVER={smtp_config['server']}, PORT={smtp_config['port']}, USERNAME={smtp_config['username']}, FROM_EMAIL={smtp_config['from_email']}")
+
+
