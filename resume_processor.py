@@ -7,6 +7,7 @@ from config_settings import Config
 import yaml
 import spacy
 import re
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -165,12 +166,13 @@ class ResumeProcessor:
         max_score = 0
 
         weights = {
-            'education': 20,
-            'experience': 30,
+            'education': 15,
+            'experience': 25,
             'skills': 20,
             'specific_knowledge': 15,
             'soft_skills': 5,
             'us_experience': 10,
+            'years_of_experience': 10
         }
 
         # Check education
@@ -179,7 +181,7 @@ class ResumeProcessor:
         if required_education and required_education in candidate_education:
             score += weights['education']
         elif 'bachelor' in candidate_education and 'master' in required_education:
-            score += weights['education'] * 0.5  # Partial credit for having a bachelor's when master's is required
+            score += weights['education'] * 0.5
         max_score += weights['education']
 
         # Check experience
@@ -191,6 +193,14 @@ class ResumeProcessor:
             experience_ratio = min(candidate_experience / required_experience, 1)
             score += weights['experience'] * experience_ratio
         max_score += weights['experience']
+
+        # Check years of experience
+        years_of_experience = self._calculate_years_of_experience(result.get('experience', ''))
+        if years_of_experience >= required_experience:
+            score += weights['years_of_experience']
+        else:
+            score += weights['years_of_experience'] * (years_of_experience / required_experience)
+            max_score += weights['years_of_experience']
 
         # Check U.S. experience
         us_experience = self._check_us_experience(result.get('experience', ''))
@@ -230,13 +240,34 @@ class ResumeProcessor:
 
         # Apply additional adjustments
         if not us_experience:
-            final_score = max(final_score - 10, 0)  # Decrease score by 10 points if no U.S. experience, but not below 0
+            final_score = max(final_score - 15, 0)  # Increased penalty for no U.S. experience
 
-        # Ensure the score doesn't exceed 95
-        final_score = min(final_score, 95)
+        # Adjust for junior status
+        if years_of_experience < 3:
+            final_score = max(final_score - 10, 0)  # Penalty for junior status
+
+        # Adjust for previous role being primarily Data Analyst
+        if self._is_primarily_data_analyst(result.get('experience', '')):
+            final_score = max(final_score - 5, 0)  # Small penalty for primarily Data Analyst experience
+
+        # Ensure the score doesn't exceed 90
+        final_score = min(final_score, 90)
 
         logger.info(f"Calculated score: {final_score}. Raw score: {score}, Max score: {max_score}")
         return final_score
+
+    def _parse_date(self, date_string: str) -> datetime:
+        try:
+            return datetime.strptime(date_string, '%B %Y')
+        except ValueError:
+            try:
+                return datetime.strptime(date_string, '%b %Y')
+            except ValueError:
+                return None
+
+    def _check_us_experience(self, experience: str) -> bool:
+        us_keywords = ['united states', 'usa', 'u.s.', 'america']
+        return any(keyword in experience.lower() for keyword in us_keywords)
 
     def _check_us_experience(self, experience: str) -> bool:
         us_keywords = ['united states', 'usa', 'u.s.', 'america']
