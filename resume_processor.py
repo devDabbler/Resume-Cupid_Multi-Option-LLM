@@ -30,15 +30,14 @@ class ResumeProcessor:
             merged_requirements = {**description_requirements, **job_requirements}
 
             analysis = llama_service.analyze_resume(resume_text, job_description, job_title)
-        
-            # Log the raw analysis for debugging
-            logger.debug(f"Raw analysis from llama_service: {analysis}")
-
+    
             result = self._process_analysis(analysis, "Unknown", job_title, merged_requirements)
+
+            # Extract experience information
+            result['experience'] = self._extract_experience(resume_text)
 
             # Ensure we have a valid match score
             if result['match_score'] == 0:
-                # If the llama_service didn't provide a score, calculate one
                 weighted_score = self._calculate_weighted_score(result, merged_requirements)
                 result['match_score'] = weighted_score
 
@@ -50,6 +49,11 @@ class ResumeProcessor:
         except Exception as e:
             logger.error(f"Error in process_resume: {str(e)}", exc_info=True)
             return self._generate_error_result("Unknown", str(e))
+
+    def _extract_experience(self, resume_text: str) -> str:
+        # Simple extraction of experience section
+        experience_section = re.search(r'EXPERIENCE.*?(?=EDUCATION|SKILLS|$)', resume_text, re.DOTALL | re.IGNORECASE)
+        return experience_section.group(0) if experience_section else ''
 
     def _process_analysis(self, raw_analysis: Dict[str, Any], file_name: str, job_title: str, job_requirements: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -147,11 +151,12 @@ class ResumeProcessor:
         max_score = 0
 
         weights = {
-            'education': 15,
-            'experience': 25,
-            'skills': 30,
-            'specific_knowledge': 20,
-            'soft_skills': 10
+            'education': 20,
+            'experience': 30,
+            'skills': 20,
+            'specific_knowledge': 15,
+            'soft_skills': 5,
+            'us_experience': 10,
         }
 
         # Check education
@@ -159,6 +164,8 @@ class ResumeProcessor:
         required_education = requirements.get('education_level', '').lower()
         if required_education and required_education in candidate_education:
             score += weights['education']
+        elif 'bachelor' in candidate_education and 'master' in required_education:
+            score += weights['education'] * 0.5  # Partial credit for having a bachelor's when master's is required
         max_score += weights['education']
 
         # Check experience
@@ -167,8 +174,15 @@ class ResumeProcessor:
         if candidate_experience >= required_experience:
             score += weights['experience']
         elif required_experience > 0:
-            score += weights['experience'] * (candidate_experience / required_experience)
+            experience_ratio = min(candidate_experience / required_experience, 1)
+            score += weights['experience'] * experience_ratio
         max_score += weights['experience']
+
+        # Check U.S. experience
+        us_experience = self._check_us_experience(result.get('experience', ''))
+        if us_experience:
+            score += weights['us_experience']
+        max_score += weights['us_experience']
 
         # Check skills
         required_skills = set(skill.lower() for skill in requirements.get('required_skills', []))
@@ -200,8 +214,19 @@ class ResumeProcessor:
         else:
             final_score = 0
 
+        # Apply additional adjustments
+        if not us_experience:
+            final_score = max(final_score - 10, 0)  # Decrease score by 10 points if no U.S. experience, but not below 0
+
+        # Ensure the score doesn't exceed 95
+        final_score = min(final_score, 95)
+
         logger.info(f"Calculated score: {final_score}. Raw score: {score}, Max score: {max_score}")
         return final_score
+
+def _check_us_experience(self, experience: str) -> bool:
+    us_keywords = ['united states', 'usa', 'u.s.', 'america']
+    return any(keyword in experience.lower() for keyword in us_keywords)
 
     def _extract_json_content(self, raw_analysis: str) -> str:
         """Extract JSON content from the raw analysis string."""
