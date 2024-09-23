@@ -25,33 +25,20 @@ class ResumeProcessor:
 
     def process_resume(self, resume_text: str, job_description: str, job_title: str) -> Dict[str, Any]:
         try:
-            # Load job requirements dynamically
             job_requirements = self.load_job_requirements(job_title)
-        
-            # Generate job requirements from the job description
             description_requirements = generate_job_requirements(job_description)
-        
-            # Merge requirements, giving priority to the loaded job requirements
             merged_requirements = {**description_requirements, **job_requirements}
-        
-            # Use the llama_service to analyze the resume
+
             analysis = llama_service.analyze_resume(resume_text, job_description, job_title)
-        
-            # Process the analysis
             result = self._process_analysis(analysis, "Unknown", job_title, merged_requirements)
-        
-            # Calculate a weighted score based on requirements
+
             weighted_score = self._calculate_weighted_score(result, merged_requirements)
-        
-            # Update the match score
             result['match_score'] = weighted_score
-        
-            # Update recommendation based on new match score
+
             result['recommendation'] = self._generate_recommendation(result['match_score'])
-        
-            # Update fit summary based on new match score
             result['fit_summary'] = self._generate_fit_summary(result['match_score'], job_title)
-        
+
+            logger.info(f"Processed resume. Match score: {result['match_score']}, Recommendation: {result['recommendation']}")
             return result
         except Exception as e:
             logger.error(f"Error in process_resume: {str(e)}")
@@ -59,7 +46,6 @@ class ResumeProcessor:
 
     def _process_analysis(self, raw_analysis: Dict[str, Any], file_name: str, job_title: str, job_requirements: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            # Extract JSON content from the raw analysis string
             analysis_str = self._extract_json_content(raw_analysis['analysis'])
             logger.debug(f"Extracted JSON content for {file_name}: {analysis_str}")
             analysis = json.loads(analysis_str)
@@ -82,18 +68,16 @@ class ResumeProcessor:
             'areas_for_improvement': self._format_list(analysis.get('Areas for Improvement', [])),
             'recruiter_questions': self._format_list(analysis.get('Recruiter Questions', [])),
             'education': analysis.get('Education', ''),
-            'experience_years': analysis.get('Total Years of Experience', 0),
+            'experience_years': int(analysis.get('Total Years of Experience', 0)),
             'skills': analysis.get('Skills', []),
             'knowledge': analysis.get('Knowledge Areas', []),
             'soft_skills': analysis.get('Soft Skills', []),
-        }
+     }
 
-        # Ensure all fields have content
         for key, value in processed.items():
             if not value and key not in ['file_name', 'match_score', 'experience_years']:
                 processed[key] = f"No {key.replace('_', ' ')} available"
 
-        # If key_strengths, areas_for_improvement, or recruiter_questions are empty, generate them based on job requirements
         if not processed['key_strengths'] or processed['key_strengths'] == ['No items available']:
             processed['key_strengths'] = self._generate_key_strengths(analysis, job_requirements)
 
@@ -147,8 +131,7 @@ class ResumeProcessor:
     def _calculate_weighted_score(self, result: Dict[str, Any], requirements: Dict[str, Any]) -> int:
         score = 0
         max_score = 0
-    
-        # Define weights for different categories
+
         weights = {
             'education': 15,
             'experience': 25,
@@ -156,21 +139,23 @@ class ResumeProcessor:
             'specific_knowledge': 20,
             'soft_skills': 10
         }
-    
+
         # Check education
         candidate_education = result.get('education', '').lower()
         required_education = requirements.get('education_level', '').lower()
         if required_education and required_education in candidate_education:
             score += weights['education']
         max_score += weights['education']
-    
+
         # Check experience
         candidate_experience = result.get('experience_years', 0)
         required_experience = requirements.get('years_of_experience', 0)
         if candidate_experience >= required_experience:
             score += weights['experience']
+        elif required_experience > 0:
+            score += weights['experience'] * (candidate_experience / required_experience)
         max_score += weights['experience']
-    
+
         # Check skills
         required_skills = set(skill.lower() for skill in requirements.get('required_skills', []))
         candidate_skills = set(skill.lower() for skill in result.get('skills', []))
@@ -178,7 +163,7 @@ class ResumeProcessor:
             skill_match_ratio = len(required_skills.intersection(candidate_skills)) / len(required_skills)
             score += weights['skills'] * skill_match_ratio
         max_score += weights['skills']
-    
+
         # Check specific knowledge
         specific_knowledge = set(skill.lower() for skill in requirements.get('specific_knowledge', []))
         candidate_knowledge = set(skill.lower() for skill in result.get('knowledge', []))
@@ -186,7 +171,7 @@ class ResumeProcessor:
             knowledge_match_ratio = len(specific_knowledge.intersection(candidate_knowledge)) / len(specific_knowledge)
             score += weights['specific_knowledge'] * knowledge_match_ratio
         max_score += weights['specific_knowledge']
-    
+
         # Check soft skills
         required_soft_skills = set(skill.lower() for skill in requirements.get('soft_skills', []))
         candidate_soft_skills = set(skill.lower() for skill in result.get('soft_skills', []))
@@ -194,12 +179,14 @@ class ResumeProcessor:
             soft_skills_match_ratio = len(required_soft_skills.intersection(candidate_soft_skills)) / len(required_soft_skills)
             score += weights['soft_skills'] * soft_skills_match_ratio
         max_score += weights['soft_skills']
-    
+
         # Calculate final percentage score
         if max_score > 0:
             final_score = int((score / max_score) * 100)
         else:
             final_score = 0
+
+        logger.info(f"Calculated score: {final_score}. Raw score: {score}, Max score: {max_score}")
         return final_score
 
     def _extract_json_content(self, raw_analysis: str) -> str:
@@ -247,7 +234,7 @@ class ResumeProcessor:
         elif 40 <= match_score < 60:
             return "Consider for interview with reservations"
         else:
-            return "Do not recommend for interview"
+            return "Not recommended for interview at this time"
 
     def _generate_fit_summary(self, match_score: int, job_title: str) -> str:
         if match_score >= 80:
