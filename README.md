@@ -26,6 +26,39 @@ Resume Cupid aims to revolutionize the hiring process by leveraging cutting-edge
 
 Resume Cupid is currently in active development. We are working on refining our AI models, improving the user interface, and ensuring the highest standards of data privacy and security.
 
+## Installation
+
+To set up Resume Cupid for local development:
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/your-username/resume-cupid.git
+   cd resume-cupid
+   ```
+
+2. Create and activate a virtual environment:
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+   ```
+
+3. Install the required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+
+4. Set up environment variables:
+   Create a `.env` file in the project root and add necessary API keys and configurations.
+
+5. Run the Streamlit app:
+   ```
+   streamlit run main_app.py
+   ```
+
+## Usage
+
+(To be added once the project reaches a more stable state. This section will include basic usage examples and screenshots.)
+
 ## Future Plans
 
 As we progress, we plan to:
@@ -33,6 +66,14 @@ As we progress, we plan to:
 2. Develop a robust API for potential integrations
 3. Explore partnerships with HR software providers
 4. Enhance our AI models with more specialized industry knowledge
+
+## Contributing
+
+We are not currently accepting external contributions as the project is in its early stages. However, we appreciate your interest and will update this section when we're ready for community contributions.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Contact
 
@@ -46,6 +87,8 @@ We would like to acknowledge the following technologies and organizations that a
 - [Meta AI](https://ai.facebook.com/) for the Llama model
 - [OpenAI](https://openai.com/) for GPT-4o-mini
 - [Streamlit](https://streamlit.io/) for the web application framework
+- [Spacy](https://spacy.io/) for natural language processing
+- [PyPDF2](https://pypdf2.readthedocs.io/) and [python-docx](https://python-docx.readthedocs.io/) for document parsing
 
 ---
 
