@@ -1,324 +1,97 @@
-import os
 import streamlit as st
 import bcrypt
-from dotenv import load_dotenv
-from database import register_user, authenticate_user, set_reset_token, reset_password, set_verification_token, verify_user, is_user_verified, admin_reset_password
-from email_utils import send_verification_email, send_password_reset_email
-from logger import get_logger  # Import the get_logger function
+from database import register_user, get_user
+from config_settings import Config
+import logging
+from utils import is_valid_email
 
-# Load environment variables from the .env.production file in the same directory
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env.production')
-logger = get_logger(__name__)  # Initialize the logger using get_logger
-logger.debug(f"Attempting to load environment variables from: {dotenv_path}")
+logger = logging.getLogger(__name__)
 
-load_dotenv(dotenv_path=dotenv_path)
+def init_auth_state():
+    if 'user' not in st.session_state:
+        st.session_state.user = None
+    if 'login_success' not in st.session_state:
+        st.session_state.login_success = False
 
-# Custom CSS for branding and UI enhancement
-custom_css = """
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+def login_user(username: str, password: str) -> bool:
+    user = get_user(username)
+    if user:
+        stored_password = user['password_hash']
+        if isinstance(stored_password, str):
+            stored_password = stored_password.encode('utf-8')
+        if bcrypt.checkpw(password.encode('utf-8'), stored_password):
+            st.session_state.user = user
+            st.session_state.login_success = True
+            logger.info(f"User logged in: {username}")
+            return True
+    logger.warning(f"Failed login attempt for user: {username}")
+    return False
+
+def logout_user():
+    st.session_state.user = None
+    st.session_state.login_success = False
+    logger.info("User logged out")
+
+def register_new_user(username: str, email: str, password: str) -> bool:
+    if not username or not email or not password:
+        st.error("All fields are required.")
+        return False
     
-    body {
-        font-family: 'Roboto', sans-serif;
-        background-color: #f0f2f6;
-        margin: 0;
-        padding: 0;
-        padding-top: 0 !important;
-        margin-top: 0 !important;
-    }
+    if not is_valid_email(email):
+        st.error("Please enter a valid email address.")
+        return False
     
-    .main-title {
-        font-size: 3.5em;
-        font-weight: 700;
-        color: #2C3E50;
-        text-align: center;
-        margin: 0.5rem 0 0.25rem;
-    }
+    if len(password) < 8:
+        st.error("Password must be at least 8 characters long.")
+        return False
     
-    .subtitle {
-        font-size: 1.2em;
-        color: #34495E;
-        text-align: center;
-        margin: 0 0 0.5rem;
-    }
-    
-    .login-form {
-        background-color: white;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        width: 100%;
-        max-width: 350px;
-        margin: 0.5rem auto 0;
-    }
-    
-    .login-button {
-        background-color: #3498DB;
-        color: white;
-        font-weight: bold;
-        border-radius: 5px;
-        padding: 0.5em 1em;
-        margin-top: 1rem;
-        width: 100%;
-    }
-    
-    .footer-text {
-        text-align: center;
-        width: 100%;
-        max-width: 800px;
-        margin: 1rem auto;
-    }
-    
-    h3 {
-        margin-bottom: 1rem !important;
-    }
-    
-    .stButton>button {
-        width: 100%;
-    }
-
-    /* Alternatively, reduce padding/margin of the tab panel */
-    
-    .stTabs [role="tabpanel"] {
-        padding: 0 !important; /* Remove padding from the tab panel */
-        margin: 0 !important; /* Remove margin from the tab panel */
-    }
-
-    /* Remove extra padding from the form container */
-    
-    .stForm {
-        margin-top: -1rem !important; /* Adjust margin to reduce space */
-    }
-    
-/* Optional: Adjust the login form padding if needed */
-
-    .login-form {
-        padding-top: 1rem !important; /* Adjust padding to reduce space */
-    }
-    
-    /* Target main Streamlit containers */
-    .main .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 0 !important; /* Ensure no extra space at the bottom */
-    }
-
-    /* Reduce space between elements */
-    .element-container {
-        margin-bottom: 0.5rem !important;
-    }
-</style>
-"""
-
-# Define allowed users and shared password
-ALLOWED_USERS = ["shayla.holmes", "sean.kirk", "amar.singh", "sean.collins"]
-SHARED_PASSWORD = os.getenv('SHARED_PASSWORD')
-
-# Debugging: Log the shared password
-logger.debug(f"SHARED_PASSWORD: {SHARED_PASSWORD}")
-
-# Log all environment variables
-logger.debug("All environment variables:")
-for key, value in os.environ.items():
-    logger.debug(f"{key}: {value}")
-
-def main_auth_page():
-    st.markdown(custom_css, unsafe_allow_html=True)
-    st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='subtitle'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
-
-    tab1, tab2, tab3, tab4 = st.tabs(["Login", "Register", "Reset Password", "Admin Reset"])
-
-    with tab1:
-        login_page()
-    
-    with tab2:
-        register_page()
-    
-    with tab3:
-        reset_password_page()
-    
-    with tab4:
-        admin_reset_password_page()
-
-    # Add this line to remove extra space at the bottom
-    st.markdown('<style>footer {visibility: hidden;}</style>', unsafe_allow_html=True)
-
-def login_page():
-    st.markdown('<div class="login-form">', unsafe_allow_html=True)
-    with st.form(key='login_form'):
-        st.markdown("<h2>Login</h2>", unsafe_allow_html=True)
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submit_button = st.form_submit_button("Login")
-        reset_button = st.form_submit_button("Reset Password")
-
-        if submit_button:
-            user = authenticate_user(username, password)
-            if user:
-                logger.info(f"User {username} authenticated successfully")
-                st.success("Login successful! Redirecting to the main app...")
-                st.session_state['logged_in'] = True
-                st.session_state['username'] = username
-                st.rerun()
-            else:
-                logger.warning(f"Authentication failed for user {username}")
-                st.error("Invalid username or password.")
-        
-        if reset_button:
-            logger.info(f"Initiating password reset for user {username}")
-            reset_token = set_reset_token(username)
-            if reset_token:
-                if send_password_reset_email(username, reset_token):
-                    st.success("Password reset link sent to your email.")
-                else:
-                    st.error("Failed to send password reset email.")
-            else:
-                st.error("User not found.")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-def admin_reset_password_page():
-    st.markdown('<div class="login-form">', unsafe_allow_html=True)
-    st.markdown("<h2>Admin Password Reset</h2>", unsafe_allow_html=True)
-
-    with st.form(key='admin_reset_form'):
-        username = st.text_input("Username")
-        new_password = st.text_input("New Password", type="password")
-        confirm_new_password = st.text_input("Confirm New Password", type="password")
-        submit_button = st.form_submit_button("Reset Password")
-
-        if submit_button:
-            if new_password != confirm_new_password:
-                st.error("Passwords do not match.")
-                logger.error("Passwords do not match")
-            elif admin_reset_password(username, new_password):
-                logger.info(f"Password reset successful for user: {username}")
-                st.success(f"Password reset successful for user: {username}")
-            else:
-                logger.error(f"Failed to reset password for user: {username}")
-                st.error("Failed to reset password. The user may not exist or there was an error.")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def register_page():
-    st.markdown('<div class="login-form">', unsafe_allow_html=True)
-    with st.form(key='register_form'):
-        st.markdown("<h2>Register</h2>", unsafe_allow_html=True)
-        username = st.text_input("Username")
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        confirm_password = st.text_input("Confirm Password", type="password")
-        register_button = st.form_submit_button("Register")
-
-        if register_button:
-            if password != confirm_password:
-                st.error("Passwords do not match.")
-            elif register_user(username, email, password):
-                verification_token = set_verification_token(email)
-                if send_verification_email(email, verification_token):
-                    st.success("Registration successful! Please check your email for verification.")
-                else:
-                    st.warning("Registration successful, but failed to send verification email.")
-            else:
-                st.error("Registration failed. Username or email may already be in use.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def reset_password_page():
-    logger.debug(f"Session state: {st.session_state}")
-    
-    st.markdown('<div class="login-form">', unsafe_allow_html=True)
-    with st.form(key='reset_password_form'):
-        st.markdown("<h2>Reset Password</h2>", unsafe_allow_html=True)
-        reset_email = st.text_input("Email")
-        reset_button = st.form_submit_button("Reset Password")
-
-        if reset_button:
-            reset_token = set_reset_token(reset_email)
-            if reset_token:
-                if send_password_reset_email(reset_email, reset_token):
-                    st.success("Password reset link sent to your email.")
-                else:
-                    st.error("Failed to send password reset email.")
-            else:
-                st.error("Email not found.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def verify_email(token):
-    logger.debug(f"Attempting to verify email with token: {token}")
-    if verify_user(token):
-        logger.info(f"Email verified successfully with token: {token}")
-        st.success("Your email has been successfully verified! You can now log in.")
-        st.session_state['email_verified'] = True
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    if register_user(username, email, hashed_password):
+        logger.info(f"New user registered: {username}")
+        return True
     else:
-        logger.warning(f"Failed to verify email with token: {token}")
-        st.error("Invalid or expired verification token.")
+        st.error("Username or email already exists.")
+        return False
 
-def handle_password_reset(token):
-    logger.debug(f"Session state: {st.session_state}")
-    
-    st.markdown('<div class="login-form">', unsafe_allow_html=True)
-    st.markdown("<h2>Set New Password</h2>", unsafe_allow_html=True)
+def auth_page():
+    st.title("Resume Cupid - Authentication")
 
-    with st.form(key='new_password_form'):
-        new_password = st.text_input("New Password", type="password")
-        confirm_new_password = st.text_input("Confirm New Password", type="password")
-        submit_button = st.form_submit_button("Set New Password")
+    init_auth_state()
 
-        if submit_button:
-            if new_password != confirm_new_password:
-                st.error("Passwords do not match.")
-                logger.error("Passwords do not match")
-                return None
-            elif reset_password(token, new_password):
-                logger.info("Password reset successful and email verified")
-                st.success("Password reset successful. Your email has been verified. You can now log in with your new password.")
-                st.session_state.password_reset_complete = True
-                st.session_state.password_reset_mode = False
-                st.session_state.reset_token = None
-                st.rerun()  # Redirect to the main page
-                return True
-            else:
-                logger.error("Failed to reset password")
-                st.error("Failed to reset password. The token may be invalid or expired.")
-                return False
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    logger.debug(f"Session state after handle_password_reset: {st.session_state}")
-    return None
-
-def auth_main():
-    logger.debug(f"Session state: {st.session_state}")
-    
-    # Initialize query_params in session state if not already set
-    if 'query_params' not in st.session_state:
-        st.session_state['query_params'] = st.query_params
-
-    query_params = st.session_state['query_params']
-    logger.debug(f"Query parameters: {query_params}")
-    
-    # Handle password reset completion
-    if 'password_reset_complete' in st.session_state:
-        st.info("Your password has been reset. Please log in with your new password.")
-        del st.session_state['password_reset_complete']
-        st.rerun()  # Redirect to the login page
-    
-    # Handle email verification and password reset
-    if 'action' in query_params and 'token' in query_params:
-        action = query_params['action'][0]
-        token = query_params['token'][0]
+    if st.session_state.user:
+        st.write(f"Welcome, {st.session_state.user['username']}!")
+        if st.button("Logout"):
+            logout_user()
+            st.rerun()  # Ensure this is available in your Streamlit version
+    else:
+        tab1, tab2 = st.tabs(["Login", "Register"])
         
-        if action == 'verify':
-            verify_email(token)
-            return
-        elif action == 'reset':
-            st.session_state.password_reset_mode = True
-            st.session_state.reset_token = token
-            return
+        with tab1:
+            st.header("Login")
+            username = st.text_input("Username", key="login_username")
+            password = st.text_input("Password", type="password", key="login_password")
+            if st.button("Login"):
+                if login_user(username, password):
+                    st.success("Logged in successfully!")
+                    st.rerun()  # Ensure this is available in your Streamlit version
+                else:
+                    st.error("Invalid username or password")
 
-    # Show password reset form if in password reset mode
-    if st.session_state.get('password_reset_mode', False):
-        handle_password_reset(st.session_state.get('reset_token'))
-        return
-    
-    # Always show the main auth page if no special conditions are met
-    main_auth_page()
+        with tab2:
+            st.header("Register")
+            new_username = st.text_input("Username", key="register_username")
+            new_email = st.text_input("Email", key="register_email")
+            new_password = st.text_input("Password", type="password", key="register_password")
+            if st.button("Register"):
+                if register_new_user(new_username, new_email, new_password):
+                    st.success("Registered successfully! You can now log in.")
+                    st.rerun()  # Ensure this is available in your Streamlit version
 
+def require_auth(func):
+    def wrapper(*args, **kwargs):
+        init_auth_state()
+        if not st.session_state.user:
+            auth_page()
+        else:
+            return func(*args, **kwargs)
+    return wrapper
