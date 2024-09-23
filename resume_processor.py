@@ -25,21 +25,35 @@ class ResumeProcessor:
 
     def process_resume(self, resume_text: str, job_description: str, job_title: str) -> Dict[str, Any]:
         try:
+            logger.info(f"Starting resume processing for job title: {job_title}")
+        
             job_requirements = self.load_job_requirements(job_title)
+            logger.debug(f"Loaded job requirements: {job_requirements}")
+        
             description_requirements = generate_job_requirements(job_description)
+            logger.debug(f"Generated description requirements: {description_requirements}")
+        
             merged_requirements = {**description_requirements, **job_requirements}
+            logger.debug(f"Merged requirements: {merged_requirements}")
 
+            logger.info("Calling llama_service for resume analysis")
             analysis = llama_service.analyze_resume(resume_text, job_description, job_title)
+            logger.debug(f"Received analysis from llama_service: {analysis}")
     
+            logger.info("Processing analysis results")
             result = self._process_analysis(analysis, "Unknown", job_title, merged_requirements)
+            logger.debug(f"Processed analysis result: {result}")
 
             # Extract experience information
             result['experience'] = self._extract_experience(resume_text)
+            logger.debug(f"Extracted experience: {result['experience']}")
 
             # Ensure we have a valid match score
             if result['match_score'] == 0:
+                logger.info("Calculating weighted score")
                 weighted_score = self._calculate_weighted_score(result, merged_requirements)
                 result['match_score'] = weighted_score
+                logger.debug(f"Calculated weighted score: {weighted_score}")
 
             result['recommendation'] = self._generate_recommendation(result['match_score'])
             result['fit_summary'] = self._generate_fit_summary(result['match_score'], job_title)
@@ -224,9 +238,9 @@ class ResumeProcessor:
         logger.info(f"Calculated score: {final_score}. Raw score: {score}, Max score: {max_score}")
         return final_score
 
-def _check_us_experience(self, experience: str) -> bool:
-    us_keywords = ['united states', 'usa', 'u.s.', 'america']
-    return any(keyword in experience.lower() for keyword in us_keywords)
+    def _check_us_experience(self, experience: str) -> bool:
+        us_keywords = ['united states', 'usa', 'u.s.', 'america']
+        return any(keyword in experience.lower() for keyword in us_keywords)
 
     def _extract_json_content(self, raw_analysis: str) -> str:
         """Extract JSON content from the raw analysis string."""
