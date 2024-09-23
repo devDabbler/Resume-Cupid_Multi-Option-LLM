@@ -142,4 +142,5 @@ class LlamaService:
         """Sanitize input text to prevent injection attacks and remove any unwanted characters."""
         sanitized_text = text.replace('\r', ' ').replace('\n', ' ').strip()
         return sanitized_text
-
+    
+llama_service = LlamaService()
