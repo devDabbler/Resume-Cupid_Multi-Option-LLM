@@ -5,6 +5,7 @@ from typing import Dict, Any
 from groq import Groq
 from config_settings import Config
 import os
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -92,9 +93,9 @@ class LlamaService:
                     {
                         "role": "system",
                         "content": (
-                            "You are an AI assistant specialized in analyzing resumes and job descriptions. "
-                            "Provide detailed and accurate analyses, ensuring all fields are populated with relevant information. "
-                            "Use the full range of scores from 0 to 100, and be critical yet fair in your evaluations."
+                        "You are an AI assistant specialized in analyzing resumes and job descriptions. "
+                        "Provide detailed and accurate analyses, ensuring all fields are populated with relevant information. "
+                        "Use the full range of scores from 0 to 100, and be critical yet fair in your evaluations."
                         ),
                     },
                     {
@@ -103,7 +104,7 @@ class LlamaService:
                     }
                 ],
                 model="llama-3.1-8b-instant",
-                max_tokens=1000,
+                max_tokens=2000,  # Increased from 1000 to 2000
                 temperature=0.5,
             )
 
@@ -115,7 +116,14 @@ class LlamaService:
             result = completion.choices[0].message.content.strip()
             logger.debug(f"Raw response from Groq: {result}")
 
-            return {"analysis": result}
+            # Attempt to parse the result as JSON
+            try:
+                parsed_result = json.loads(result)
+            except json.JSONDecodeError:
+                logger.warning("Failed to parse result as JSON. Using raw text.")
+                parsed_result = {"analysis": result}
+
+            return parsed_result
 
         except Exception as e:
             logger.error(f"Error during Groq API analysis: {str(e)}", exc_info=True)

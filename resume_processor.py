@@ -30,10 +30,17 @@ class ResumeProcessor:
             merged_requirements = {**description_requirements, **job_requirements}
 
             analysis = llama_service.analyze_resume(resume_text, job_description, job_title)
+        
+            # Log the raw analysis for debugging
+            logger.debug(f"Raw analysis from llama_service: {analysis}")
+
             result = self._process_analysis(analysis, "Unknown", job_title, merged_requirements)
 
-            weighted_score = self._calculate_weighted_score(result, merged_requirements)
-            result['match_score'] = weighted_score
+            # Ensure we have a valid match score
+            if result['match_score'] == 0:
+                # If the llama_service didn't provide a score, calculate one
+                weighted_score = self._calculate_weighted_score(result, merged_requirements)
+                result['match_score'] = weighted_score
 
             result['recommendation'] = self._generate_recommendation(result['match_score'])
             result['fit_summary'] = self._generate_fit_summary(result['match_score'], job_title)
@@ -41,21 +48,25 @@ class ResumeProcessor:
             logger.info(f"Processed resume. Match score: {result['match_score']}, Recommendation: {result['recommendation']}")
             return result
         except Exception as e:
-            logger.error(f"Error in process_resume: {str(e)}")
+            logger.error(f"Error in process_resume: {str(e)}", exc_info=True)
             return self._generate_error_result("Unknown", str(e))
 
     def _process_analysis(self, raw_analysis: Dict[str, Any], file_name: str, job_title: str, job_requirements: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            analysis_str = self._extract_json_content(raw_analysis['analysis'])
-            logger.debug(f"Extracted JSON content for {file_name}: {analysis_str}")
-            analysis = json.loads(analysis_str)
+            # Check if the raw_analysis is already in the correct format
+            if isinstance(raw_analysis, dict) and 'analysis' in raw_analysis:
+                analysis = raw_analysis['analysis']
+            else:
+                # If not, try to extract JSON content
+                analysis_str = self._extract_json_content(str(raw_analysis))
+                analysis = json.loads(analysis_str)
         except json.JSONDecodeError as json_error:
             logger.error(f"JSON Decode Error for {file_name}: {str(json_error)}")
-            logger.error(f"Raw analysis content: {raw_analysis['analysis']}")
+            logger.error(f"Raw analysis content: {raw_analysis}")
             return self._generate_error_result(file_name, f"JSON Decode Error: {str(json_error)}")
         except Exception as e:
             logger.error(f"Unexpected error processing analysis for {file_name}: {str(e)}")
-            logger.error(f"Raw analysis content: {raw_analysis['analysis']}")
+            logger.error(f"Raw analysis content: {raw_analysis}")
             return self._generate_error_result(file_name, f"Unexpected Error: {str(e)}")
 
         processed = {
@@ -72,12 +83,13 @@ class ResumeProcessor:
             'skills': analysis.get('Skills', []),
             'knowledge': analysis.get('Knowledge Areas', []),
             'soft_skills': analysis.get('Soft Skills', []),
-     }
+        }
 
-        for key, value in processed.items():
-            if not value and key not in ['file_name', 'match_score', 'experience_years']:
-                processed[key] = f"No {key.replace('_', ' ')} available"
+        # If we don't have a match score from the analysis, calculate one
+        if processed['match_score'] == 0:
+            processed['match_score'] = self._calculate_weighted_score(processed, job_requirements)
 
+        # Generate fallback content only if necessary
         if not processed['key_strengths'] or processed['key_strengths'] == ['No items available']:
             processed['key_strengths'] = self._generate_key_strengths(analysis, job_requirements)
 
