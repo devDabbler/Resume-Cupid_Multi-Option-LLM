@@ -55,15 +55,17 @@ class ResumeProcessor:
         try:
             # Check if the raw_analysis is already in the correct format
             if isinstance(raw_analysis, dict) and 'analysis' in raw_analysis:
-                analysis = raw_analysis['analysis']
+                analysis_str = raw_analysis['analysis']
             else:
-                # If not, try to extract JSON content
-                analysis_str = self._extract_json_content(str(raw_analysis))
-                analysis = json.loads(analysis_str)
-        except json.JSONDecodeError as json_error:
-            logger.error(f"JSON Decode Error for {file_name}: {str(json_error)}")
-            logger.error(f"Raw analysis content: {raw_analysis}")
-            return self._generate_error_result(file_name, f"JSON Decode Error: {str(json_error)}")
+                analysis_str = str(raw_analysis)
+
+            # Try to extract JSON content
+            try:
+                analysis = json.loads(self._extract_json_content(analysis_str))
+            except json.JSONDecodeError:
+                # If JSON parsing fails, use the raw string as the analysis
+                analysis = {'Brief Summary': analysis_str}
+
         except Exception as e:
             logger.error(f"Unexpected error processing analysis for {file_name}: {str(e)}")
             logger.error(f"Raw analysis content: {raw_analysis}")
