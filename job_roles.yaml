@@ -1,637 +1,362 @@
 job_roles:
-  data_scientist:
+  Data Scientist:
     description: "Data Scientist role details"
-    skills:
-      - python
-      - r
-      - sql
-      - machine learning
-      - deep learning
-      - statistics
-      - data visualization
-      - big data
-      - tensorflow
-      - pytorch
-      - scikit-learn
-    experience_keywords:
-      - data scientist
-      - machine learning engineer
-      - data analyst
-      - statistician
-    project_keywords:
-      - machine learning model
-      - predictive analytics
-      - data pipeline
-      - statistical analysis
-      - big data processing
-    skill_importance:
-      machine_learning: 0.9
-      deep_learning: 0.8
-      statistics: 0.8
-      python: 0.7
-      data_analysis: 0.7
-    education_preference:
-      - "PhD in Computer Science, Statistics, or related field"
-      - "MS in Computer Science, Statistics, or related field"
-    project_complexity_factors:
-      - large-scale data processing
-      - advanced machine learning algorithms
-      - deployment of models in production environments
-    minimum_requirements:
-    min_score: 70
-    critical_skills:
-      - python
-      - machine learning
-      - statistics
-    min_experience_years: 3
+    education_level: "MS or PhD in Computer Science, Statistics, or related fields"
+    years_of_experience: 3
+    required_skills:
+      - Python
+      - R
+      - SQL
+      - Machine Learning
+      - Deep Learning
+      - Statistics
+      - Data Visualization
+      - Big Data
+      - TensorFlow
+      - PyTorch
+      - Scikit-learn
+    specific_knowledge:
+      - Data Wrangling
+      - Statistical Analysis
+      - Data Mining
+      - Predictive Modeling
+    soft_skills:
+      - Problem Solving
+      - Analytical Thinking
+      - Communication
+      - Teamwork
 
-  software_engineer:
+  Software Engineer:
     description: "Software Engineer role details"
-    skills:
-      - java
-      - python
-      - c++
-      - javascript
-      - go
-      - rust
-      - react
-      - angular
-      - node.js
-      - docker
-      - kubernetes
-      - aws
-      - azure
-      - microservices
-    experience_keywords:
-      - software engineer
-      - software developer
-      - full stack developer
-      - backend engineer
-      - frontend engineer
-    project_keywords:
-      - software architecture
-      - scalable systems
-      - api development
-      - database design
-      - cloud infrastructure
-    skill_importance:
-      java: 0.8
-      python: 0.8
-      javascript: 0.7
-      docker: 0.6
-      kubernetes: 0.6
-    education_preference:
-      - "BS in Computer Science or related field"
-      - "MS in Computer Science or Software Engineering"
-    project_complexity_factors:
-      - distributed systems
-      - high-performance computing
-      - microservices architecture
-    minimum_requirements:
-    min_score: 75
-    critical_skills:
-      - java or python
-      - software architecture
-      - database design
-    min_experience_years: 3
+    education_level: "BS or MS in Computer Science or Software Engineering"
+    years_of_experience: 3
+    required_skills:
+      - Java
+      - Python
+      - C++
+      - JavaScript
+      - Go
+      - Rust
+      - React
+      - Angular
+      - Node.js
+      - Docker
+      - Kubernetes
+      - AWS
+      - Azure
+      - Microservices
+    specific_knowledge:
+      - Software Architecture
+      - Scalable Systems
+      - API Development
+      - Database Design
+      - Cloud Infrastructure
+    soft_skills:
+      - Problem Solving
+      - Team Collaboration
+      - Communication
+      - Adaptability
 
-  ui_designer:
+  UI Designer:
     description: "UI Designer role details"
-    skills:
-      - ui design
-      - ux design
-      - figma
-      - sketch
-      - adobe xd
-      - invision
-      - prototyping
-      - wireframing
-      - user research
-      - typography
-      - color theory
-    experience_keywords:
-      - ui designer
-      - ux designer
-      - product designer
-      - interaction designer
-    project_keywords:
-      - user interface
-      - user experience
-      - design system
-      - responsive design
-      - mobile app design
-      - web design
-    skill_importance:
-      ui_design: 0.9
-      ux_design: 0.9
-      figma: 0.7
-      prototyping: 0.8
-      user_research: 0.7
-    education_preference:
-      - "BS in Graphic Design, Interaction Design, or related field"
-      - "MS in Human-Computer Interaction or User Experience Design"
-    project_complexity_factors:
-      - multi-platform design systems
-      - accessibility compliance
-      - complex interaction patterns
-    minimum_requirements:
-    min_score: 70
-    critical_skills:
-      - ui design
-      - prototyping
-      - user research
-    min_experience_years: 2
+    education_level: "BS or MS in Graphic Design, Interaction Design, or related fields"
+    years_of_experience: 2
+    required_skills:
+      - UI Design
+      - UX Design
+      - Figma
+      - Sketch
+      - Adobe XD
+      - InVision
+      - Prototyping
+      - Wireframing
+      - User Research
+      - Typography
+      - Color Theory
+    specific_knowledge:
+      - Design Systems
+      - Responsive Design
+      - Mobile App Design
+      - Web Design
+      - Accessibility Compliance
+    soft_skills:
+      - Creativity
+      - User-Centered Thinking
+      - Communication
+      - Attention to Detail
 
-  full_stack_engineer:
+  Full Stack Engineer:
     description: "Full Stack Engineer role details"
-    skills:
-      - javascript
-      - python
-      - java
-      - react
-      - angular
-      - vue.js
-      - node.js
-      - express.js
-      - django
-      - flask
-      - sql
-      - nosql
-      - rest api
-      - graphql
-    experience_keywords:
-      - full stack engineer
-      - full stack developer
-      - software engineer
-      - web developer
-    project_keywords:
-      - full stack application
-      - web application
-      - database design
-      - api development
-      - frontend development
-      - backend development
-    skill_importance:
-      javascript: 0.9
-      python: 0.8
-      react: 0.7
-      node.js: 0.7
-      sql: 0.6
-    education_preference:
-      - "BS in Computer Science or related field"
-      - "MS in Software Engineering or Web Development"
-    project_complexity_factors:
-      - scalable web applications
-      - real-time data processing
-      - complex state management
-    minimum_requirements:
-    min_score: 75
-    critical_skills:
-      - javascript
-      - backend development
-      - frontend development
-    min_experience_years: 4
+    education_level: "BS or MS in Computer Science or Software Engineering"
+    years_of_experience: 4
+    required_skills:
+      - JavaScript
+      - Python
+      - Java
+      - React
+      - Angular
+      - Vue.js
+      - Node.js
+      - Express.js
+      - Django
+      - Flask
+      - SQL
+      - NoSQL
+      - REST API
+      - GraphQL
+    specific_knowledge:
+      - Full Stack Development
+      - Web Application Development
+      - Database Design
+      - API Development
+      - Frontend and Backend Integration
+    soft_skills:
+      - Problem Solving
+      - Teamwork
+      - Communication
+      - Time Management
 
-solutions_architect_cpg:
-  description: "Solutions Architect for CPG industry role details"
-  skills:
-    - cloud computing
-    - web services
-    - backend integration
-    - aws
-    - azure
-    - google cloud
-    - software architecture
-    - technical specifications
-    - solution design
-    - integration
-  experience_keywords:
-    - solutions architect
-    - pre-sales
-    - client-facing
-    - consulting
-    - cpg industry
-  project_keywords:
-    - solution design
-    - technical specifications
-    - integration
-    - cloud services
-    - software architecture
-  skill_importance:
-    cloud_computing: 0.9
-    solution_design: 0.8
-    aws: 0.7
-    azure: 0.7
-    integration: 0.7
-  education_preference:
-    - "BS in Computer Science, Information Systems, or related field"
-    - "MS in Computer Science or Software Architecture"
-  project_complexity_factors:
-    - multi-cloud architectures
-    - enterprise-scale solutions
-    - legacy system integration
-    minimum_requirements:
-    min_score: 80
-    critical_skills:
-      - cloud computing
-      - solution design
-      - cpg industry experience
-    min_experience_years: 5
+  Solutions Architect - CPG:
+    description: "Solutions Architect for CPG industry role details"
+    education_level: "BS or MS in Computer Science, Information Systems, or related fields"
+    years_of_experience: 5
+    required_skills:
+      - Cloud Computing
+      - Web Services
+      - Backend Integration
+      - AWS
+      - Azure
+      - Google Cloud
+      - Software Architecture
+      - Technical Specifications
+      - Solution Design
+      - Integration
+    specific_knowledge:
+      - Multi-Cloud Architectures
+      - Enterprise-Scale Solutions
+      - Legacy System Integration
+      - CPG Industry Experience
+    soft_skills:
+      - Client-Facing Communication
+      - Consulting
+      - Project Management
+      - Cross-Functional Collaboration
 
-azure_platform_architect:
-  description: "Azure Platform Architect role details"
-  skills:
-    - azure
-    - devops
-    - cloud security
-    - ci/cd
-    - terraform
-    - docker
-    - kubernetes
-    - unix
-    - linux
-    - shell scripting
-  experience_keywords:
-    - azure architect
-    - devops engineer
-    - cloud engineer
-    - cloud architect
-  project_keywords:
-    - cloud architecture
-    - devops
-    - cloud security
-    - ci/cd pipelines
-    - cloud optimization
-  skill_importance:
-    azure: 0.9
-    devops: 0.8
-    cloud_security: 0.8
-    terraform: 0.7
-    kubernetes: 0.7
-  education_preference:
-    - "BS in Computer Science, Information Technology, or related field"
-    - "MS in Cloud Computing or Information Security"
-  project_complexity_factors:
-    - large-scale azure deployments
-    - multi-region architectures
-    - complex security requirements
-    minimum_requirements:
-    min_score: 80
-    critical_skills:
-      - azure
-      - cloud security
-      - devops
-    min_experience_years: 5
+  Azure Platform Architect:
+    description: "Azure Platform Architect role details"
+    education_level: "BS or MS in Computer Science, Information Technology, or related fields"
+    years_of_experience: 5
+    required_skills:
+      - Azure
+      - DevOps
+      - Cloud Security
+      - CI/CD
+      - Terraform
+      - Docker
+      - Kubernetes
+      - Unix/Linux
+      - Shell Scripting
+    specific_knowledge:
+      - Large-Scale Azure Deployments
+      - Multi-Region Architectures
+      - Complex Security Requirements
+      - Cloud Optimization
+    soft_skills:
+      - Problem Solving
+      - Team Leadership
+      - Communication
+      - Attention to Detail
 
-project_manager:
-  description: "Project Manager role details"
-  skills:
-    - project management
-    - agile methodology
-    - risk management
-    - communication management
-    - performance management
-    - client communication
-    - analytics
-    - sql
-    - cloud
-  experience_keywords:
-    - project manager
-    - program manager
-    - project delivery
-    - client engagement
-  project_keywords:
-    - project planning
-    - scheduling
-    - risk management
-    - quality management
-    - communication management
-  skill_importance:
-    project_management: 0.9
-    agile_methodology: 0.8
-    risk_management: 0.7
-    client_communication: 0.8
-    analytics: 0.6
-  education_preference:
-    - "BS in Business Administration, Computer Science, or related field"
-    - "MBA or MS in Project Management"
-  project_complexity_factors:
-    - multi-team coordination
-    - international projects
-    - high-stakes deliverables
-  minimum_requirements:
-  min_score: 75
-  critical_skills:
-    - project management
-    - agile methodology
-    - risk management
-  min_experience_years: 4
+  Project Manager:
+    description: "Project Manager role details"
+    education_level: "BS in Business Administration, Computer Science, or related fields; MBA or MS in Project Management preferred"
+    years_of_experience: 4
+    required_skills:
+      - Project Management
+      - Agile Methodology
+      - Risk Management
+      - Communication Management
+      - Performance Management
+      - Client Communication
+      - Analytics
+      - SQL
+      - Cloud Technologies
+    specific_knowledge:
+      - Multi-Team Coordination
+      - International Project Experience
+      - High-Stakes Deliverables
+    soft_skills:
+      - Leadership
+      - Communication
+      - Organizational Skills
+      - Problem Solving
 
-account_manager:
-  description: "Account Manager role details"
-  skills:
-    - business development
-    - client relationship management
-    - consultative sales
-    - cpg industry
-    - ai
-    - analytics
-    - cloud technology
-    - data engineering
-  experience_keywords:
-    - account manager
-    - business development manager
-    - client relationship manager
-    - sales consultant
-  project_keywords:
-    - business development
-    - client engagement
-    - sales campaigns
-    - consultative sales
-    - client relationship management
-  skill_importance:
-    client_relationship_management: 0.9
-    consultative_sales: 0.8
-    business_development: 0.8
-    ai: 0.6
-    analytics: 0.6
-  education_preference:
-    - "BS in Business Administration, Marketing, or related field"
-    - "MBA or MS in Sales Management"
-  project_complexity_factors:
-    - enterprise-level account management
-    - complex solution selling
-    - long-term relationship building
-  minimum_requirements:
-  min_score: 70
-  critical_skills:
-    - client relationship management
-    - business development
-    - cpg industry knowledge
-  min_experience_years: 3
+  Account Manager:
+    description: "Account Manager role details"
+    education_level: "BS in Business Administration, Marketing, or related fields; MBA or MS in Sales Management preferred"
+    years_of_experience: 3
+    required_skills:
+      - Business Development
+      - Client Relationship Management
+      - Consultative Sales
+      - CPG Industry Knowledge
+      - AI
+      - Analytics
+      - Cloud Technology
+      - Data Engineering
+    specific_knowledge:
+      - Enterprise-Level Account Management
+      - Complex Solution Selling
+      - Long-Term Relationship Building
+    soft_skills:
+      - Communication
+      - Negotiation
+      - Strategic Thinking
+      - Customer Focus
 
-software_development_engineer:
-  description: "Software Development Engineer role details"
-  skills:
-    - javascript
-    - python
-    - etl
-    - pandas
-    - numpy
-    - shell scripting
-    - cron job scheduling
-    - git
-    - cloud computing
-    - sql
-    - nosql
-  experience_keywords:
-    - software development engineer
-    - full stack developer
-    - ai engineer
-    - data engineer
-  project_keywords:
-    - ai applications
-    - data integration
-    - etl processes
-    - cloud deployment
-    - performance optimization
-  skill_importance:
-    python: 0.8
-    etl: 0.7
-    cloud_computing: 0.7
-    sql: 0.6
-    ai: 0.6
-  education_preference:
-    - "BS in Computer Science, Software Engineering, or related field"
-    - "MS in Computer Science or Artificial Intelligence"
-  project_complexity_factors:
-    - large-scale data processing
-    - AI model integration
-    - distributed computing
-  minimum_requirements:
-  min_score: 75
-  critical_skills:
-    - javascript or python
-    - etl
-    - cloud computing
-  min_experience_years: 3
+  Software Development Engineer:
+    description: "Software Development Engineer role details"
+    education_level: "BS or MS in Computer Science, Software Engineering, or related fields"
+    years_of_experience: 3
+    required_skills:
+      - JavaScript
+      - Python
+      - ETL Processes
+      - Pandas
+      - NumPy
+      - Shell Scripting
+      - Cron Job Scheduling
+      - Git
+      - Cloud Computing
+      - SQL
+      - NoSQL
+    specific_knowledge:
+      - AI Applications
+      - Data Integration
+      - Cloud Deployment
+      - Performance Optimization
+    soft_skills:
+      - Problem Solving
+      - Teamwork
+      - Adaptability
+      - Communication
 
-cloud_engineer:
-  description: "Cloud Engineer role details"
-  skills:
-    - aws
-    - cloud architecture
-    - network security
-    - ci/cd
-    - terraform
-    - docker
-    - kubernetes
-    - python
-    - sql
-    - devops
-  experience_keywords:
-    - cloud engineer
-    - platform engineer
-    - devops engineer
-    - cloud architect
-  project_keywords:
-    - cloud infrastructure
-    - devops
-    - cloud security
-    - ci/cd pipelines
-    - cloud optimization
-  skill_importance:
-    aws: 0.9
-    cloud_architecture: 0.8
-    network_security: 0.7
-    terraform: 0.7
-    kubernetes: 0.7
-  education_preference:
-    - "BS in Computer Science, Information Technology, or related field"
-    - "MS in Cloud Computing or Network Security"
-  project_complexity_factors:
-    - multi-cloud environments
-    - large-scale migrations
-    - high-availability architectures
-  minimum_requirements:
-  min_score: 75
-  critical_skills:
-    - aws
-    - cloud architecture
-    - devops
-  min_experience_years: 3
+  Cloud Engineer:
+    description: "Cloud Engineer role details"
+    education_level: "BS or MS in Computer Science, Information Technology, or related fields"
+    years_of_experience: 3
+    required_skills:
+      - AWS
+      - Cloud Architecture
+      - Network Security
+      - CI/CD
+      - Terraform
+      - Docker
+      - Kubernetes
+      - Python
+      - SQL
+      - DevOps
+    specific_knowledge:
+      - Multi-Cloud Environments
+      - Large-Scale Migrations
+      - High-Availability Architectures
+    soft_skills:
+      - Problem Solving
+      - Communication
+      - Team Collaboration
+      - Attention to Detail
 
-ai_solutions_manager:
-  description: "AI Solutions Manager role details"
-  skills:
-    - ai
-    - machine learning
-    - data science
-    - cloud computing
-    - product management
-    - business development
-    - client engagement
-    - sales
-  experience_keywords:
-    - ai solutions manager
-    - ai sales consultant
-    - product manager
-    - business development manager
-  project_keywords:
-    - ai applications
-    - machine learning solutions
-    - client engagement
-    - sales campaigns
-    - product development
-  skill_importance:
-    ai: 0.9
-    machine_learning: 0.8
-    client_engagement: 0.8
-    product_management: 0.7
-    cloud_computing: 0.6
-  education_preference:
-    - "BS in Computer Science, Data Science, or related field"
-    - "MS in Artificial Intelligence or MBA"
-  project_complexity_factors:
-    - enterprise AI solutions
-    - cross-industry AI applications
-    - AI ethics and governance
-  minimum_requirements:
-  min_score: 75
-  critical_skills:
-    - ai
-    - machine learning
-    - product management
-  min_experience_years: 4
+  AI Solutions Manager:
+    description: "AI Solutions Manager role details"
+    education_level: "BS in Computer Science, Data Science, or related fields; MS in AI or MBA preferred"
+    years_of_experience: 4
+    required_skills:
+      - AI
+      - Machine Learning
+      - Data Science
+      - Cloud Computing
+      - Product Management
+      - Business Development
+      - Client Engagement
+      - Sales
+    specific_knowledge:
+      - Enterprise AI Solutions
+      - Cross-Industry AI Applications
+      - AI Ethics and Governance
+    soft_skills:
+      - Leadership
+      - Strategic Thinking
+      - Communication
+      - Client Relationship Management
 
-machine_learning_engineer:
-  description: "Machine Learning Engineer role details"
-  skills:
-    - machine learning
-    - python
-    - pyspark
-    - mlops
-    - azure
-    - data factory
-    - data lake storage
-    - event hub
-    - databricks
-    - mlflow
-  experience_keywords:
-    - machine learning engineer
-    - ai engineer
-    - data scientist
-    - cloud engineer
-  project_keywords:
-    - machine learning models
-    - mlops pipelines
-    - cloud deployment
-    - data integration
-    - performance optimization
-  skill_importance:
-    machine_learning: 0.9
-    python: 0.8
-    mlops: 0.8
-    azure: 0.7
-    databricks: 0.6
-  education_preference:
-    - "MS in Computer Science, Machine Learning, or related field"
-    - "PhD in Machine Learning or Artificial Intelligence"
-  project_complexity_factors:
-    - large-scale ML model deployment
-    - real-time prediction systems
-    - automated ML pipelines
-  minimum_requirements:
-  min_score: 80
-  critical_skills:
-    - machine learning
-    - python
-    - mlops
-  min_experience_years: 3
+  Machine Learning Engineer:
+    description: "Machine Learning Engineer role details"
+    education_level: "MS or PhD in Computer Science, Machine Learning, or related fields"
+    years_of_experience: 3
+    required_skills:
+      - Machine Learning
+      - Python
+      - PySpark
+      - MLOps
+      - Azure
+      - Data Factory
+      - Data Lake Storage
+      - Event Hub
+      - Databricks
+      - MLflow
+    specific_knowledge:
+      - Large-Scale ML Model Deployment
+      - Real-Time Prediction Systems
+      - Automated ML Pipelines
+    soft_skills:
+      - Problem Solving
+      - Analytical Thinking
+      - Teamwork
+      - Communication
 
-senior_retail_consultant:
-  description: "Senior Retail Consultant role details"
-  skills:
-    - marketing mix modelling
-    - multi-touch attribution
-    - unified marketing measurement
-    - retail media analytics
-    - data aggregation
-    - python
-    - sql
-    - databricks
-    - powerbi
-  experience_keywords:
-    - retail consultant
-    - marketing analytics consultant
-    - data scientist
-    - marketing analyst
-  project_keywords:
-    - marketing analytics
-    - retail media
-    - data aggregation
-    - marketing performance
-    - client communication
-  skill_importance:
-    marketing_mix_modelling: 0.9
-    retail_media_analytics: 0.8
-    data_aggregation: 0.7
-    python: 0.6
-    powerbi: 0.6
-  education_preference:
-    - "BS in Marketing, Business Analytics, or related field"
-    - "MS in Marketing Analytics or MBA"
-  project_complexity_factors:
-    - multi-channel attribution modeling
-    - large-scale retail data analysis
-    - predictive customer behavior modeling
-  minimum_requirements:
-  min_score: 80
-  critical_skills:
-    - marketing mix modelling
-    - retail media analytics
-    - python or sql
-  min_experience_years: 5
+  Senior Retail Consultant:
+    description: "Senior Retail Consultant role details"
+    education_level: "BS in Marketing, Business Analytics, or related fields; MS in Marketing Analytics or MBA preferred"
+    years_of_experience: 5
+    required_skills:
+      - Marketing Mix Modelling
+      - Multi-Touch Attribution
+      - Unified Marketing Measurement
+      - Retail Media Analytics
+      - Data Aggregation
+      - Python
+      - SQL
+      - Databricks
+      - Power BI
+    specific_knowledge:
+      - Multi-Channel Attribution Modeling
+      - Large-Scale Retail Data Analysis
+      - Predictive Customer Behavior Modeling
+    soft_skills:
+      - Analytical Thinking
+      - Communication
+      - Client Engagement
+      - Problem Solving
 
-engagement_manager:
-  description: "Engagement Manager role details"
-  skills:
-    - client relationship management
-    - project management
-    - marketing analytics
-    - sales analytics
-    - supply chain analytics
-    - data science
-    - ai
-    - machine learning
-  experience_keywords:
-    - engagement manager
-    - client relationship manager
-    - project manager
-    - analytics consultant
-  project_keywords:
-    - client engagement
-    - project delivery
-    - analytics solutions
-    - marketing analytics
-    - sales analytics
-  skill_importance:
-    client_relationship_management: 0.9
-    project_management: 0.8
-    marketing_analytics: 0.7
-    data_science: 0.6
-    ai: 0.6
-  education_preference:
-    - "BS in Business Administration, Computer Science, or related field"
-    - "MBA or MS in Analytics"
-  project_complexity_factors:
-    - multi-stakeholder project management
-    - cross-functional team leadership
-    - complex analytics solution delivery
-  minimum_requirements:
-  min_score: 75
-  critical_skills:
-    - client relationship management
-    - project management
-    - analytics
-  min_experience_years: 5
+  Engagement Manager:
+    description: "Engagement Manager role details"
+    education_level: "BS in Business Administration, Computer Science, or related fields; MBA or MS in Analytics preferred"
+    years_of_experience: 5
+    required_skills:
+      - Client Relationship Management
+      - Project Management
+      - Marketing Analytics
+      - Sales Analytics
+      - Supply Chain Analytics
+      - Data Science
+      - AI
+      - Machine Learning
+    specific_knowledge:
+      - Multi-Stakeholder Project Management
+      - Cross-Functional Team Leadership
+      - Complex Analytics Solution Delivery
+    soft_skills:
+      - Leadership
+      - Strategic Thinking
+      - Communication
+      - Problem Solving

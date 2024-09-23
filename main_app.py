@@ -1,378 +1,234 @@
-from config_settings import Config
-import logging
-import uuid
 import streamlit as st
-from utils import extract_job_description, is_valid_fractal_job_link, get_available_api_keys, clear_cache, process_resume, display_results, extract_text_from_file, generate_job_requirements
-from database import init_db, insert_run_log, save_role, delete_saved_role, get_saved_roles, save_feedback
-from resume_processor import create_resume_processor
-import os
-from claude_analyzer import ClaudeAPI
-from gpt4o_mini_analyzer import GPT4oMiniAPI
-from llama_analyzer import LlamaAPI, initialize_llm
-from logger import get_logger
-import json
+import uuid
+import pandas as pd
+from typing import List, Dict, Any
+from auth import require_auth, init_auth_state
+from resume_processor import resume_processor
+from database import save_role, get_saved_roles, save_evaluation_result, get_evaluation_results
+from utils import extract_text_from_file, generate_pdf_report
+import logging
+import re
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
-# Get the BASE_URL from the Config
-BASE_URL = Config.BASE_URL
-
-# Get the directory of the current script
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Load API keys from Config
-claude_api_key = Config.CLAUDE_API_KEY
-gpt4o_mini_api_key = Config.GPT4O_MINI_API_KEY
-llama_api_key = Config.LLAMA_API_KEY
-logger.debug(f"Llama API Key (first 5 chars): {llama_api_key[:5] if llama_api_key else 'Not set'}")
-
-# Initialize API clients
-try:
-    claude_api = ClaudeAPI(claude_api_key) if claude_api_key else None
-    llama_api = LlamaAPI(llama_api_key) if llama_api_key else None
-    gpt4o_mini_api = GPT4oMiniAPI(gpt4o_mini_api_key) if gpt4o_mini_api_key else None
-    
-    logger.info("API clients initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize API clients: {str(e)}")
-    st.error("Failed to initialize API clients. Please check your configuration.")
-
-# Environment type (e.g., development or production)
-ENVIRONMENT = Config.ENVIRONMENT
-
-def test_llama_api(llm):
-    try:
-        test_prompt = "Please analyze this simple sentence: 'The quick brown fox jumps over the lazy dog.'"
-        result = llm.analyze(test_prompt)
-        logger.info(f"Test Llama API call result: {json.dumps(result, indent=2)}")
-        return True
-    except Exception as e:
-        logger.error(f"Test Llama API call failed: {str(e)}", exc_info=True)
-        return False
-
-# Session State Initialization
-if 'importance_factors' not in st.session_state:
-    st.session_state.importance_factors = {
-        'education': 0.5,
-        'experience': 0.5,
-        'skills': 0.5
+def load_css():
+    st.markdown("""
+    <style>
+    .main-title {
+        font-size: 3rem;
+        font-weight: bold;
+        color: #3366cc;
+        margin-bottom: 2rem;
     }
-
-if 'backend' not in st.session_state:
-    st.session_state.backend = None
-if 'resume_processor' not in st.session_state:
-    st.session_state.resume_processor = None
-
-BATCH_SIZE = 3  # Number of resumes to process in each batch
-
-def generate_error_result(file_name, error_message):
-    return {
-        "file_name": file_name,
-        "error": error_message,
-        "status": "error"
+    .section-title {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #1f4e79;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
     }
-
-def main_app():
-    init_db()  # Initialize the database
-    st.markdown("", unsafe_allow_html=True)
-    st.markdown('<h1 class="main-title">Resume Cupid 💘</h1>', unsafe_allow_html=True)
-    st.markdown("Resume Cupid is an intelligent resume evaluation tool designed to streamline the hiring process. Upload one or multiple resumes to evaluate and rank candidates for a specific role.")
-
-    # Initialize session state variables
-    if 'roles_updated' not in st.session_state:
-        st.session_state.roles_updated = False
-
-    for key in ['role_name_input', 'job_description', 'current_role_name', 'job_description_link', 'backend', 'resume_processor', 'last_backend', 'key_skills']:
-        st.session_state.setdefault(key, [] if key == 'key_skills' else '')
-
-    if 'saved_roles' not in st.session_state:
-        st.session_state.saved_roles = get_saved_roles()
-
-    llm_descriptions = {
-        "llama": "Created by Meta AI, this is the llama-3.1, 8 billion parameter model. This is the latest and most capable large language model with strong performance on various NLP tasks.",
+    .info-box {
+        background-color: #e6f2ff;
+        padding: 1rem;
+        border-radius: 5px;
+        margin-bottom: 1rem;
     }
+    .stButton>button {
+        background-color: #3366cc;
+        color: white;
+        font-weight: bold;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-    api_keys = get_available_api_keys()
+@require_auth
+def main():
+    load_css()
+    st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='info-box'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
 
-    if not api_keys or 'llama' not in api_keys:
-        st.error("No API key found for Llama. Please check your configuration.")
+    menu = ["Evaluate Resumes", "Manage Job Roles", "View Past Evaluations"]
+    choice = st.sidebar.selectbox("Menu", menu)
+
+    if choice == "Evaluate Resumes":
+        evaluate_resumes_page()
+    elif choice == "Manage Job Roles":
+        manage_job_roles_page()
+    elif choice == "View Past Evaluations":
+        view_past_evaluations_page()
+
+def evaluate_resumes_page():
+    st.markdown("<h2 class='section-title'>Evaluate Resumes</h2>", unsafe_allow_html=True)
+
+    saved_roles = get_saved_roles()
+    role_names = [role['role_name'] for role in saved_roles]
+    selected_role = st.selectbox("Select a job role", [""] + role_names)
+
+    if selected_role:
+        role = next((role for role in saved_roles if role['role_name'] == selected_role), None)
+        if role:
+            st.markdown("<p class='info-box'>Job Description:</p>", unsafe_allow_html=True)
+            sanitized_job_description = sanitize_text(role['job_description'])
+            st.text_area("", value=sanitized_job_description, height=200, disabled=True)
+
+            uploaded_files = st.file_uploader("Upload resumes (PDF or DOCX)", accept_multiple_files=True, type=['pdf', 'docx'])
+
+            if uploaded_files:
+                if st.button("Evaluate Resumes"):
+                    with st.spinner("Evaluating resumes, please wait..."):
+                        results = process_resumes(uploaded_files, role['job_description'], role['id'])
+                    display_results(results)
+        else:
+            st.error("Selected job role not found.")
+
+def display_results(results: List[Dict[str, Any]]):
+    st.markdown("<h3 class='section-title'>Evaluation Results</h3>", unsafe_allow_html=True)
+
+    if not results:
+        st.warning("No results to display.")
         return
 
-    available_backends = ['llama']
-    backend_options = [f"{backend}: {llm_descriptions.get(backend, '')}" for backend in available_backends]
+    df = pd.DataFrame(results)
+    columns_to_display = ['file_name', 'match_score', 'recommendation']
+    df = df[[col for col in columns_to_display if col in df.columns]]
+    df.columns = ['Resume', 'Match Score', 'Recommendation']
+    df = df.sort_values('Match Score', ascending=False)
 
-    if not backend_options:
-        st.error("No compatible backends found. Please check your API key configuration.")
-        return
+    st.dataframe(df)
 
-    selected_backend = st.selectbox("Select AI backend:", backend_options, index=0).split(":")[0].strip()
+    for result in results:
+        with st.expander(f"Detailed Analysis: {result.get('file_name', 'Unknown')}"):
+            st.write(f"**Match Score:** {result.get('match_score', 'N/A')}%")
+            st.write(f"**Recommendation:** {result.get('recommendation', 'N/A')}")
+            st.write(f"**Brief Summary:** {result.get('brief_summary', 'N/A')}")
+            st.write(f"**Fit Summary:** {result.get('fit_summary', 'N/A')}")
 
-    if selected_backend != st.session_state.get('last_backend'):
-        selected_api_key = api_keys.get(selected_backend)
-        if not selected_api_key:
-            st.error(f"No API key found for {selected_backend}. Please check your configuration.")
-            return
-    
-        st.session_state.resume_processor = create_resume_processor(selected_api_key, selected_backend)
-        if hasattr(st.session_state.resume_processor, 'clear_cache'):
-            clear_cache()
-        st.session_state.last_backend = selected_backend
-        logger.debug(f"Switched to {selected_backend} backend and cleared cache")
-    else:
-        selected_api_key = api_keys.get(selected_backend)
-        if not selected_api_key:
-            st.error(f"No API key found for {selected_backend}. Please check your configuration.")
-            return
+            if 'skills_analysis' in result:
+                st.write("**Skills Analysis:**")
+                for skill, score in result['skills_analysis'].items():
+                    st.write(f"- {skill}: {score:.2f}")
 
-    st.session_state.backend = selected_backend
-    resume_processor = st.session_state.resume_processor
-    
-    try:
-        llm = initialize_llm()
-        logger.info("LlamaAPI initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize LlamaAPI: {str(e)}", exc_info=True)
-        st.error("Failed to initialize LlamaAPI. Please check your configuration and API key.")
-        return
+            if 'experience_analysis' in result:
+                st.write("**Experience Analysis:**")
+                st.write(f"- Relevance: {result['experience_analysis'].get('relevance', 'N/A')}")
+                st.write(f"- Years: {result['experience_analysis'].get('years', 'N/A')}")
 
-    if not test_llama_api(llm):
-        st.error("Failed to connect to Llama API. Please check your configuration and API key.")
-        return
+            if 'project_analysis' in result:
+                st.write("**Project Analysis:**")
+                st.write(f"- Complexity: {result['project_analysis'].get('complexity', 'N/A')}")
+                st.write(f"- Relevance: {result['project_analysis'].get('relevance', 'N/A')}")
 
-    if not hasattr(resume_processor, 'analyze_match'):
-        raise AttributeError(f"ResumeProcessor for backend '{selected_backend}' does not have the 'analyze_match' method")
+            if 'education_analysis' in result:
+                st.write("**Education Analysis:**")
+                st.write(f"- Degree Level: {result['education_analysis'].get('degree_level', 'N/A')}")
+                st.write(f"- Relevance: {result['education_analysis'].get('relevance', 'N/A')}")
 
-    saved_role_options = ["Select a saved role"] + [f"{role['role_name']} - {role['client']}" for role in st.session_state.saved_roles]
-    selected_saved_role = st.selectbox("Select a saved role:", options=saved_role_options)
+            st.write("**Key Strengths:**")
+            for strength in result.get('key_strengths', []):
+                st.write(f"- {strength}")
 
-    if selected_saved_role != "Select a saved role":
-        selected_role = next(role for role in st.session_state.saved_roles if f"{role['role_name']} - {role['client']}" == selected_saved_role)
-        st.session_state.update({
-            'job_description': selected_role['job_description'],
-            'job_description_link': selected_role['job_description_link'],
-            'role_name_input': selected_role['role_name'],
-            'client': selected_role['client']
-        })
+            st.write("**Areas for Improvement:**")
+            for area in result.get('areas_for_improvement', []):
+                st.write(f"- {area}")
 
-    st.session_state.job_title = st.text_input("Enter the job title:", value=st.session_state.get('job_title', ''))
+            st.write("**Recommended Interview Questions:**")
+            for question in result.get('recruiter_questions', []):
+                st.write(f"- {question}")
 
-    jd_option = st.radio("Job Description Input Method:", ("Paste Job Description", "Provide Link to Fractal Job Posting"))
+    if results:
+        pdf_report = generate_pdf_report(results, str(uuid.uuid4()))
+        st.download_button(
+            label="Download PDF Report",
+            data=pdf_report,
+            file_name="resume_evaluation_report.pdf",
+            mime="application/pdf"
+        )
 
-    if jd_option == "Paste Job Description":
-        st.markdown('<div class="content-area">', unsafe_allow_html=True)
-        st.text_area("Paste the Job Description here:", value=st.session_state.get('job_description', ''), placeholder="Job description. This field is required.")
-        st.markdown('</div>', unsafe_allow_html=True)   
-    else:
-        st.session_state.job_description_link = st.text_input("Enter the link to the Fractal job posting:", value=st.session_state.get('job_description_link', ''))
+def process_resumes(files: List[Any], job_description: str, job_role_id: int) -> List[Dict[str, Any]]:
+    results = []
 
-    if not st.session_state.job_description:
-        if st.session_state.job_description_link and is_valid_fractal_job_link(st.session_state.job_description_link):
-            with st.spinner('Extracting job description...'):
-                st.session_state.job_description = extract_job_description(st.session_state.job_description_link)
+    # Fetch the job role details
+    saved_roles = get_saved_roles()
+    job_role = next((role for role in saved_roles if role['id'] == job_role_id), None)
 
-    if st.session_state.job_description:
-        st.text_area("Current Job Description:", value=st.session_state.job_description, height=200, key='current_jd', disabled=True)
+    if not job_role:
+        st.error(f"Job role with ID {job_role_id} not found.")
+        return results
 
-    st.session_state.client = st.text_input("Enter the client name:", value=st.session_state.get('client', ''))
+    job_title = job_role['role_name']
 
-    st.subheader("Customize Importance Factors")
-    
-    # Define the required factors and their defaults
-    required_factors = {
-        'technical_skills': 0.5,
-        'experience': 0.5,
-        'education': 0.5,
-        'soft_skills': 0.5,
-        'industry_knowledge': 0.5
-    }
-
-    # Initialize or update importance_factors in session state
-    if 'importance_factors' not in st.session_state:
-        # Initialize with default values if not present
-        st.session_state.importance_factors = {factor: default_value for factor, default_value in required_factors.items()}
-    else:
-        # Ensure all required factors are present, set missing ones to their default values
-        for factor, default_value in required_factors.items():
-            st.session_state.importance_factors.setdefault(factor, default_value)
-
-    # Create sliders for importance factors
-    cols = st.columns(len(required_factors))
-    for i, (factor, default_value) in enumerate(required_factors.items()):
-        with cols[i]:
-            st.session_state.importance_factors[factor] = st.slider(
-                f"{factor.replace('_', ' ').title()}",
-                0.0, 1.0,
-                st.session_state.importance_factors[factor],
-                0.1,
-                key=f"slider_{factor}"  # Add a unique key for each slider
-            )
-
-    st.write("Current Importance Factors:", st.session_state.importance_factors)
-
-    key_skills = st.text_area("Enter key skills or requirements (one per line):", help="These will be used to assess the candidate's fit for the role.")
-
-    if key_skills:
-        st.session_state.key_skills = [skill.strip() for skill in key_skills.split('\n') if skill.strip()]
-
-    if st.session_state.key_skills:
-        st.write("Key Skills/Requirements Entered:")
-        for skill in st.session_state.key_skills:
-            st.write(f"- {skill}")
-
-    st.write("Upload your resume(s) (Maximum 3 files allowed):")
-    resume_files = st.file_uploader("Upload resumes (max 3)", type=['pdf', 'docx'], accept_multiple_files=True)
-
-    if resume_files:
-        if len(resume_files) > 3:
-            st.warning("You've uploaded more than 3 resumes. Only the first 3 will be processed.")
-            resume_files = resume_files[:3]
-        st.write(f"Number of resumes uploaded: {len(resume_files)}")
-
-    if st.button('Process Resumes', key='process_resumes'):
-        if resume_files and st.session_state.job_description and st.session_state.job_title:
-            evaluation_results = []
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-
-        job_requirements = generate_job_requirements(st.session_state.job_description)
-
-    for i, resume_file in enumerate(resume_files):
-        status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
+    for file in files:
         try:
-            logger.info(f"Starting to process resume: {resume_file.name}")
-            result = process_resume(
-                resume_file, 
-                resume_processor, 
-                st.session_state.job_description, 
-                st.session_state.importance_factors,
-                st.session_state.job_title, 
-                st.session_state.key_skills, 
-                llm, 
-                job_requirements
-            )
-            logger.info(f"Finished processing resume: {resume_file.name}")
-            logger.debug(f"Result for {resume_file.name}: {json.dumps(result, indent=2)}")
-            evaluation_results.append(result)
-            progress_bar.progress((i + 1) / len(resume_files))
+            logger.debug(f"Processing file: {file.name}, Size: {file.size} bytes, Type: {file.type}")
+            resume_text = extract_text_from_file(file)
+            if not resume_text.strip():
+                st.warning(f"Resume {file.name} is empty or unreadable.")
+                continue
+
+            result = resume_processor.process_resume(resume_text, job_description, job_title)
+            result['file_name'] = file.name  # Add the file name to the result
+            results.append(result)
+            save_evaluation_result(file.name, job_role_id, result['match_score'], result['recommendation'])
         except Exception as e:
-            logger.error(f"Error processing resume {resume_file.name}: {str(e)}", exc_info=True)
-            st.error(f"Error processing resume {resume_file.name}: {str(e)}")
+            logger.error(f"Error processing resume {file.name}: {str(e)}", exc_info=True)
+            st.error(f"Error processing resume {file.name}: {str(e)}")
+    return results
 
-        if evaluation_results:
-            st.success("Evaluation complete!")
-            try:
-                display_results(evaluation_results, str(uuid.uuid4()), save_feedback)
-            except Exception as e:
-                logger.error(f"Error displaying results: {str(e)}", exc_info=True)
-                st.error(f"Error displaying results: {str(e)}")
-        else:
-            st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
-    else:
-        if not st.session_state.job_description:
-            st.error("Please ensure a job description is provided.")
-        if not st.session_state.job_title:
-            st.error("Please enter a job title.")
-        if not resume_files:
-            st.error("Please upload at least one resume.")
+def manage_job_roles_page():
+    st.markdown("<h2 class='section-title'>Manage Job Roles</h2>", unsafe_allow_html=True)
 
-    handle_save_role_logic()
-    handle_delete_role_logic()
+    with st.form("add_job_role"):
+        role_name = st.text_input("Role Name")
+        job_description = st.text_area("Job Description")
+        submitted = st.form_submit_button("Save Job Role")
 
-    if st.button("Logout"):
-        st.session_state.clear()
-        st.experimental_rerun()
-
-def process_resumes_logic(resume_files, resume_processor, llm):
-    run_id = str(uuid.uuid4())
-    insert_run_log(run_id, "start_analysis", f"Starting analysis for {len(resume_files)} resumes")
-    logger.info("Processing resumes...")
-
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-
-    job_requirements = generate_job_requirements(st.session_state.job_description)
-
-    evaluation_results = []
-    try:
-        with st.spinner('Processing resumes...'):
-            for i, resume_file in enumerate(resume_files):
-                status_text.text(f"Processing resume {i+1} of {len(resume_files)}: {resume_file.name}")
-                result = process_resume(
-                    resume_file, 
-                    resume_processor, 
-                    st.session_state.job_description, 
-                    st.session_state.importance_factors,
-                    st.session_state.job_title, 
-                    st.session_state.key_skills, 
-                    llm, 
-                    job_requirements
-                )
-                evaluation_results.append(result)
-                progress_bar.progress((i + 1) / len(resume_files))
-
-        insert_run_log(run_id, "end_analysis", f"Completed analysis for {len(resume_files)} resumes")
-
-        if evaluation_results:
-            st.success("Evaluation complete!")
-            display_results(evaluation_results, run_id, save_feedback)
-        else:
-            st.warning("No resumes were successfully processed. Please check the uploaded files and try again.")
-    except Exception as e:
-        st.error(f"An error occurred during processing: {str(e)}")
-        logger.error(f"Error during resume processing: {str(e)}", exc_info=True)
-    finally:
-        progress_bar.empty()
-        status_text.empty()
-
-def handle_save_role_logic():
-    save_button = False
-    save_role_option = st.checkbox("Save this role for future use")
-
-    if save_role_option:
-        with st.form(key='save_role_form'):
-            saved_role_name = st.text_input("Save role as (e.g., Job Title):", value=st.session_state.role_name_input)
-            client = st.text_input("Client (required):", value=st.session_state.get('client', ''))
-            save_button = st.form_submit_button('Save Role')
-
-    if save_button:
-        if not saved_role_name or not client:
-            st.error("Please enter both a name for the role and a client before saving.")
-        elif not st.session_state.job_description:
-            st.error("Job description is required to save a role.")
-        else:
-            try:
-                if save_role(saved_role_name, client, st.session_state.job_description, st.session_state.job_description_link):
-                    st.success(f"Role '{saved_role_name} - {client}' saved successfully!")
-                    st.session_state.saved_roles = get_saved_roles()
+        if submitted:
+            if role_name.strip() and job_description.strip():
+                sanitized_role_name = sanitize_text(role_name)
+                sanitized_job_description = sanitize_text(job_description)
+                if save_role(sanitized_role_name, sanitized_job_description):
+                    st.success("Job role saved successfully!")
                 else:
-                    st.error("Failed to save the role. Please try again.")
-            except Exception as e:
-                st.error(f"An error occurred while saving the role: {str(e)}")
+                    st.error("Failed to save job role. Please try again.")
+            else:
+                st.warning("Please provide both role name and job description.")
 
+    st.markdown("<h3 class='section-title'>Existing Job Roles</h3>", unsafe_allow_html=True)
+    roles = get_saved_roles()
+    for role in roles:
+        with st.expander(role['role_name']):
+            st.write(role['job_description'])
 
-def handle_delete_role_logic():
-    if st.checkbox("Delete a saved role"):
-        delete_role_options = [f"{role['role_name']} - {role['client']}" for role in st.session_state.saved_roles]
+def view_past_evaluations_page():
+    st.markdown("<h2 class='section-title'>View Past Evaluations</h2>", unsafe_allow_html=True)
 
-        if delete_role_options:
-            delete_role_name = st.selectbox("Select a role to delete:", options=delete_role_options)
+    saved_roles = get_saved_roles()
+    role_names = [role['role_name'] for role in saved_roles]
+    selected_role = st.selectbox("Select a job role", [""] + role_names)
 
-            if delete_role_name:
-                if st.button(f"Delete {delete_role_name}"):
-                    role_parts = delete_role_name.rsplit(" - ", 2)
-                    role_name_to_delete = " - ".join(role_parts[:-1])
+    if selected_role:
+        role = next((role for role in saved_roles if role['role_name'] == selected_role), None)
+        if role:
+            results = get_evaluation_results(role['id'])
 
-                    try:
-                        if delete_saved_role(role_name_to_delete):
-                            st.success(f"Role '{delete_role_name}' deleted successfully!")
-                            st.session_state.saved_roles = get_saved_roles()
-                        else:
-                            raise Exception("Deletion failed")
-                    except Exception as e:
-                        st.error(f"Failed to delete role '{delete_role_name}'. Error: {str(e)}")
+            if results:
+                df = pd.DataFrame(results)
+                df = df[['resume_file_name', 'match_score', 'recommendation']]
+                df.columns = ['Resume', 'Match Score', 'Recommendation']
+                df = df.sort_values('Match Score', ascending=False)
 
+                st.dataframe(df)
+            else:
+                st.info("No past evaluations found for this role.")
+        else:
+            st.error("Selected job role not found.")
+
+def sanitize_text(text: str) -> str:
+    """Sanitize text to prevent XSS attacks and unwanted HTML rendering."""
+    sanitized = re.sub(r'<.*?>', '', text)  # Remove HTML tags
+    sanitized = re.sub(r'[^A-Za-z0-9 .,!?@#&()\-\'\"]+', ' ', sanitized)  # Remove special characters
+    return sanitized.strip()
 
 if __name__ == "__main__":
-    main_app()
+    init_auth_state()
+    main()

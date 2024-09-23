@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import logging
-from auth import auth_main, handle_password_reset, login_page, verify_email
+from auth1 import auth_main, handle_password_reset, login_page, verify_email
 from config_settings import Config
 
 # Use the logger from the existing configuration
