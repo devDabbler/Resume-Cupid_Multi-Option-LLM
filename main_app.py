@@ -21,6 +21,8 @@ load_dotenv(dotenv_file)
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+st.set_page_config(page_title="Resume Cupid", page_icon="💘")
+
 def load_css():
     """Load custom CSS for styling Streamlit elements."""
     st.markdown("""

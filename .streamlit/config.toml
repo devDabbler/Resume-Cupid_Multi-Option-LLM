@@ -6,7 +6,7 @@ secondaryBackgroundColor = "#E0F2F1"  # Soft mint green for content areas
 
 # Text colors
 textColor = "#37474F"  # Dark charcoal for main text
-font = "Roboto, 'Helvetica Neue', sans-serif"  # Clean, sans-serif font similar to the image
+font = "sans serif"  # Default sans-serif font
 
 # Additional custom colors (for use in your CSS)
 [theme.colors]
