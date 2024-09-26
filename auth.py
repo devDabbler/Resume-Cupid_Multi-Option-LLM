@@ -1,6 +1,6 @@
 import streamlit as st
 import bcrypt
-from database import register_user, get_user, get_db_connection
+from database import get_user, get_user_by_email, register_user, get_db_connection, release_db_connection
 from config_settings import Config
 import logging
 from utils import is_valid_email
@@ -12,15 +12,14 @@ def init_auth_state():
         st.session_state.user = None
     if 'login_success' not in st.session_state:
         st.session_state.login_success = False
-    if 'db_connection' not in st.session_state:
-        st.session_state.db_connection = None
 
 def login_user(username: str, password: str) -> bool:
     conn = get_db_connection()
     if conn is None:
         logger.error("Failed to establish database connection")
+        st.error("Database connection error. Please try again later.")
         return False
-    
+
     try:
         user = get_user(conn, username)
         if user:
@@ -30,153 +29,128 @@ def login_user(username: str, password: str) -> bool:
             if bcrypt.checkpw(password.encode('utf-8'), stored_password):
                 st.session_state.user = user
                 st.session_state.login_success = True
-                st.session_state.db_connection = conn  # Store the connection in session state
                 logger.info(f"User logged in: {username}")
                 return True
         logger.warning(f"Failed login attempt for user: {username}")
         return False
+    except Exception as e:
+        logger.error(f"Error during login for user {username}: {str(e)}")
+        st.error("An unexpected error occurred during login. Please try again later.")
+        return False
     finally:
-        if not st.session_state.login_success:
-            conn.close()
+        conn.close()
 
 def logout_user():
-    if st.session_state.db_connection:
-        st.session_state.db_connection.close()
     st.session_state.user = None
     st.session_state.login_success = False
-    st.session_state.db_connection = None
     logger.info("User logged out")
 
 def register_new_user(username: str, email: str, password: str) -> bool:
     if not username or not email or not password:
         st.error("All fields are required.")
         return False
-    
+
     if not is_valid_email(email):
         st.error("Please enter a valid email address.")
         return False
-    
+
     if len(password) < 8:
         st.error("Password must be at least 8 characters long.")
         return False
+
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     conn = get_db_connection()
     if conn is None:
         logger.error("Failed to establish database connection")
+        st.error("Database error. Please try again later.")
         return False
-    
+
     try:
+        # Check if username exists
+        if get_user(conn, username):
+            st.error("Username already exists.")
+            return False
+
+        # Check if email exists
+        if get_user_by_email(conn, email):
+            st.error("Email already exists.")
+            return False
+
         if register_user(conn, username, email, hashed_password):
             logger.info(f"New user registered: {username}")
+            st.success("Registration successful! You can now log in with your new credentials.")
             return True
         else:
-            st.error("Username or email already exists.")
+            st.error("An error occurred during registration. Please try again.")
             return False
+    except Exception as e:
+        logger.error(f"Error registering user {username}: {str(e)}")
+        st.error("An unexpected error occurred during registration. Please try again later.")
+        return False
     finally:
         conn.close()
 
-def auth_page():
-    st.markdown("""
-    <style>
-    .stApp {
-        max-width: 100%;
-        padding: 0;
-    }
-    .main-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        width: 100%;
-        padding: 2rem;
-    }
-    .welcome-section {
-        width: 100%;
-        max-width: 1200px;
-        background-color: #f0f8ff;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-bottom: 2rem;
-        text-align: center; /* Center text inside the section */
-    }
-    .main-title {
-        font-size: 2.5rem; /* Adjusted for responsiveness */
-        color: #3366cc;
-        margin-bottom: 1rem;
-    }
-    .subtitle {
-        font-size: 1.2rem; /* Adjusted for responsiveness */
-        color: #555;
-        margin-bottom: 1.5rem;
-    }
-    .features-title {
-        font-size: 1.5rem; /* Adjusted for responsiveness */
-        color: #1f4e79;
-        margin-bottom: 1rem;
-    }
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1rem;
-        text-align: left; /* Align text to the left inside the grid */
-    }
-    .feature-item {
-        display: flex;
-        align-items: center;
-    }
-    .feature-item:before {
-        content: "✓";
-        color: #3366cc;
-        font-weight: bold;
-        margin-right: 0.5rem;
-    }
-    .powered-by {
-        font-size: 0.9rem; /* Adjusted for responsiveness */
-        color: #666;
-        margin-top: 1.5rem;
-    }
-    .login-section {
-        width: 100%;
-        max-width: 400px;
-        text-align: center; /* Center text inside the login section */
-    }
-    .login-title {
-        font-size: 1.5rem; /* Adjusted for responsiveness */
-        color: #3366cc;
-        margin-bottom: 1rem;
-    }
-    @media (max-width: 768px) {
-        .main-title {
-            font-size: 2rem; /* Smaller font size for mobile */
-        }
-        .subtitle, .features-title, .login-title {
-            font-size: 1rem; /* Smaller font size for mobile */
-        }
-    }
-    </style>
-    """, unsafe_allow_html=True)
+def reset_password(username_or_email: str, old_password: str, new_password: str) -> bool:
+    if len(new_password) < 8:
+        st.error("New password must be at least 8 characters long.")
+        return False
 
+    conn = get_db_connection()
+    if conn is None:
+        logger.error("Failed to establish database connection")
+        st.error("Database error. Please try again later.")
+        return False
+
+    try:
+        user = get_user(conn, username_or_email)
+        if not user:
+            user = get_user_by_email(conn, username_or_email)
+        if user:
+            stored_password = user['password_hash']
+            if isinstance(stored_password, str):
+                stored_password = stored_password.encode('utf-8')
+            if bcrypt.checkpw(old_password.encode('utf-8'), stored_password):
+                new_hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+                cur = conn.cursor()
+                cur.execute('''UPDATE users SET password_hash = ? WHERE id = ?''', (new_hashed_password, user['id']))
+                conn.commit()
+                logger.info(f"Password reset successful for user: {user['username']}")
+                st.success("Password reset successfully!")
+                return True
+            else:
+                st.error("Invalid old password")
+                return False
+        else:
+            st.error("Username or email not found")
+            return False
+    except Exception as e:
+        logger.error(f"Error resetting password for user {username_or_email}: {str(e)}")
+        st.error("An unexpected error occurred during password reset. Please try again later.")
+        return False
+    finally:
+        conn.close()
+
+def check_db_connection() -> bool:
+    try:
+        conn = get_db_connection()
+        if conn is None:
+            return False
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"Database connection error: {str(e)}")
+        return False
+
+def auth_page():
+    st.markdown("""<style>.stApp {max-width: 100%; padding: 0;}</style>""", unsafe_allow_html=True)
     st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
-    st.markdown("""
-    <div class="welcome-section">
-        <h1 class="main-title">Welcome to Resume Cupid</h1>
-        <p class="subtitle">Revolutionize your hiring process with our cutting-edge AI-powered resume evaluation tool.</p>
-        <h2 class="features-title">Key Features:</h2>
-        <div class="features-grid">
-            <div class="feature-item">Advanced AI analysis of resumes</div>
-            <div class="feature-item">Instant matching against job descriptions</div>
-            <div class="feature-item">Detailed candidate insights and recommendations</div>
-            <div class="feature-item">Time-saving automated evaluations</div>
-        </div>
-        <p class="powered-by">Powered by the latest Large Language Models and Machine Learning algorithms.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">Welcome to Resume Cupid</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">Revolutionize your hiring process with our cutting-edge AI-powered resume evaluation tool.</p>', unsafe_allow_html=True)
 
-    st.markdown('<div class="login-section">', unsafe_allow_html=True)
-    st.markdown('<h2 class="login-title">Login / Register</h2>', unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["Login", "Register"])
+    tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
     
     with tab1:
         username = st.text_input("Username", key="login_username")
@@ -184,7 +158,7 @@ def auth_page():
         if st.button("Login", key="login_button", type="primary", use_container_width=True):
             if login_user(username, password):
                 st.success("Logged in successfully!")
-                st.rerun()
+                st.rerun()  # Changed from st.experimental_rerun() to st.rerun()
             else:
                 st.error("Invalid username or password")
 
@@ -193,18 +167,16 @@ def auth_page():
         new_email = st.text_input("Email", key="register_email")
         new_password = st.text_input("Password", type="password", key="register_password")
         if st.button("Register", key="register_button", type="primary", use_container_width=True):
-            if register_new_user(new_username, new_email, new_password):
-                st.success("Registered successfully! You can now log in.")
-                st.rerun()
+            register_new_user(new_username, new_email, new_password)
+    
+    with tab3:
+        username_reset = st.text_input("Username or Email", key="reset_username")
+        old_password = st.text_input("Current Password", type="password", key="reset_old_password")
+        new_password = st.text_input("New Password", type="password", key="reset_new_password")
+        if st.button("Reset Password", key="reset_button", type="primary", use_container_width=True):
+            reset_password(username_reset, old_password, new_password)
 
     st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def check_db_connection():
-    if st.session_state.db_connection is None or st.session_state.db_connection.total_changes == -1:
-        logger.info("Refreshing database connection")
-        st.session_state.db_connection = get_db_connection()
-    return st.session_state.db_connection is not None
 
 def require_auth(func):
     def wrapper(*args, **kwargs):
