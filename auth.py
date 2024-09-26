@@ -59,7 +59,6 @@ def register_new_user(username: str, email: str, password: str) -> bool:
     if len(password) < 8:
         st.error("Password must be at least 8 characters long.")
         return False
-    
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     conn = get_db_connection()
     if conn is None:
