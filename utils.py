@@ -114,12 +114,12 @@ def generate_pdf_report(results: List[Dict[str, Any]], run_id: str, job_title: s
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
 
-    elements.append(Paragraph("Evaluation Report", styles['Title']))
+    elements.append(Paragraph(f"Evaluation Report for {job_title}", styles['Title']))
     elements.append(Spacer(1, 12))
 
     # Create the table for the summary
     data = [["Rank", "Resume", "Match Score", "Recommendation"]]
-    for i, result in enumerate(results, 1):
+    for i, result in enumerate(sorted(results, key=lambda x: x['match_score'], reverse=True), 1):
         data.append([
             str(i),
             result['file_name'],
@@ -147,7 +147,7 @@ def generate_pdf_report(results: List[Dict[str, Any]], run_id: str, job_title: s
     elements.append(table)
     elements.append(Spacer(1, 12))
 
-    for result in results:
+    for result in sorted(results, key=lambda x: x['match_score'], reverse=True):
         elements.append(Paragraph(f"Detailed Analysis: {result['file_name']}", styles['Heading2']))
         elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
         elements.append(Paragraph(f"Recommendation: {generate_recommendation(result['match_score'])}", styles['Normal']))

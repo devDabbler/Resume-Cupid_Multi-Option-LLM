@@ -161,8 +161,10 @@ def get_evaluation_results(conn, job_role_id: int) -> List[Dict[str, Any]]:
     try:
         cur = conn.cursor()
         cur.execute('''
-        SELECT * FROM evaluation_results WHERE job_role_id = ?
-        ORDER BY match_score DESC
+        SELECT id, resume_file_name, match_score, recommendation, created_at
+        FROM evaluation_results
+        WHERE job_role_id = ?
+        ORDER BY created_at DESC
         ''', (job_role_id,))
         results = cur.fetchall()
         return [dict(zip([column[0] for column in cur.description], result)) for result in results]
