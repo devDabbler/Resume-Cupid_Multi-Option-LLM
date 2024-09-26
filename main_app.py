@@ -2,18 +2,34 @@ import streamlit as st
 import uuid
 import pandas as pd
 from typing import List, Dict, Any
-from auth import require_auth, init_auth_state
+from auth import require_auth, init_auth_state, auth_page
 from resume_processor import resume_processor
 from database import save_role, get_saved_roles, save_evaluation_result, get_evaluation_results
 from utils import extract_text_from_file, generate_pdf_report
 import logging
+import time
 import re
+import os
+from dotenv import load_dotenv
+from llm_orchestrator import llm_orchestrator
+from llama_service import LlamaService
 
+# Load environment variables from the specified .env file
+dotenv_file = os.getenv('DOTENV_FILE', '.env.development')
+load_dotenv(dotenv_file)
+
+# Initialize logger
 logger = logging.getLogger(__name__)
 
 def load_css():
+    """Load custom CSS for styling Streamlit elements."""
     st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Roboto', sans-serif;
+    }
     .main-title {
         font-size: 3rem;
         font-weight: bold;
@@ -41,26 +57,31 @@ def load_css():
     </style>
     """, unsafe_allow_html=True)
 
-@require_auth
 def main():
+    """Main function for loading and managing the Streamlit app."""
     load_css()
-    st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='info-box'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
+    if not st.session_state.get('user'):
+        auth_page()
+    else:
+        st.markdown("<h1 class='main-title'>Resume Cupid 💘</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='info-box'>Welcome to Resume Cupid - Your AI-powered resume evaluation tool</p>", unsafe_allow_html=True)
 
-    menu = ["Evaluate Resumes", "Manage Job Roles", "View Past Evaluations"]
-    choice = st.sidebar.selectbox("Menu", menu)
+        menu = ["Evaluate Resumes", "Manage Job Roles", "View Past Evaluations"]
+        choice = st.sidebar.selectbox("Menu", menu)
 
-    if choice == "Evaluate Resumes":
-        evaluate_resumes_page()
-    elif choice == "Manage Job Roles":
-        manage_job_roles_page()
-    elif choice == "View Past Evaluations":
-        view_past_evaluations_page()
+        if choice == "Evaluate Resumes":
+            evaluate_resumes_page()
+        elif choice == "Manage Job Roles":
+            manage_job_roles_page()
+        elif choice == "View Past Evaluations":
+            view_past_evaluations_page()
 
 def evaluate_resumes_page():
+    """Page for evaluating resumes."""
     st.markdown("<h2 class='section-title'>Evaluate Resumes</h2>", unsafe_allow_html=True)
 
-    saved_roles = get_saved_roles()
+    db_conn = st.session_state.get('db_connection')
+    saved_roles = get_saved_roles(db_conn)
     role_names = [role['role_name'] for role in saved_roles]
     selected_role = st.selectbox("Select a job role", [""] + role_names)
 
@@ -69,74 +90,160 @@ def evaluate_resumes_page():
         if role:
             st.markdown("<p class='info-box'>Job Description:</p>", unsafe_allow_html=True)
             sanitized_job_description = sanitize_text(role['job_description'])
-            st.text_area("", value=sanitized_job_description, height=200, disabled=True)
+            st.text_area("", value=sanitized_job_description, height=200, key="job_description")
 
-            uploaded_files = st.file_uploader("Upload resumes (PDF or DOCX)", accept_multiple_files=True, type=['pdf', 'docx'])
-
+            uploaded_files = st.file_uploader("Upload Resumes", accept_multiple_files=True, type=["pdf", "docx"])
+            
             if uploaded_files:
                 if st.button("Evaluate Resumes"):
                     with st.spinner("Evaluating resumes, please wait..."):
-                        results = process_resumes(uploaded_files, role['job_description'], role['id'])
-                    display_results(results)
+                        job_description = role['job_description']
+                        job_role_id = role['id']
+                        job_title = role['role_name'].replace("- C3", "").strip()  # Standardize job title here
+                        results = process_resumes(uploaded_files, job_description, job_role_id, job_title, db_conn)
+                        
+                        if results:
+                            display_results(results, job_title=job_title)
+                        else:
+                            st.warning("No valid results to display. Please check the error messages above.")
+            else:
+                st.warning("Please upload resumes to evaluate.")
         else:
             st.error("Selected job role not found.")
 
-def display_results(results: List[Dict[str, Any]]):
+def process_resumes(files: List[Any], job_description: str, job_role_id: int, job_title: str, db_conn) -> List[Dict[str, Any]]:
+    """Process uploaded resumes and evaluate against job description."""
+    results = []
+    
+    for file in files:
+        try:
+            logger.info(f"Starting to process resume: {file.name}")
+            resume_text = extract_text_from_file(file)
+            if not resume_text.strip():
+                logger.warning(f"Resume {file.name} is empty or unreadable.")
+                st.warning(f"Resume {file.name} is empty or unreadable.")
+                continue
+
+            start_time = time.time()
+            result = llm_orchestrator.analyze_resume(resume_text, job_description, job_title)
+            processing_time = time.time() - start_time
+            logger.info(f"Resume {file.name} processed in {processing_time:.2f} seconds")
+
+            if isinstance(result, dict) and "error" in result:
+                logger.error(f"Error processing {file.name}: {result['error']}")
+                st.error(f"Error processing {file.name}: {result['error']}")
+                continue
+
+            result['file_name'] = file.name
+            save_evaluation_result(db_conn, file.name, job_role_id, result.get('match_score', 0), result.get('summary', 'N/A'))
+            logger.info(f"Saved evaluation result for {file.name}")
+            results.append(result)
+            st.success(f"Successfully processed resume: {file.name}")
+        except Exception as e:
+            logger.error(f"Unexpected error processing resume {file.name}: {str(e)}", exc_info=True)
+            st.error(f"Unexpected error processing resume {file.name}: {str(e)}")
+
+    return results
+
+def generate_recommendation(match_score: int) -> str:
+    """Generate recommendation based on match score."""
+    if match_score >= 90:
+        return "Strongly recommend for immediate interview"
+    elif 80 <= match_score < 90:
+        return "Highly recommend for interview"
+    elif 70 <= match_score < 80:
+        return "Recommend for interview"
+    elif 60 <= match_score < 70:
+        return "Consider for interview with reservations"
+    elif 50 <= match_score < 60:
+        return "Potentially consider for interview, but significant gaps exist"
+    else:
+        return "Do not recommend for interview at this time"
+
+def generate_fit_summary(match_score: int, job_title: str) -> str:
+    """Generate a fit summary based on match score and job title."""
+    if match_score >= 90:
+        return f"The candidate is an exceptional fit for the {job_title} role, exceeding most job requirements and demonstrating outstanding qualifications."
+    elif 80 <= match_score < 90:
+        return f"The candidate is an excellent fit for the {job_title} role, meeting or exceeding most job requirements with minor areas for improvement."
+    elif 70 <= match_score < 80:
+        return f"The candidate is a good fit for the {job_title} role, meeting many of the job requirements with some areas for development."
+    elif 60 <= match_score < 70:
+        return f"The candidate shows potential for the {job_title} role but has notable gaps that would require further assessment and development."
+    elif 50 <= match_score < 60:
+        return f"The candidate has some relevant skills for the {job_title} role, but significant gaps exist that may hinder their immediate success."
+    else:
+        return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
+
+def display_results(results: List[Dict[str, Any]], job_title: str):
+    """Display evaluation results for the processed resumes."""
     st.markdown("<h3 class='section-title'>Evaluation Results</h3>", unsafe_allow_html=True)
 
     if not results:
         st.warning("No results to display.")
         return
 
-    df = pd.DataFrame(results)
-    columns_to_display = ['file_name', 'match_score', 'recommendation']
-    df = df[[col for col in columns_to_display if col in df.columns]]
-    df.columns = ['Resume', 'Match Score', 'Recommendation']
-    df = df.sort_values('Match Score', ascending=False)
+    # Sort results by match score in descending order
+    sorted_results = sorted(results, key=lambda x: x.get('match_score', 0), reverse=True)
+
+    # Create DataFrame with rank
+    df = pd.DataFrame(sorted_results)
+    df['Rank'] = range(1, len(df) + 1)
+    df['Recommendation'] = df['match_score'].apply(generate_recommendation)
+    
+    columns_to_display = ['Rank', 'file_name', 'match_score', 'Recommendation']
+    df = df[columns_to_display]
+    df.columns = ['Rank', 'Resume', 'Match Score', 'Recommendation']
 
     st.dataframe(df)
 
-    for result in results:
+    for result in sorted_results:
         with st.expander(f"Detailed Analysis: {result.get('file_name', 'Unknown')}"):
             st.write(f"**Match Score:** {result.get('match_score', 'N/A')}%")
-            st.write(f"**Recommendation:** {result.get('recommendation', 'N/A')}")
-            st.write(f"**Brief Summary:** {result.get('brief_summary', 'N/A')}")
-            st.write(f"**Fit Summary:** {result.get('fit_summary', 'N/A')}")
-
-            if 'skills_analysis' in result:
-                st.write("**Skills Analysis:**")
-                for skill, score in result['skills_analysis'].items():
-                    st.write(f"- {skill}: {score:.2f}")
-
-            if 'experience_analysis' in result:
-                st.write("**Experience Analysis:**")
-                st.write(f"- Relevance: {result['experience_analysis'].get('relevance', 'N/A')}")
-                st.write(f"- Years: {result['experience_analysis'].get('years', 'N/A')}")
-
-            if 'project_analysis' in result:
-                st.write("**Project Analysis:**")
-                st.write(f"- Complexity: {result['project_analysis'].get('complexity', 'N/A')}")
-                st.write(f"- Relevance: {result['project_analysis'].get('relevance', 'N/A')}")
-
-            if 'education_analysis' in result:
-                st.write("**Education Analysis:**")
-                st.write(f"- Degree Level: {result['education_analysis'].get('degree_level', 'N/A')}")
-                st.write(f"- Relevance: {result['education_analysis'].get('relevance', 'N/A')}")
+            st.write(f"**Recommendation:** {generate_recommendation(result.get('match_score', 0))}")
+            st.write(f"**Fit Summary:** {generate_fit_summary(result.get('match_score', 0), job_title)}")
+            
+            st.write("**Experience Relevance:**")
+            experience_relevance = result.get('experience_relevance', {})
+            for job, details in experience_relevance.items():
+                st.write(f"* {job}:")
+                if isinstance(details, dict):
+                    for project, relevance in details.items():
+                        if isinstance(relevance, dict):
+                            for sub_project, sub_relevance in relevance.items():
+                                st.write(f"  * {sub_project}: {sub_relevance}")
+                        else:
+                            st.write(f"  * {project}: {relevance}")
+                else:
+                    st.write(f"  * {details}")
 
             st.write("**Key Strengths:**")
             for strength in result.get('key_strengths', []):
-                st.write(f"- {strength}")
+                st.write(f"* {strength}")
 
             st.write("**Areas for Improvement:**")
             for area in result.get('areas_for_improvement', []):
-                st.write(f"- {area}")
+                st.write(f"* {area}")
 
-            st.write("**Recommended Interview Questions:**")
-            for question in result.get('recruiter_questions', []):
-                st.write(f"- {question}")
+            st.write("**Skills Gap:**")
+            for skill in result.get('skills_gap', []):
+                st.write(f"* {skill}")
+
+            st.write("**Recruiter Questions:**")
+            recruiter_questions = result.get('recruiter_questions', [])
+            if recruiter_questions:
+                for i, question in enumerate(recruiter_questions, 1):
+                    if isinstance(question, dict):
+                        st.write(f"{i}. **Question:** {question['question']}")
+                        st.write(f"   **Purpose:** {question['purpose']}")
+                        st.write("")  # Add a blank line for better readability
+                    else:
+                        st.write(f"{i}. {question}")
+            else:
+                st.write("No recruiter questions generated.")
 
     if results:
-        pdf_report = generate_pdf_report(results, str(uuid.uuid4()))
+        pdf_report = generate_pdf_report(sorted_results, str(uuid.uuid4()), job_title)
         st.download_button(
             label="Download PDF Report",
             data=pdf_report,
@@ -144,39 +251,11 @@ def display_results(results: List[Dict[str, Any]]):
             mime="application/pdf"
         )
 
-def process_resumes(files: List[Any], job_description: str, job_role_id: int) -> List[Dict[str, Any]]:
-    results = []
-
-    # Fetch the job role details
-    saved_roles = get_saved_roles()
-    job_role = next((role for role in saved_roles if role['id'] == job_role_id), None)
-
-    if not job_role:
-        st.error(f"Job role with ID {job_role_id} not found.")
-        return results
-
-    job_title = job_role['role_name']
-
-    for file in files:
-        try:
-            logger.debug(f"Processing file: {file.name}, Size: {file.size} bytes, Type: {file.type}")
-            resume_text = extract_text_from_file(file)
-            if not resume_text.strip():
-                st.warning(f"Resume {file.name} is empty or unreadable.")
-                continue
-
-            result = resume_processor.process_resume(resume_text, job_description, job_title)
-            result['file_name'] = file.name  # Add the file name to the result
-            results.append(result)
-            save_evaluation_result(file.name, job_role_id, result['match_score'], result['recommendation'])
-        except Exception as e:
-            logger.error(f"Error processing resume {file.name}: {str(e)}", exc_info=True)
-            st.error(f"Error processing resume {file.name}: {str(e)}")
-    return results
-
 def manage_job_roles_page():
+    """Page for managing job roles."""
     st.markdown("<h2 class='section-title'>Manage Job Roles</h2>", unsafe_allow_html=True)
 
+    db_conn = st.session_state.get('db_connection')
     with st.form("add_job_role"):
         role_name = st.text_input("Role Name")
         job_description = st.text_area("Job Description")
@@ -186,7 +265,7 @@ def manage_job_roles_page():
             if role_name.strip() and job_description.strip():
                 sanitized_role_name = sanitize_text(role_name)
                 sanitized_job_description = sanitize_text(job_description)
-                if save_role(sanitized_role_name, sanitized_job_description):
+                if save_role(db_conn, sanitized_role_name, sanitized_job_description):
                     st.success("Job role saved successfully!")
                 else:
                     st.error("Failed to save job role. Please try again.")
@@ -194,22 +273,24 @@ def manage_job_roles_page():
                 st.warning("Please provide both role name and job description.")
 
     st.markdown("<h3 class='section-title'>Existing Job Roles</h3>", unsafe_allow_html=True)
-    roles = get_saved_roles()
+    roles = get_saved_roles(db_conn)
     for role in roles:
         with st.expander(role['role_name']):
             st.write(role['job_description'])
 
 def view_past_evaluations_page():
+    """Page to view past evaluations for selected job roles."""
     st.markdown("<h2 class='section-title'>View Past Evaluations</h2>", unsafe_allow_html=True)
 
-    saved_roles = get_saved_roles()
+    db_conn = st.session_state.get('db_connection')
+    saved_roles = get_saved_roles(db_conn)
     role_names = [role['role_name'] for role in saved_roles]
     selected_role = st.selectbox("Select a job role", [""] + role_names)
 
     if selected_role:
         role = next((role for role in saved_roles if role['role_name'] == selected_role), None)
         if role:
-            results = get_evaluation_results(role['id'])
+            results = get_evaluation_results(db_conn, role['id'])
 
             if results:
                 df = pd.DataFrame(results)
