@@ -1,6 +1,6 @@
 import logging
 import io
-import PyPDF2
+import pypdf
 from docx import Document
 import re
 import spacy
@@ -11,6 +11,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ def extract_text_from_file(file) -> str:
 def extract_text_from_pdf(file_content: bytes) -> str:
     try:
         print(f"PDF content size: {len(file_content)} bytes")
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+        pdf_reader = pypdf.PdfReader(io.BytesIO(file_content))
         print(f"Number of pages in PDF: {len(pdf_reader.pages)}")
         if len(pdf_reader.pages) == 0:
             raise ValueError("PDF file has no pages.")
@@ -85,25 +86,45 @@ def generate_job_requirements(job_description: str) -> Dict[str, Any]:
         'industry_keywords': industry_keywords
     }
 
-def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -> bytes:
+def generate_recommendation(match_score: int) -> str:
+    if match_score >= 80:
+        return "Highly recommend for interview"
+    elif 65 <= match_score < 80:
+        return "Recommend for interview"
+    elif 50 <= match_score < 65:
+        return "Consider for interview with reservations"
+    else:
+        return "Not recommended for interview at this time"
+
+def generate_fit_summary(match_score: int, job_title: str) -> str:
+    if match_score >= 80:
+        return f"The candidate is an excellent fit for the {job_title} role, meeting or exceeding most job requirements."
+    elif 65 <= match_score < 80:
+        return f"The candidate is a good fit for the {job_title} role, meeting many of the job requirements with some minor gaps."
+    elif 50 <= match_score < 65:
+        return f"The candidate shows potential for the {job_title} role but has some gaps that would require further assessment."
+    else:
+        return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
+    
+def generate_pdf_report(results: List[Dict[str, Any]], run_id: str, job_title: str) -> bytes:
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
     elements = []
 
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
 
-    elements.append(Paragraph(f"Evaluation Report (Run ID: {run_id})", styles['Heading1']))
+    elements.append(Paragraph("Evaluation Report", styles['Title']))
     elements.append(Spacer(1, 12))
 
-    # Summary table
-    data = [['Rank', 'Candidate', 'Match Score (%)', 'Recommendation']]
-    for i, result in enumerate(sorted(evaluation_results, key=lambda x: x.get('match_score', 0), reverse=True), 1):
+    # Create the table for the summary
+    data = [["Rank", "Resume", "Match Score", "Recommendation"]]
+    for i, result in enumerate(results, 1):
         data.append([
-            i,
-            result.get('file_name', 'Unknown'),
-            result.get('match_score', 0),
-            result.get('recommendation', 'N/A')
+            str(i),
+            result['file_name'],
+            f"{result['match_score']}%",
+            generate_recommendation(result['match_score'])
         ])
 
     table = Table(data)
@@ -126,60 +147,84 @@ def generate_pdf_report(evaluation_results: List[Dict[str, Any]], run_id: str) -
     elements.append(table)
     elements.append(Spacer(1, 12))
 
-    for result in evaluation_results:
-        elements.append(Paragraph(f"{result.get('file_name', 'Unknown')}", styles['Heading2']))
-        elements.append(Paragraph(f"Match Score: {result.get('match_score', 0)}%", styles['Normal']))
-        elements.append(Paragraph(f"Recommendation: {result.get('recommendation', 'N/A')}", styles['Normal']))
-        elements.append(Spacer(1, 12))
-
-        elements.append(Paragraph("Brief Summary:", styles['Heading3']))
-        elements.append(Paragraph(result.get('brief_summary', 'No summary available.'), styles['Justify']))
-        elements.append(Spacer(1, 12))
-
-        elements.append(Paragraph("Fit Summary:", styles['Heading3']))
-        elements.append(Paragraph(result.get('fit_summary', 'No fit summary available.'), styles['Justify']))
-        elements.append(Spacer(1, 12))
-
-        elements.append(Paragraph("Experience and Project Relevance:", styles['Heading3']))
-        experience_and_project_relevance = result.get('experience_and_project_relevance', {})
-        if isinstance(experience_and_project_relevance, dict):
-            for key, value in experience_and_project_relevance.items():
-                elements.append(Paragraph(f"{key}: {value}", styles['Justify']))
-        elif isinstance(experience_and_project_relevance, list):
-            for item in experience_and_project_relevance:
-                elements.append(Paragraph(f"- {item}", styles['Justify']))
-        elif isinstance(experience_and_project_relevance, int):
-            elements.append(Paragraph(f"Relevance Score: {experience_and_project_relevance}", styles['Justify']))
-        else:
-            elements.append(Paragraph(str(experience_and_project_relevance), styles['Justify']))
-        elements.append(Spacer(1, 12))
-
-        elements.append(Paragraph("Skills Gap:", styles['Heading3']))
-        for skill in result.get('skills_gap', []):
-            elements.append(Paragraph(f"- {skill}", styles['Normal']))
-        elements.append(Spacer(1, 12))
-
+    for result in results:
+        elements.append(Paragraph(f"Detailed Analysis: {result['file_name']}", styles['Heading2']))
+        elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
+        elements.append(Paragraph(f"Recommendation: {generate_recommendation(result['match_score'])}", styles['Normal']))
+        elements.append(Paragraph(f"Fit Summary: {generate_fit_summary(result['match_score'], job_title)}", styles['Normal']))
+        elements.append(Paragraph(f"Summary: {result.get('summary', 'N/A')}", styles['Normal']))
+        
+        elements.append(Paragraph("Experience Relevance:", styles['Heading3']))
+        for job, details in result.get('experience_relevance', {}).items():
+            elements.append(Paragraph(f"- {job}:", styles['Normal']))
+            if isinstance(details, dict):
+                for project, relevance in details.items():
+                    elements.append(Paragraph(f"  * {project}: {relevance}", styles['Normal']))
+            else:
+                elements.append(Paragraph(f"  * {details}", styles['Normal']))
+        
         elements.append(Paragraph("Key Strengths:", styles['Heading3']))
         for strength in result.get('key_strengths', []):
             elements.append(Paragraph(f"- {strength}", styles['Normal']))
-        elements.append(Spacer(1, 12))
-
+        
         elements.append(Paragraph("Areas for Improvement:", styles['Heading3']))
         for area in result.get('areas_for_improvement', []):
             elements.append(Paragraph(f"- {area}", styles['Normal']))
+        
+        elements.append(Paragraph("Skills Gap:", styles['Heading3']))
+        for skill in result.get('skills_gap', []):
+            elements.append(Paragraph(f"- {skill}", styles['Normal']))
+        
+        elements.append(Paragraph("Recruiter Questions:", styles['Heading3']))
+        for i, question in enumerate(result.get('recruiter_questions', []), 1):
+            if isinstance(question, dict):
+                elements.append(Paragraph(f"{i}. {question['question']}", styles['Normal']))
+                elements.append(Paragraph(f"   Purpose: {question['purpose']}", styles['Normal']))
+            else:
+                elements.append(Paragraph(f"{i}. {question}", styles['Normal']))
+        
         elements.append(Spacer(1, 12))
-
-        elements.append(Paragraph("Recommended Interview Questions:", styles['Heading3']))
-        for question in result.get('recruiter_questions', []):
-            elements.append(Paragraph(f"- {question}", styles['Normal']))
-        elements.append(Spacer(1, 12))
-
-        elements.append(Paragraph("", styles['Normal']))  # Add a blank line between candidates
 
     doc.build(elements)
-    buffer.seek(0)
     return buffer.getvalue()
 
+def generate_resume_summary(result: Dict[str, Any], job_title: str) -> str:
+    return f"""
+    <div class="resume-summary">
+        <h2>Detailed Analysis: {result['file_name']}</h2>
+        <p><strong>Match Score:</strong> {result['match_score']}%</p>
+        <p><strong>Recommendation:</strong> {generate_recommendation(result['match_score'])}</p>
+        <p><strong>Fit Summary:</strong> {generate_fit_summary(result['match_score'], job_title)}</p>
+        <p><strong>Summary:</strong> {result.get('summary', 'N/A')}</p>
+        <h3>Experience Relevance:</h3>
+        <ul>
+            {"".join(generate_experience_relevance(result.get('experience_relevance', {})))}
+        </ul>
+        <h3>Key Strengths:</h3>
+        <ul>{"".join(f"<li>{strength}</li>" for strength in result.get('key_strengths', []))}</ul>
+        <h3>Areas for Improvement:</h3>
+        <ul>{"".join(f"<li>{area}</li>" for area in result.get('areas_for_improvement', []))}</ul>
+        <h3>Skills Gap:</h3>
+        <ul>{"".join(f"<li>{skill}</li>" for skill in result.get('skills_gap', []))}</ul>
+        <h3>Recruiter Questions:</h3>
+        <ol>{"".join(generate_recruiter_questions(result.get('recruiter_questions', [])))}</ol>
+    </div>
+    """
+
+def generate_experience_relevance(experience_relevance: Dict[str, Any]) -> str:
+    return "".join(
+        f"<li>{job}:<ul>{''.join(f'<li>{project}: {relevance}</li>' for project, relevance in details.items()) if isinstance(details, dict) else f'<li>{details}</li>'}</ul></li>"
+        for job, details in experience_relevance.items()
+    )
+
+def generate_recruiter_questions(questions: List[Dict[str, str]]) -> str:
+    return "".join(
+        f"<li>{question['question']}<br><small>Purpose: {question['purpose']}</small></li>"
+        if isinstance(question, dict)
+        else f"<li>{question}</li>"
+        for question in questions
+    )
+    
 def is_valid_email(email: str) -> bool:
     email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(email_regex, email) is not None

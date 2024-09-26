@@ -12,12 +12,15 @@ bcrypt==4.0.1
 groq==0.11.0
 PyYAML==6.0.2
 reportlab==4.0.4
+pypdf
 
 # AI and NLP
 llama-cpp-python==0.2.11
-
-# Database
-sqlite3==3.35.0
+torch==2.2.1
+transformers==4.38.2
+sentence-transformers==2.4.0
+nltk==3.6.3
+spacy
 
 # Utilities
 tqdm==4.66.5

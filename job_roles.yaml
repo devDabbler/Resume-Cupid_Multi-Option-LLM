@@ -1,8 +1,8 @@
 job_roles:
   Data Scientist:
-    description: "Data Scientist role details"
+    description: "Data Scientist role for C3 AI"
     education_level: "MS or PhD in Computer Science, Statistics, or related fields"
-    years_of_experience: 3
+    years_of_experience: 4
     required_skills:
       - Python
       - R
@@ -15,16 +15,35 @@ job_roles:
       - TensorFlow
       - PyTorch
       - Scikit-learn
+      - Spark
+      - MLOps
     specific_knowledge:
       - Data Wrangling
       - Statistical Analysis
       - Data Mining
       - Predictive Modeling
+      - Generative AI
+      - Large Language Models
+      - Reinforcement Learning
+      - Cloud Computing (AWS, Azure, or GCP)
     soft_skills:
       - Problem Solving
       - Analytical Thinking
       - Communication
       - Teamwork
+      - Project Management
+    industry_experience:
+      - AI/ML Applications
+      - Industrial Applications
+      - Predictive Maintenance
+      - Demand Forecasting
+      - Process Optimization
+    us_experience_preferred: true
+    project_types:
+      - Scalable ML Systems
+      - Deep Learning Models
+      - NLP/LLM Applications
+      - Industrial AI Solutions
 
   Software Engineer:
     description: "Software Engineer role details"
@@ -60,7 +79,7 @@ job_roles:
   UI Designer:
     description: "UI Designer role details"
     education_level: "BS or MS in Graphic Design, Interaction Design, or related fields"
-    years_of_experience: 2
+    years_of_experience: 4
     required_skills:
       - UI Design
       - UX Design
@@ -85,258 +104,6 @@ job_roles:
       - Communication
       - Attention to Detail
 
-  Full Stack Engineer:
-    description: "Full Stack Engineer role details"
-    education_level: "BS or MS in Computer Science or Software Engineering"
-    years_of_experience: 4
-    required_skills:
-      - JavaScript
-      - Python
-      - Java
-      - React
-      - Angular
-      - Vue.js
-      - Node.js
-      - Express.js
-      - Django
-      - Flask
-      - SQL
-      - NoSQL
-      - REST API
-      - GraphQL
-    specific_knowledge:
-      - Full Stack Development
-      - Web Application Development
-      - Database Design
-      - API Development
-      - Frontend and Backend Integration
-    soft_skills:
-      - Problem Solving
-      - Teamwork
-      - Communication
-      - Time Management
-
-  Solutions Architect - CPG:
-    description: "Solutions Architect for CPG industry role details"
-    education_level: "BS or MS in Computer Science, Information Systems, or related fields"
-    years_of_experience: 5
-    required_skills:
-      - Cloud Computing
-      - Web Services
-      - Backend Integration
-      - AWS
-      - Azure
-      - Google Cloud
-      - Software Architecture
-      - Technical Specifications
-      - Solution Design
-      - Integration
-    specific_knowledge:
-      - Multi-Cloud Architectures
-      - Enterprise-Scale Solutions
-      - Legacy System Integration
-      - CPG Industry Experience
-    soft_skills:
-      - Client-Facing Communication
-      - Consulting
-      - Project Management
-      - Cross-Functional Collaboration
-
-  Azure Platform Architect:
-    description: "Azure Platform Architect role details"
-    education_level: "BS or MS in Computer Science, Information Technology, or related fields"
-    years_of_experience: 5
-    required_skills:
-      - Azure
-      - DevOps
-      - Cloud Security
-      - CI/CD
-      - Terraform
-      - Docker
-      - Kubernetes
-      - Unix/Linux
-      - Shell Scripting
-    specific_knowledge:
-      - Large-Scale Azure Deployments
-      - Multi-Region Architectures
-      - Complex Security Requirements
-      - Cloud Optimization
-    soft_skills:
-      - Problem Solving
-      - Team Leadership
-      - Communication
-      - Attention to Detail
-
-  Project Manager:
-    description: "Project Manager role details"
-    education_level: "BS in Business Administration, Computer Science, or related fields; MBA or MS in Project Management preferred"
-    years_of_experience: 4
-    required_skills:
-      - Project Management
-      - Agile Methodology
-      - Risk Management
-      - Communication Management
-      - Performance Management
-      - Client Communication
-      - Analytics
-      - SQL
-      - Cloud Technologies
-    specific_knowledge:
-      - Multi-Team Coordination
-      - International Project Experience
-      - High-Stakes Deliverables
-    soft_skills:
-      - Leadership
-      - Communication
-      - Organizational Skills
-      - Problem Solving
-
-  Account Manager:
-    description: "Account Manager role details"
-    education_level: "BS in Business Administration, Marketing, or related fields; MBA or MS in Sales Management preferred"
-    years_of_experience: 3
-    required_skills:
-      - Business Development
-      - Client Relationship Management
-      - Consultative Sales
-      - CPG Industry Knowledge
-      - AI
-      - Analytics
-      - Cloud Technology
-      - Data Engineering
-    specific_knowledge:
-      - Enterprise-Level Account Management
-      - Complex Solution Selling
-      - Long-Term Relationship Building
-    soft_skills:
-      - Communication
-      - Negotiation
-      - Strategic Thinking
-      - Customer Focus
-
-  Software Development Engineer:
-    description: "Software Development Engineer role details"
-    education_level: "BS or MS in Computer Science, Software Engineering, or related fields"
-    years_of_experience: 3
-    required_skills:
-      - JavaScript
-      - Python
-      - ETL Processes
-      - Pandas
-      - NumPy
-      - Shell Scripting
-      - Cron Job Scheduling
-      - Git
-      - Cloud Computing
-      - SQL
-      - NoSQL
-    specific_knowledge:
-      - AI Applications
-      - Data Integration
-      - Cloud Deployment
-      - Performance Optimization
-    soft_skills:
-      - Problem Solving
-      - Teamwork
-      - Adaptability
-      - Communication
-
-  Cloud Engineer:
-    description: "Cloud Engineer role details"
-    education_level: "BS or MS in Computer Science, Information Technology, or related fields"
-    years_of_experience: 3
-    required_skills:
-      - AWS
-      - Cloud Architecture
-      - Network Security
-      - CI/CD
-      - Terraform
-      - Docker
-      - Kubernetes
-      - Python
-      - SQL
-      - DevOps
-    specific_knowledge:
-      - Multi-Cloud Environments
-      - Large-Scale Migrations
-      - High-Availability Architectures
-    soft_skills:
-      - Problem Solving
-      - Communication
-      - Team Collaboration
-      - Attention to Detail
-
-  AI Solutions Manager:
-    description: "AI Solutions Manager role details"
-    education_level: "BS in Computer Science, Data Science, or related fields; MS in AI or MBA preferred"
-    years_of_experience: 4
-    required_skills:
-      - AI
-      - Machine Learning
-      - Data Science
-      - Cloud Computing
-      - Product Management
-      - Business Development
-      - Client Engagement
-      - Sales
-    specific_knowledge:
-      - Enterprise AI Solutions
-      - Cross-Industry AI Applications
-      - AI Ethics and Governance
-    soft_skills:
-      - Leadership
-      - Strategic Thinking
-      - Communication
-      - Client Relationship Management
-
-  Machine Learning Engineer:
-    description: "Machine Learning Engineer role details"
-    education_level: "MS or PhD in Computer Science, Machine Learning, or related fields"
-    years_of_experience: 3
-    required_skills:
-      - Machine Learning
-      - Python
-      - PySpark
-      - MLOps
-      - Azure
-      - Data Factory
-      - Data Lake Storage
-      - Event Hub
-      - Databricks
-      - MLflow
-    specific_knowledge:
-      - Large-Scale ML Model Deployment
-      - Real-Time Prediction Systems
-      - Automated ML Pipelines
-    soft_skills:
-      - Problem Solving
-      - Analytical Thinking
-      - Teamwork
-      - Communication
-
-  Senior Retail Consultant:
-    description: "Senior Retail Consultant role details"
-    education_level: "BS in Marketing, Business Analytics, or related fields; MS in Marketing Analytics or MBA preferred"
-    years_of_experience: 5
-    required_skills:
-      - Marketing Mix Modelling
-      - Multi-Touch Attribution
-      - Unified Marketing Measurement
-      - Retail Media Analytics
-      - Data Aggregation
-      - Python
-      - SQL
-      - Databricks
-      - Power BI
-    specific_knowledge:
-      - Multi-Channel Attribution Modeling
-      - Large-Scale Retail Data Analysis
-      - Predictive Customer Behavior Modeling
-    soft_skills:
-      - Analytical Thinking
-      - Communication
-      - Client Engagement
-      - Problem Solving
 
   Engagement Manager:
     description: "Engagement Manager role details"
