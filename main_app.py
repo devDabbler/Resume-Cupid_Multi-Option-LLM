@@ -4,7 +4,7 @@ import pandas as pd
 from typing import List, Dict, Any
 from auth import require_auth, init_auth_state, auth_page
 from resume_processor import resume_processor
-from database import save_role, get_saved_roles, save_evaluation_result, get_evaluation_results
+from database import get_saved_roles, save_role, save_evaluation_result, get_evaluation_results
 from utils import extract_text_from_file, generate_pdf_report
 import logging
 import time
@@ -278,15 +278,14 @@ def manage_job_roles_page():
 def view_past_evaluations_page():
     st.markdown("<h2 class='section-title'>View Past Evaluations</h2>", unsafe_allow_html=True)
 
-    db_conn = st.session_state.get('db_connection')
-    saved_roles = get_saved_roles(db_conn)
+    saved_roles = get_saved_roles()  # Remove db_conn argument
     role_names = [role['role_name'] for role in saved_roles]
     selected_role = st.selectbox("Select a job role", [""] + role_names)
 
     if selected_role:
         role = next((role for role in saved_roles if role['role_name'] == selected_role), None)
         if role:
-            results = get_evaluation_results(db_conn, role['id'])
+            results = get_evaluation_results(role['id'])  # Remove db_conn argument if it was present
 
             if results:
                 df = pd.DataFrame(results)
