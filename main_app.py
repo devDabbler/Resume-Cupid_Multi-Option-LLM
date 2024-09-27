@@ -113,8 +113,7 @@ def evaluate_resumes_page():
         else:
             st.error("Selected job role not found.")
 
-def process_resumes(files: List[Any], job_description: str, job_role_id: int, job_title: str, db_conn) -> List[Dict[str, Any]]:
-    """Process uploaded resumes and evaluate against job description."""
+def process_resumes(files: List[Any], job_description: str, job_role_id: int, job_title: str) -> List[Dict[str, Any]]:
     results = []
     
     for file in files:
@@ -126,10 +125,7 @@ def process_resumes(files: List[Any], job_description: str, job_role_id: int, jo
                 st.warning(f"Resume {file.name} is empty or unreadable.")
                 continue
 
-            start_time = time.time()
             result = llm_orchestrator.analyze_resume(resume_text, job_description, job_title)
-            processing_time = time.time() - start_time
-            logger.info(f"Resume {file.name} processed in {processing_time:.2f} seconds")
 
             if isinstance(result, dict) and "error" in result:
                 logger.error(f"Error processing {file.name}: {result['error']}")
@@ -137,10 +133,13 @@ def process_resumes(files: List[Any], job_description: str, job_role_id: int, jo
                 continue
 
             result['file_name'] = file.name
-            save_evaluation_result(db_conn, file.name, job_role_id, result.get('match_score', 0), result.get('summary', 'N/A'))
-            logger.info(f"Saved evaluation result for {file.name}")
-            results.append(result)
-            st.success(f"Successfully processed resume: {file.name}")
+            if save_evaluation_result(file.name, job_role_id, result.get('match_score', 0), result.get('summary', 'N/A')):
+                logger.info(f"Saved evaluation result for {file.name}")
+                results.append(result)
+                st.success(f"Successfully processed resume: {file.name}")
+            else:
+                logger.error(f"Failed to save evaluation result for {file.name}")
+                st.error(f"Failed to save evaluation result for {file.name}")
         except Exception as e:
             logger.error(f"Unexpected error processing resume {file.name}: {str(e)}", exc_info=True)
             st.error(f"Unexpected error processing resume {file.name}: {str(e)}")

@@ -3,6 +3,7 @@ import threading
 import logging
 from typing import Any, Dict, List, Optional
 from queue import Queue, Empty
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -15,25 +16,52 @@ class DatabaseConnectionPool:
 
     def get_connection(self):
         try:
-            return self.connection_queue.get(block=False)
+            connection = self.connection_queue.get(block=False)
+            if self._is_connection_valid(connection):
+                return connection
+            else:
+                return self._create_connection()
         except Empty:
             if self.connection_queue.qsize() < self.max_connections:
                 return self._create_connection()
             return self.connection_queue.get()
 
     def release_connection(self, connection):
-        self.connection_queue.put(connection)
+        if self._is_connection_valid(connection):
+            self.connection_queue.put(connection)
+        else:
+            connection.close()
+            self.connection_queue.put(self._create_connection())
 
     def _create_connection(self):
         return sqlite3.connect(self.db_path, check_same_thread=False)
 
+    def _is_connection_valid(self, connection):
+        try:
+            connection.execute("SELECT 1")
+            return True
+        except sqlite3.Error:
+            return False
+
 db_pool = DatabaseConnectionPool('resume_cupid.db')
 
+@contextmanager
 def get_db_connection():
-    return db_pool.get_connection()
+    connection = db_pool.get_connection()
+    try:
+        yield connection
+    finally:
+        db_pool.release_connection(connection)
 
-def release_db_connection(conn):
-    db_pool.release_connection(conn)
+def execute_with_retry(func, *args, max_retries=3, **kwargs):
+    for attempt in range(max_retries):
+        try:
+            with get_db_connection() as conn:
+                return func(conn, *args, **kwargs)
+        except sqlite3.Error as e:
+            logger.error(f"Database error (attempt {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt == max_retries - 1:
+                raise
 
 def init_db(conn):
     try:
@@ -80,12 +108,8 @@ def init_db(conn):
         logger.error(f"Error initializing database: {str(e)}")
         raise
 
-def register_user(conn, username: str, email: str, password_hash: bytes) -> bool:
-    if conn is None:
-        logger.error("Cannot register user: database connection is None")
-        return False
-    
-    try:
+def register_user(username: str, email: str, password_hash: bytes) -> bool:
+    def _register(conn):
         cur = conn.cursor()
         cur.execute('''
         INSERT INTO users (username, email, password_hash)
@@ -94,60 +118,45 @@ def register_user(conn, username: str, email: str, password_hash: bytes) -> bool
         conn.commit()
         logger.info(f"User registered successfully: {username}")
         return True
+
+    try:
+        return execute_with_retry(_register)
     except Exception as e:
         logger.error(f"Error registering user {username}: {str(e)}")
         return False
 
-def get_user(conn, username: str) -> Optional[Dict[str, Any]]:
-    if conn is None:
-        logger.error("Cannot get user: database connection is None")
-        return None
-    
-    try:
+def get_user(username: str) -> Optional[Dict[str, Any]]:
+    def _get_user(conn):
         cur = conn.cursor()
         cur.execute('SELECT * FROM users WHERE username = ?', (username,))
         user = cur.fetchone()
         if user:
             return dict(zip([column[0] for column in cur.description], user))
         return None
-    except sqlite3.OperationalError as e:
-        if "Cannot operate on a closed database" in str(e):
-            logger.warning(f"Database connection closed unexpectedly: {str(e)}")
-            return None
-        raise
+
+    try:
+        return execute_with_retry(_get_user)
     except Exception as e:
         logger.error(f"Error retrieving user {username}: {str(e)}")
         return None
 
-def get_user_by_email(conn, email: str) -> Optional[Dict[str, Any]]:
-    if conn is None:
-        logger.error("Cannot get user: database connection is None")
-        return None
-    
-    try:
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    def _get_user_by_email(conn):
         cur = conn.cursor()
         cur.execute('SELECT * FROM users WHERE email = ?', (email,))
         user = cur.fetchone()
         if user:
             return dict(zip([column[0] for column in cur.description], user))
         return None
-    except sqlite3.OperationalError as e:
-        if "Cannot operate on a closed database" in str(e):
-            logger.warning(f"Database connection closed unexpectedly: {str(e)}")
-            return None
-        raise
+
+    try:
+        return execute_with_retry(_get_user_by_email)
     except Exception as e:
         logger.error(f"Error retrieving user by email {email}: {str(e)}")
         return None
 
-def save_role(conn=None, role_name: str = "", job_description: str = "") -> bool:
-    if not conn:
-        conn = get_db_connection()
-    if conn is None:
-        logger.error("Cannot save role: database connection is None")
-        return False
-    
-    try:
+def save_role(role_name: str, job_description: str) -> bool:
+    def _save_role(conn):
         cur = conn.cursor()
         cur.execute('''
         INSERT INTO saved_roles (role_name, job_description)
@@ -156,32 +165,28 @@ def save_role(conn=None, role_name: str = "", job_description: str = "") -> bool
         conn.commit()
         logger.info(f"Role saved successfully: {role_name}")
         return True
+
+    try:
+        return execute_with_retry(_save_role)
     except Exception as e:
         logger.error(f"Error saving role: {e}")
         return False
 
-def get_saved_roles(conn=None) -> List[Dict[str, Any]]:
-    if not conn:
-        conn = get_db_connection()
-    if conn is None:
-        logger.error("Cannot get saved roles: database connection is None")
-        return []
-    
-    try:
+def get_saved_roles() -> List[Dict[str, Any]]:
+    def _get_saved_roles(conn):
         cur = conn.cursor()
         cur.execute('SELECT * FROM saved_roles')
         roles = cur.fetchall()
         return [dict(zip([column[0] for column in cur.description], role)) for role in roles]
+
+    try:
+        return execute_with_retry(_get_saved_roles)
     except Exception as e:
         logger.error(f"Error retrieving saved roles: {e}")
         return []
 
-def save_evaluation_result(conn, resume_file_name: str, job_role_id: int, match_score: int, recommendation: str) -> bool:
-    if conn is None:
-        logger.error("Cannot save evaluation result: database connection is None")
-        return False
-    
-    try:
+def save_evaluation_result(resume_file_name: str, job_role_id: int, match_score: int, recommendation: str) -> bool:
+    def _save_evaluation_result(conn):
         cur = conn.cursor()
         cur.execute('''
         INSERT INTO evaluation_results (resume_file_name, job_role_id, match_score, recommendation)
@@ -190,16 +195,15 @@ def save_evaluation_result(conn, resume_file_name: str, job_role_id: int, match_
         conn.commit()
         logger.info(f"Evaluation result saved successfully for resume: {resume_file_name}")
         return True
+
+    try:
+        return execute_with_retry(_save_evaluation_result)
     except Exception as e:
         logger.error(f"Error saving evaluation result: {e}")
         return False
 
-def get_evaluation_results(conn, job_role_id: int) -> List[Dict[str, Any]]:
-    if conn is None:
-        logger.error("Cannot get evaluation results: database connection is None")
-        return []
-    
-    try:
+def get_evaluation_results(job_role_id: int) -> List[Dict[str, Any]]:
+    def _get_evaluation_results(conn):
         cur = conn.cursor()
         cur.execute('''
         SELECT id, resume_file_name, match_score, recommendation, created_at
@@ -209,16 +213,21 @@ def get_evaluation_results(conn, job_role_id: int) -> List[Dict[str, Any]]:
         ''', (job_role_id,))
         results = cur.fetchall()
         return [dict(zip([column[0] for column in cur.description], result)) for result in results]
+
+    try:
+        return execute_with_retry(_get_evaluation_results)
     except Exception as e:
         logger.error(f"Error retrieving evaluation results: {e}")
         return []
 
 def ensure_db_initialized():
-    conn = get_db_connection()
-    if conn:
+    def _init(conn):
         init_db(conn)
-        release_db_connection(conn)
-    else:
-        logger.error("Failed to initialize database: could not establish connection")
+
+    try:
+        execute_with_retry(_init)
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {str(e)}")
 
 ensure_db_initialized()
