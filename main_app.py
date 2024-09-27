@@ -251,10 +251,8 @@ def display_results(results: List[Dict[str, Any]], job_title: str):
         )
 
 def manage_job_roles_page():
-    """Page for managing job roles."""
     st.markdown("<h2 class='section-title'>Manage Job Roles</h2>", unsafe_allow_html=True)
 
-    db_conn = st.session_state.get('db_connection')
     with st.form("add_job_role"):
         role_name = st.text_input("Role Name")
         job_description = st.text_area("Job Description")
@@ -264,7 +262,7 @@ def manage_job_roles_page():
             if role_name.strip() and job_description.strip():
                 sanitized_role_name = sanitize_text(role_name)
                 sanitized_job_description = sanitize_text(job_description)
-                if save_role(db_conn, sanitized_role_name, sanitized_job_description):
+                if save_role(sanitized_role_name, sanitized_job_description):
                     st.success("Job role saved successfully!")
                 else:
                     st.error("Failed to save job role. Please try again.")
@@ -272,7 +270,7 @@ def manage_job_roles_page():
                 st.warning("Please provide both role name and job description.")
 
     st.markdown("<h3 class='section-title'>Existing Job Roles</h3>", unsafe_allow_html=True)
-    roles = get_saved_roles(db_conn)
+    roles = get_saved_roles()  # Remove db_conn argument
     for role in roles:
         with st.expander(role['role_name']):
             st.write(role['job_description'])
