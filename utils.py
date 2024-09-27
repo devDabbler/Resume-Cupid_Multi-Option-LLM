@@ -113,7 +113,11 @@ def generate_fit_summary(match_score: int, job_title: str) -> str:
         return f"The candidate has some relevant skills for the {job_title} role, but significant gaps exist that may hinder their immediate success."
     else:
         return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
-    
+
+def extract_score(rating):
+    match = re.search(r'\((\d+)', rating)
+    return int(match.group(1)) if match else 0
+
 def generate_pdf_report(results: List[Dict[str, Any]], run_id: str, job_title: str) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -191,17 +195,17 @@ def generate_pdf_report(results: List[Dict[str, Any]], run_id: str, job_title: s
             for job, details in experience.items():
                 if isinstance(details, dict):
                     for project, rating in details.items():
-                        score = int(rating.split('/')[0])
+                        score = extract_score(rating)
                         if (relevance == 'High' and score >= 8) or \
                            (relevance == 'Medium' and 6 <= score < 8) or \
                            (relevance == 'Low' and score < 6):
-                            data.append([f"{job} - {project}", rating])
+                            data.append([f"{job} - {project}", f"{score}/10"])
                 else:
-                    score = int(details.split('/')[0])
+                    score = extract_score(details)
                     if (relevance == 'High' and score >= 8) or \
                        (relevance == 'Medium' and 6 <= score < 8) or \
                        (relevance == 'Low' and score < 6):
-                        data.append([job, details])
+                        data.append([job, f"{score}/10"])
             
             if data:
                 t = Table(data, colWidths=[400, 50])
