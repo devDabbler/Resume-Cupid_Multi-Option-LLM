@@ -13,20 +13,26 @@ from utils import extract_text_from_file, generate_job_requirements
 
 class ResumeProcessor:
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
         self.job_roles = self.load_job_roles()
-        self.nlp = spacy.load("en_core_web_md")
-        self.llama_service = llama_service
 
-    def load_job_roles(self):
+    def load_job_roles(self) -> Dict[str, Any]:
         try:
-            job_roles_path = os.path.join(os.path.dirname(__file__), 'job_roles.yaml')
-            with open(job_roles_path, 'r', encoding='utf-8') as file:
-                roles = yaml.safe_load(file)
-            return roles.get('job_roles', {})
+            with open('job_roles.yaml', 'r') as file:
+                return yaml.safe_load(file)['job_roles']
         except Exception as e:
             self.logger.error(f"Error loading job roles: {str(e)}")
             return {}
+
+    def get_job_requirements(self, job_title: str) -> Dict[str, Any]:
+        role = self.job_roles.get(job_title, {})
+        return {
+            'required_skills': role.get('required_skills', []),
+            'preferred_skills': role.get('specific_knowledge', []),
+            'soft_skills': role.get('soft_skills', []),
+            'education_level': role.get('education_level', ''),
+            'years_of_experience': role.get('years_of_experience', 0),
+            'industry_experience': role.get('industry_experience', [])
+        }
 
     def load_job_requirements(self, job_title: str) -> Dict[str, Any]:
         if job_title in self.job_roles:
@@ -39,6 +45,7 @@ class ResumeProcessor:
         try:
             self.logger.info(f"Starting resume processing for job title: {job_title}")
 
+            # Load and merge job requirements
             job_requirements = self.load_job_requirements(job_title)
             if not job_requirements:
                 self.logger.warning(f"No job requirements found for title: {job_title}. Using generated requirements.")
@@ -51,6 +58,7 @@ class ResumeProcessor:
             merged_requirements = {**description_requirements, **job_requirements}
             self.logger.debug(f"Merged requirements: {merged_requirements}")
 
+            # Perform LLM analyses
             self.logger.info("Calling LLM services for resume analysis")
             llama_analysis = self._get_llama_analysis(resume_text, job_description, job_title)
             falcon_analysis = self._get_falcon_analysis(resume_text, job_description, job_title)
@@ -61,23 +69,28 @@ class ResumeProcessor:
             combined_analysis = self._combine_analyses(llama_analysis, falcon_analysis)
             self.logger.debug(f"Combined analysis: {combined_analysis}")
 
+            # Process analysis results
             self.logger.info("Processing analysis results")
             result = self._process_analysis(combined_analysis, "Unknown", job_title, merged_requirements)
             self.logger.debug(f"Processed analysis result: {result}")
 
+            # Extract experience
             result['experience'] = self._extract_experience(resume_text)
             self.logger.debug(f"Extracted experience: {result['experience']}")
 
-            weighted_score = self._calculate_weighted_score(result, merged_requirements, job_description)
-            result['match_score'] = weighted_score
-            self.logger.debug(f"Calculated weighted score: {weighted_score}")
+            # Calculate score using the dynamic approach
+            score_result = self.score_calculator.calculate_score(combined_analysis, merged_requirements)
+            result.update(score_result)
+            self.logger.debug(f"Calculated score: {score_result}")
 
+            # Generate additional fields
             result['recommendation'] = self._generate_recommendation(result['match_score'])
             result['fit_summary'] = self._generate_fit_summary(result['match_score'], job_title)
             result['recruiter_questions'] = self._generate_recruiter_questions(combined_analysis, job_title, job_description)
 
             self.logger.info(f"Processed resume. Match score: {result['match_score']}, Recommendation: {result['recommendation']}")
             return result
+
         except Exception as e:
             self.logger.error(f"Error in process_resume: {str(e)}", exc_info=True)
             return self._generate_error_result("Unknown", str(e))
