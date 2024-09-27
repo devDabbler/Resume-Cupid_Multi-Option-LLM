@@ -10,10 +10,12 @@ import os
 import random
 from llama_service import llama_service
 from utils import extract_text_from_file, generate_job_requirements
+from score_calculator import score_calculator
 
 class ResumeProcessor:
     def __init__(self):
         self.job_roles = self.load_job_roles()
+        self.logger = logging.getLogger(__name__)
 
     def load_job_roles(self) -> Dict[str, Any]:
         try:
@@ -90,7 +92,7 @@ class ResumeProcessor:
 
     def _get_llama_analysis(self, resume_text: str, job_description: str, job_title: str) -> Optional[Dict[str, Any]]:
         try:
-            analysis = self.llama_service.analyze_resume(resume_text, job_description, job_title)
+            analysis = llama_service.analyze_resume(resume_text, job_description, job_title)
             self.logger.debug(f"Received analysis from LLAMA: {analysis}")
             return analysis
         except Exception as e:
@@ -98,13 +100,10 @@ class ResumeProcessor:
             return None
 
     def _get_falcon_analysis(self, resume_text: str, job_description: str, job_title: str) -> Optional[Dict[str, Any]]:
-        try:
-            analysis = self.falcon_service.analyze_resume(resume_text, job_description, job_title)
-            self.logger.debug(f"Received analysis from Falcon: {analysis}")
-            return analysis
-        except Exception as e:
-            self.logger.error(f"Error in Falcon analysis: {str(e)}", exc_info=True)
-            return None
+        # Placeholder for Falcon analysis
+        # Replace this with actual Falcon service call when implemented
+        self.logger.warning("Falcon analysis not implemented yet")
+        return None
 
     def _combine_analyses(self, llama_analysis: Optional[Dict[str, Any]], falcon_analysis: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         combined = {}
@@ -203,11 +202,6 @@ class ResumeProcessor:
             'recruiter_questions': ['Unable to provide questions due to an error'],
             'fit_summary': 'Unable to generate fit summary due to an error',
         }
-
-    def _calculate_weighted_score(self, result: Dict[str, Any], requirements: Dict[str, Any], job_description: str) -> int:
-        # Implement your weighted score calculation logic here
-        # This is a placeholder implementation
-        return min(max(result.get('match_score', 0), 0), 100)
 
     def _generate_recruiter_questions(self, analysis: Dict[str, Any], job_title: str, job_description: str) -> List[str]:
         # Implement your recruiter questions generation logic here
