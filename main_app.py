@@ -235,24 +235,38 @@ def display_results(results: List[Dict[str, Any]], job_title: str):
 
             st.subheader("Experience Relevance")
             experience = result.get('experience_relevance', {})
-            for relevance in ['High', 'Medium', 'Low']:
-                with st.expander(f"{relevance} Relevance Experience"):
-                    for job, details in experience.items():
-                        if isinstance(details, dict):
-                            for project, rating in details.items():
-                                score = int(rating.split('/')[0])
-                                if (relevance == 'High' and score >= 8) or \
-                                   (relevance == 'Medium' and 6 <= score < 8) or \
-                                   (relevance == 'Low' and score < 6):
-                                    st.write(f"**{job} - {project}**")
-                                    st.progress(score / 10)
+            relevance_data = {
+                'High': [],
+                'Medium': [],
+                'Low': []
+            }
+
+            for job, details in experience.items():
+                if isinstance(details, dict):
+                    for project, rating in details.items():
+                        score = int(rating.split('/')[0])
+                        if score >= 8:
+                            relevance_data['High'].append((f"{job} - {project}", score))
+                        elif 6 <= score < 8:
+                            relevance_data['Medium'].append((f"{job} - {project}", score))
                         else:
-                            score = int(details.split('/')[0])
-                            if (relevance == 'High' and score >= 8) or \
-                               (relevance == 'Medium' and 6 <= score < 8) or \
-                               (relevance == 'Low' and score < 6):
-                                st.write(f"**{job}**")
-                                st.progress(score / 10)
+                            relevance_data['Low'].append((f"{job} - {project}", score))
+                else:
+                    score = int(details.split('/')[0])
+                    if score >= 8:
+                        relevance_data['High'].append((job, score))
+                    elif 6 <= score < 8:
+                        relevance_data['Medium'].append((job, score))
+                    else:
+                        relevance_data['Low'].append((job, score))
+
+            for relevance, data in relevance_data.items():
+                if data:
+                    st.write(f"**{relevance} Relevance Experience:**")
+                    for item, score in data:
+                        st.write(f"- {item}")
+                        st.progress(score / 10)
+                    st.write("")  # Add some space between relevance categories
 
             col1, col2 = st.columns(2)
             with col1:
