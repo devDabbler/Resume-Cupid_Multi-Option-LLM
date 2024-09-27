@@ -13,6 +13,8 @@ import os
 from dotenv import load_dotenv
 from llm_orchestrator import llm_orchestrator
 from llama_service import LlamaService
+import plotly.graph_objects as go
+from utils import generate_recommendation, generate_fit_summary
 
 # Load environment variables from the specified .env file
 dotenv_file = os.getenv('DOTENV_FILE', '.env.development')
@@ -175,8 +177,7 @@ def generate_fit_summary(match_score: int, job_title: str) -> str:
         return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
 
 def display_results(results: List[Dict[str, Any]], job_title: str):
-    """Display evaluation results for the processed resumes."""
-    st.markdown("<h3 class='section-title'>Evaluation Results</h3>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-title'>Evaluation Results</h2>", unsafe_allow_html=True)
 
     if not results:
         st.warning("No results to display.")
@@ -198,48 +199,81 @@ def display_results(results: List[Dict[str, Any]], job_title: str):
 
     for result in sorted_results:
         with st.expander(f"Detailed Analysis: {result.get('file_name', 'Unknown')}"):
-            st.write(f"**Match Score:** {result.get('match_score', 'N/A')}%")
-            st.write(f"**Recommendation:** {generate_recommendation(result.get('match_score', 0))}")
-            st.write(f"**Fit Summary:** {generate_fit_summary(result.get('match_score', 0), job_title)}")
+            col1, col2 = st.columns([2, 1])
             
-            st.write("**Experience Relevance:**")
-            experience_relevance = result.get('experience_relevance', {})
-            for job, details in experience_relevance.items():
-                st.write(f"* {job}:")
-                if isinstance(details, dict):
-                    for project, relevance in details.items():
-                        if isinstance(relevance, dict):
-                            for sub_project, sub_relevance in relevance.items():
-                                st.write(f"  * {sub_project}: {sub_relevance}")
+            with col1:
+                st.subheader("Candidate Information")
+                st.write(f"**Name:** {result['file_name']}")
+                st.write(f"**Recommendation:** {generate_recommendation(result['match_score'])}")
+                st.write(f"**Fit Summary:** {generate_fit_summary(result['match_score'], job_title)}")
+            
+            with col2:
+                fig = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=result['match_score'],
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': "Match Score"},
+                    gauge={
+                        'axis': {'range': [0, 100]},
+                        'bar': {'color': "darkblue"},
+                        'steps': [
+                            {'range': [0, 50], 'color': "lightgray"},
+                            {'range': [50, 75], 'color': "gray"},
+                            {'range': [75, 100], 'color': "darkgray"}
+                        ],
+                        'threshold': {
+                            'line': {'color': "red", 'width': 4},
+                            'thickness': 0.75,
+                            'value': 85
+                        }
+                    }
+                ))
+                st.plotly_chart(fig)
+
+            st.subheader("Summary")
+            st.write(result.get('summary', 'N/A'))
+
+            st.subheader("Experience Relevance")
+            experience = result.get('experience_relevance', {})
+            for relevance in ['High', 'Medium', 'Low']:
+                with st.expander(f"{relevance} Relevance Experience"):
+                    for job, details in experience.items():
+                        if isinstance(details, dict):
+                            for project, rating in details.items():
+                                score = int(rating.split('/')[0])
+                                if (relevance == 'High' and score >= 8) or \
+                                   (relevance == 'Medium' and 6 <= score < 8) or \
+                                   (relevance == 'Low' and score < 6):
+                                    st.write(f"**{job} - {project}**")
+                                    st.progress(score / 10)
                         else:
-                            st.write(f"  * {project}: {relevance}")
-                else:
-                    st.write(f"  * {details}")
+                            score = int(details.split('/')[0])
+                            if (relevance == 'High' and score >= 8) or \
+                               (relevance == 'Medium' and 6 <= score < 8) or \
+                               (relevance == 'Low' and score < 6):
+                                st.write(f"**{job}**")
+                                st.progress(score / 10)
 
-            st.write("**Key Strengths:**")
-            for strength in result.get('key_strengths', []):
-                st.write(f"* {strength}")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Key Strengths")
+                for strength in result.get('key_strengths', []):
+                    st.write(f"- {strength}")
 
-            st.write("**Areas for Improvement:**")
-            for area in result.get('areas_for_improvement', []):
-                st.write(f"* {area}")
+            with col2:
+                st.subheader("Areas for Improvement")
+                for area in result.get('areas_for_improvement', []):
+                    st.write(f"- {area}")
 
-            st.write("**Skills Gap:**")
+            st.subheader("Skills Gap")
             for skill in result.get('skills_gap', []):
-                st.write(f"* {skill}")
+                st.write(f"- {skill}")
 
-            st.write("**Recruiter Questions:**")
-            recruiter_questions = result.get('recruiter_questions', [])
-            if recruiter_questions:
-                for i, question in enumerate(recruiter_questions, 1):
-                    if isinstance(question, dict):
-                        st.write(f"{i}. **Question:** {question['question']}")
-                        st.write(f"   **Purpose:** {question['purpose']}")
-                        st.write("")  # Add a blank line for better readability
-                    else:
-                        st.write(f"{i}. {question}")
-            else:
-                st.write("No recruiter questions generated.")
+            st.subheader("Recruiter Questions")
+            for i, question in enumerate(result.get('recruiter_questions', []), 1):
+                with st.expander(f"Question {i}"):
+                    st.write(f"**Question:** {question['question']}")
+                    st.write(f"**Purpose:** {question['purpose']}")
 
     if results:
         pdf_report = generate_pdf_report(sorted_results, str(uuid.uuid4()), job_title)

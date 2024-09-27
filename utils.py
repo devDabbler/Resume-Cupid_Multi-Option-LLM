@@ -7,10 +7,10 @@ import spacy
 from collections import Counter
 from typing import List, Dict, Any
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
 
 
 logger = logging.getLogger(__name__)
@@ -118,80 +118,143 @@ def generate_pdf_report(results: List[Dict[str, Any]], run_id: str, job_title: s
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     elements = []
-
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
+    styles.add(ParagraphStyle(name='Center', alignment=TA_CENTER))
 
     elements.append(Paragraph(f"Evaluation Report for {job_title}", styles['Title']))
     elements.append(Spacer(1, 12))
 
-    # Create the table for the summary
-    data = [["Rank", "Resume", "Match Score", "Recommendation"]]
+    # Summary table
+    summary_data = [["Rank", "Resume", "Match Score", "Recommendation"]]
     for i, result in enumerate(sorted(results, key=lambda x: x['match_score'], reverse=True), 1):
-        data.append([
+        summary_data.append([
             str(i),
             result['file_name'],
             f"{result['match_score']}%",
             generate_recommendation(result['match_score'])
         ])
 
-    table = Table(data)
-    table.setStyle(TableStyle([
+    summary_table = Table(summary_data, colWidths=[40, 200, 70, 180])
+    summary_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 12),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('TOPPADDING', (0, 1), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
-    elements.append(table)
+    elements.append(summary_table)
     elements.append(Spacer(1, 12))
 
     for result in sorted(results, key=lambda x: x['match_score'], reverse=True):
-        elements.append(Paragraph(f"Detailed Analysis: {result['file_name']}", styles['Heading2']))
-        elements.append(Paragraph(f"Match Score: {result['match_score']}%", styles['Normal']))
-        elements.append(Paragraph(f"Recommendation: {generate_recommendation(result['match_score'])}", styles['Normal']))
-        elements.append(Paragraph(f"Fit Summary: {generate_fit_summary(result['match_score'], job_title)}", styles['Normal']))
-        elements.append(Paragraph(f"Summary: {result.get('summary', 'N/A')}", styles['Normal']))
-        
-        elements.append(Paragraph("Experience Relevance:", styles['Heading3']))
-        for job, details in result.get('experience_relevance', {}).items():
-            elements.append(Paragraph(f"- {job}:", styles['Normal']))
-            if isinstance(details, dict):
-                for project, relevance in details.items():
-                    elements.append(Paragraph(f"  * {project}: {relevance}", styles['Normal']))
-            else:
-                elements.append(Paragraph(f"  * {details}", styles['Normal']))
-        
-        elements.append(Paragraph("Key Strengths:", styles['Heading3']))
-        for strength in result.get('key_strengths', []):
-            elements.append(Paragraph(f"- {strength}", styles['Normal']))
-        
-        elements.append(Paragraph("Areas for Improvement:", styles['Heading3']))
-        for area in result.get('areas_for_improvement', []):
-            elements.append(Paragraph(f"- {area}", styles['Normal']))
-        
-        elements.append(Paragraph("Skills Gap:", styles['Heading3']))
-        for skill in result.get('skills_gap', []):
-            elements.append(Paragraph(f"- {skill}", styles['Normal']))
-        
-        elements.append(Paragraph("Recruiter Questions:", styles['Heading3']))
-        for i, question in enumerate(result.get('recruiter_questions', []), 1):
-            if isinstance(question, dict):
-                elements.append(Paragraph(f"{i}. {question['question']}", styles['Normal']))
-                elements.append(Paragraph(f"   Purpose: {question['purpose']}", styles['Normal']))
-            else:
-                elements.append(Paragraph(f"{i}. {question}", styles['Normal']))
-        
+        elements.append(Paragraph(f"Detailed Analysis: {result['file_name']}", styles['Heading1']))
+        elements.append(Spacer(1, 6))
+
+        # Candidate Information
+        info_data = [
+            ["Match Score", f"{result['match_score']}%"],
+            ["Recommendation", generate_recommendation(result['match_score'])],
+            ["Fit Summary", generate_fit_summary(result['match_score'], job_title)]
+        ]
+        info_table = Table(info_data, colWidths=[100, 400])
+        info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(info_table)
         elements.append(Spacer(1, 12))
+
+        elements.append(Paragraph("Summary", styles['Heading2']))
+        elements.append(Paragraph(result.get('summary', 'N/A'), styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+        elements.append(Paragraph("Experience Relevance", styles['Heading2']))
+        experience = result.get('experience_relevance', {})
+        for relevance in ['High', 'Medium', 'Low']:
+            elements.append(Paragraph(f"{relevance} Relevance Experience", styles['Heading3']))
+            data = []
+            for job, details in experience.items():
+                if isinstance(details, dict):
+                    for project, rating in details.items():
+                        score = int(rating.split('/')[0])
+                        if (relevance == 'High' and score >= 8) or \
+                           (relevance == 'Medium' and 6 <= score < 8) or \
+                           (relevance == 'Low' and score < 6):
+                            data.append([f"{job} - {project}", rating])
+                else:
+                    score = int(details.split('/')[0])
+                    if (relevance == 'High' and score >= 8) or \
+                       (relevance == 'Medium' and 6 <= score < 8) or \
+                       (relevance == 'Low' and score < 6):
+                        data.append([job, details])
+            
+            if data:
+                t = Table(data, colWidths=[400, 50])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.beige),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('TOPPADDING', (0, 0), (-1, -1), 3),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                elements.append(t)
+            elements.append(Spacer(1, 6))
+
+        # Key Strengths and Areas for Improvement
+        elements.append(Paragraph("Key Strengths and Areas for Improvement", styles['Heading2']))
+        strengths_improvements = [["Key Strengths", "Areas for Improvement"]]
+        strengths = result.get('key_strengths', [])
+        improvements = result.get('areas_for_improvement', [])
+        max_len = max(len(strengths), len(improvements))
+        for i in range(max_len):
+            strengths_improvements.append([
+                strengths[i] if i < len(strengths) else "",
+                improvements[i] if i < len(improvements) else ""
+            ])
+        si_table = Table(strengths_improvements, colWidths=[250, 250])
+        si_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(si_table)
+        elements.append(Spacer(1, 12))
+
+        elements.append(Paragraph("Skills Gap", styles['Heading2']))
+        for skill in result.get('skills_gap', []):
+            elements.append(Paragraph(f"• {skill}", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+        elements.append(Paragraph("Recruiter Questions", styles['Heading2']))
+        for i, question in enumerate(result.get('recruiter_questions', []), 1):
+            elements.append(Paragraph(f"{i}. {question['question']}", styles['Normal']))
+            elements.append(Paragraph(f"Purpose: {question['purpose']}", ParagraphStyle('Italic', parent=styles['Normal'], fontName='Helvetica-Oblique')))
+            elements.append(Spacer(1, 6))
+
+        elements.append(PageBreak())
 
     doc.build(elements)
     return buffer.getvalue()
