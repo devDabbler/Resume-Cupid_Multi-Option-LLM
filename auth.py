@@ -225,7 +225,7 @@ def auth_page():
     st.markdown('<div class="login-section">', unsafe_allow_html=True)
     st.markdown('<h2 class="login-title">Login / Register</h2>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["Login", "Register"])
+    tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
     
     with tab1:
         username = st.text_input("Username", key="login_username")
@@ -244,6 +244,15 @@ def auth_page():
         if st.button("Register", key="register_button", type="primary", use_container_width=True):
             if register_new_user(new_username, new_email, new_password):
                 st.success("Registered successfully! You can now log in.")
+                st.rerun()
+    
+        with tab3:
+        username_or_email = st.text_input("Username or Email", key="reset_username_email")
+        old_password = st.text_input("Old Password", type="password", key="reset_old_password")
+        new_password = st.text_input("New Password", type="password", key="reset_new_password")
+        if st.button("Reset Password", key="reset_password_button", type="primary", use_container_width=True):
+            if reset_password(username_or_email, old_password, new_password):
+                st.success("Password reset successful! You can now log in with your new password.")
                 st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
