@@ -146,20 +146,20 @@ def auth_page():
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         margin-bottom: 2rem;
-        text-align: center; /* Center text inside the section */
+        text-align: center;
     }
     .main-title {
-        font-size: 2.5rem; /* Adjusted for responsiveness */
+        font-size: 2.5rem;
         color: #3366cc;
         margin-bottom: 1rem;
     }
     .subtitle {
-        font-size: 1.2rem; /* Adjusted for responsiveness */
+        font-size: 1.2rem;
         color: #555;
         margin-bottom: 1.5rem;
     }
     .features-title {
-        font-size: 1.5rem; /* Adjusted for responsiveness */
+        font-size: 1.5rem;
         color: #1f4e79;
         margin-bottom: 1rem;
     }
@@ -167,7 +167,7 @@ def auth_page():
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         gap: 1rem;
-        text-align: left; /* Align text to the left inside the grid */
+        text-align: left;
     }
     .feature-item {
         display: flex;
@@ -180,26 +180,26 @@ def auth_page():
         margin-right: 0.5rem;
     }
     .powered-by {
-        font-size: 0.9rem; /* Adjusted for responsiveness */
+        font-size: 0.9rem;
         color: #666;
         margin-top: 1.5rem;
     }
     .login-section {
         width: 100%;
         max-width: 400px;
-        text-align: center; /* Center text inside the login section */
+        text-align: center;
     }
     .login-title {
-        font-size: 1.5rem; /* Adjusted for responsiveness */
+        font-size: 1.5rem;
         color: #3366cc;
         margin-bottom: 1rem;
     }
     @media (max-width: 768px) {
         .main-title {
-            font-size: 2rem; /* Smaller font size for mobile */
+            font-size: 2rem;
         }
         .subtitle, .features-title, .login-title {
-            font-size: 1rem; /* Smaller font size for mobile */
+            font-size: 1rem;
         }
     }
     </style>
@@ -223,7 +223,7 @@ def auth_page():
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="login-section">', unsafe_allow_html=True)
-    st.markdown('<h2 class="login-title">Login / Register</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="login-title">Login / Register / Reset Password</h2>', unsafe_allow_html=True)
     
     tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
     
@@ -245,8 +245,8 @@ def auth_page():
             if register_new_user(new_username, new_email, new_password):
                 st.success("Registered successfully! You can now log in.")
                 st.rerun()
-    
-        with tab3:
+
+    with tab3:
         username_or_email = st.text_input("Username or Email", key="reset_username_email")
         old_password = st.text_input("Old Password", type="password", key="reset_old_password")
         new_password = st.text_input("New Password", type="password", key="reset_new_password")
