@@ -1,6 +1,6 @@
 import streamlit as st
 import bcrypt
-from database import get_user, get_user_by_email, register_user, get_db_connection
+from database import get_user, get_user_by_email, register_user, update_user_password
 from config_settings import Config
 import logging
 from utils import is_valid_email
@@ -30,28 +30,7 @@ def login_user(username: str, password: str) -> bool:
     except Exception as e:
         logger.error(f"Error during login for user {username}: {str(e)}")
         st.error("An unexpected error occurred during login. Please try again later.")
-        return Falsee connection error. Please try again later.")
         return False
-
-    try:
-        user = get_user(conn, username)
-        if user:
-            stored_password = user['password_hash']
-            if isinstance(stored_password, str):
-                stored_password = stored_password.encode('utf-8')
-            if bcrypt.checkpw(password.encode('utf-8'), stored_password):
-                st.session_state.user = user
-                st.session_state.login_success = True
-                logger.info(f"User logged in: {username}")
-                return True
-        logger.warning(f"Failed login attempt for user: {username}")
-        return False
-    except Exception as e:
-        logger.error(f"Error during login for user {username}: {str(e)}")
-        st.error("An unexpected error occurred during login. Please try again later.")
-        return False
-    finally:
-        conn.close()
 
 def logout_user():
     st.session_state.user = None
