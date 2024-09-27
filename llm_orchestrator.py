@@ -4,6 +4,7 @@ from llama_service import LlamaService
 import concurrent.futures
 import time
 from score_calculator import score_calculator
+from utils import generate_job_requirements
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class LLMOrchestrator:
                 logger.error(f"Error in {name} service: {str(e)}")
                 results[name] = {"error": str(e)}
         
-        return self._aggregate_results(results, job_title)
+        return self._aggregate_results(results, job_description, job_title)
 
     def _analyze_with_service(self, name: str, service: Any, resume_text: str, job_description: str, job_title: str) -> Dict[str, Any]:
         logger.info(f"Starting analysis with {name} service")
@@ -32,7 +33,7 @@ class LLMOrchestrator:
         logger.info(f"Completed analysis with {name} service")
         return result
 
-    def _aggregate_results(self, results: Dict[str, Dict[str, Any]], job_title: str) -> Dict[str, Any]:
+    def _aggregate_results(self, results: Dict[str, Dict[str, Any]], job_description: str, job_title: str) -> Dict[str, Any]:
         aggregated_result = {
             "match_score": 0,
             "summary": "",
@@ -45,7 +46,8 @@ class LLMOrchestrator:
 
         if 'llama' in results and 'error' not in results['llama']:
             llama_result = results['llama']
-            aggregated_result["match_score"] = score_calculator.calculate_score(llama_result)  # Updated line
+            job_requirements = generate_job_requirements(job_description)
+            aggregated_result["match_score"] = score_calculator.calculate_score(llama_result, job_requirements)
             aggregated_result["summary"] = llama_result.get("Brief Summary", "No summary available")
             aggregated_result["key_strengths"] = llama_result.get("Key Strengths", [])
             aggregated_result["areas_for_improvement"] = llama_result.get("Areas for Improvement", [])
