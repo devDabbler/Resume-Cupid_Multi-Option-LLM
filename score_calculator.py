@@ -66,26 +66,36 @@ class ScoreCalculator:
         skills_score = self._calculate_skills_score(llm_result.get("Skills Assessment", {}), job_requirements)
         experience_score = self._calculate_experience_score(llm_result.get("Experience and Project Relevance", {}), job_requirements)
         education_score = self._calculate_education_score(llm_result.get("Education", ""), job_requirements)
+        project_diversity_score = self._calculate_project_diversity_score(llm_result.get("Experience and Project Relevance", {}))
         
-        # Adjust weights to better balance different aspects
-        weighted_score = (skills_score * 0.4) + (experience_score * 0.4) + (education_score * 0.2)
+        weighted_score = (skills_score * 0.35) + (experience_score * 0.35) + (education_score * 0.15) + (project_diversity_score * 0.15)
         
         missing_skills_penalty = self._calculate_missing_skills_penalty(llm_result.get("Missing Critical Skills", []), job_requirements)
         
-        # Further reduce the impact of missing skills penalty
         final_score = max(0, weighted_score - missing_skills_penalty * 0.1)
         
-        # Apply a boost for candidates with high experience scores
         if experience_score > 80:
-            final_score = min(100, final_score * 1.1)
+            final_score = min(100, final_score * 1.05)
         
         return {
-            'match_score': min(100, int(final_score)),
+            'match_score': min(100, round(final_score, 1)),  # Round to one decimal place
             'skills_score': skills_score,
             'experience_score': experience_score,
             'education_score': education_score,
+            'project_diversity_score': project_diversity_score,
             'missing_skills_penalty': missing_skills_penalty
         }
+
+    def _calculate_project_diversity_score(self, experience_relevance: Dict[str, Any]) -> float:
+        unique_projects = set()
+        for job, details in experience_relevance.items():
+            if isinstance(details, dict):
+                unique_projects.update(details.keys())
+            else:
+                unique_projects.add(job)
+        
+        diversity_score = min(len(unique_projects) * 5, 100)  # 5 points per unique project, max 100
+        return diversity_score
 
     def _calculate_skills_score(self, skills_assessment: Dict[str, List[str]], job_requirements: Dict[str, Any]) -> float:
         required_skills = set(job_requirements.get('required_skills', []))

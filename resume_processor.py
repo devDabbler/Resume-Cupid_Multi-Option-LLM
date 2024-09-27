@@ -72,12 +72,25 @@ class ResumeProcessor:
             # Calculate score using the dynamic approach
             score_result = score_calculator.calculate_score(llm_analysis, merged_requirements)
             result.update(score_result)
+            result['project_diversity_score'] = score_result['project_diversity_score']
             self.logger.debug(f"Calculated score: {score_result}")
 
             # Generate additional fields
             result['recommendation'] = self._generate_recommendation(result['match_score'])
             result['fit_summary'] = self._generate_fit_summary(result['match_score'], job_title)
             result['recruiter_questions'] = self._generate_recruiter_questions(llm_analysis, job_title, job_description)
+
+            # Add detailed scores
+            result['detailed_scores'] = {
+                'skills_score': score_result['skills_score'],
+                'experience_score': score_result['experience_score'],
+                'education_score': score_result['education_score'],
+                'project_diversity_score': score_result['project_diversity_score'],
+                'missing_skills_penalty': score_result['missing_skills_penalty']
+            }
+
+            # Ensure match_score is a float with one decimal place
+            result['match_score'] = round(float(result['match_score']), 1)
 
             self.logger.info(f"Processed resume. Match score: {result['match_score']}, Recommendation: {result['recommendation']}")
             return result
@@ -167,7 +180,7 @@ class ResumeProcessor:
         
         return formatted_items if formatted_items else ["No items available"]
 
-    def _generate_recommendation(self, match_score: int) -> str:
+    def _generate_recommendation(self, match_score: float) -> str:
         if match_score >= 85:
             return "Strongly recommend for interview"
         elif 70 <= match_score < 85:
@@ -177,7 +190,7 @@ class ResumeProcessor:
         else:
             return "Not recommended for interview at this time"
 
-    def _generate_fit_summary(self, match_score: int, job_title: str) -> str:
+    def _generate_fit_summary(self, match_score: float, job_title: str) -> str:
         if match_score >= 85:
             return f"The candidate is an excellent fit for the {job_title} role, meeting or exceeding most job requirements."
         elif 70 <= match_score < 85:
