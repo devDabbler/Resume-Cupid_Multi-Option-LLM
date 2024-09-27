@@ -23,7 +23,7 @@ class ResumeProcessor:
             self.logger.error(f"Error loading job roles: {str(e)}")
             return {}
 
-    def get_job_requirements(self, job_title: str) -> Dict[str, Any]:
+    def load_job_requirements(self, job_title: str) -> Dict[str, Any]:
         role = self.job_roles.get(job_title, {})
         return {
             'required_skills': role.get('required_skills', []),
@@ -33,13 +33,6 @@ class ResumeProcessor:
             'years_of_experience': role.get('years_of_experience', 0),
             'industry_experience': role.get('industry_experience', [])
         }
-
-    def load_job_requirements(self, job_title: str) -> Dict[str, Any]:
-        if job_title in self.job_roles:
-            return self.job_roles[job_title]
-        else:
-            self.logger.warning(f"No predefined requirements found for job title: {job_title}")
-            return {}
 
     def process_resume(self, resume_text: str, job_description: str, job_title: str) -> Dict[str, Any]:
         try:
@@ -79,7 +72,7 @@ class ResumeProcessor:
             self.logger.debug(f"Extracted experience: {result['experience']}")
 
             # Calculate score using the dynamic approach
-            score_result = self.score_calculator.calculate_score(combined_analysis, merged_requirements)
+            score_result = score_calculator.calculate_score(combined_analysis, merged_requirements)
             result.update(score_result)
             self.logger.debug(f"Calculated score: {score_result}")
 
