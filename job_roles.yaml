@@ -48,7 +48,7 @@ job_roles:
       - Industrial AI Solutions
 
   Software Engineer:
-    description: "Software Engineer role details"
+    description: "Software Engineer"
     education_level: "BS or MS in Computer Science or Software Engineering"
     years_of_experience: 3
     required_skills:
@@ -79,7 +79,7 @@ job_roles:
       - Adaptability
 
   UI Designer:
-    description: "UI Designer role details"
+    description: "UI Designer"
     education_level: "BS or MS in Graphic Design, Interaction Design, or related fields"
     years_of_experience: 4
     required_skills:
@@ -106,7 +106,6 @@ job_roles:
       - Communication
       - Attention to Detail
 
-
   Engagement Manager:
     description: "Engagement Manager role details"
     education_level: "BS in Business Administration, Computer Science, or related fields; MBA or MS in Analytics preferred"
@@ -129,3 +128,151 @@ job_roles:
       - Strategic Thinking
       - Communication
       - Problem Solving
+
+  ML Ops Engineer, Model Risk Management & Governance:
+    description: "ML Ops Engineer role focused on Model Risk Management & Governance at Fractal Analytics."
+    education_level: "Bachelor's / Master's degree in Engineering, Business, Economics, or Statistics"
+    years_of_experience: 5
+    required_skills:
+      - Python
+      - R
+      - Scala
+      - Model Development
+      - Model Validation
+      - Model Monitoring
+      - Risk Management
+      - Compliance
+      - Documentation Automation
+    specific_knowledge:
+      - Analytics
+      - Financial Services
+      - Insurance
+      - Model Governance
+      - Data Quality
+      - Performance Testing
+      - Regulatory Requirements
+    soft_skills:
+      - Problem Solving
+      - Communication
+      - Teamwork
+      - Leadership
+      - Strategic Insight
+    industry_experience:
+      - Financial Services
+      - Insurance
+      - Risk Management
+      - Compliance
+    us_experience_preferred: true
+    project_types:
+      - Model Governance Framework
+      - Model Risk Mitigation
+      - Performance Testing
+      - Documentation Automation
+
+  Solutions Architect, Health & Life Sciences:
+    description: "Solutions Architect role in Health & Life Sciences (HLS) at Fractal Analytics."
+    education_level: "Bachelor's degree in Computer Science, Information Technology, or a related field"
+    years_of_experience: 10
+    required_skills:
+      - Solution Architecture
+      - Cloud Computing (AWS, Azure, or GCP)
+      - Backend Integrations
+      - Software Architecture Design
+      - Business Development
+      - Technical Leadership
+    specific_knowledge:
+      - Health & Life Sciences Industry
+      - Client Engagement
+      - Pre-sales Consulting
+      - IT Architecture
+      - System Integration
+      - Emerging Technologies
+    soft_skills:
+      - Executive Communication
+      - Presentation Skills
+      - Collaboration
+      - Influencing Stakeholders
+      - Thought Leadership
+    industry_experience:
+      - Health & Life Sciences
+      - Cloud Computing
+      - IT Consulting
+      - Pre-sales
+    us_experience_preferred: true
+    project_types:
+      - Technical Solution Development
+      - System Integration
+      - Scalable Architectures
+      - Client Engagement and Sales
+
+  Sr. Research Operations Scientist:
+    description: "Senior Research Operations Scientist role at Fractal Analytics."
+    education_level: "Master's or PhD in Operations Research, Industrial Engineering, Mathematics, or Computer Science"
+    years_of_experience: 3
+    required_skills:
+      - Mathematical Optimization
+      - Problem Decomposition
+      - Data Mining
+      - Python
+      - Java
+      - C++
+      - Statistical Analysis
+      - Machine Learning
+    specific_knowledge:
+      - Optimization Models (Linear, Non-linear, MIP)
+      - Scheduling Problems
+      - Routing Optimization
+      - Data Mining Techniques
+      - Stochastic Processes
+      - Uncertainty Modeling
+    soft_skills:
+      - Research Skills
+      - Problem Solving
+      - Intellectual Curiosity
+      - Data-driven Decision Making
+    industry_experience:
+      - AI-driven Optimization
+      - Scheduling and Routing
+      - Software Development
+    us_experience_preferred: true
+    project_types:
+      - Optimization Models
+      - Data Mining
+      - AI-driven Solutions
+      - Proof of Concepts
+
+  AWS Platform Data Engineer:
+    description: "AWS Platform Data Engineer role at Fractal Analytics."
+    education_level: "Bachelor's degree in Computer Science, Engineering, or related fields"
+    years_of_experience: 7
+    required_skills:
+      - AWS
+      - Databricks
+      - Terraform
+      - Infrastructure as Code (IaC)
+      - Python
+      - Bash
+      - PowerShell
+      - Cloud Security
+    specific_knowledge:
+      - AWS Cloud Services
+      - Databricks Optimization
+      - Capacity Management
+      - Security Roles in Cloud
+      - Cloud and Data Engineering
+    soft_skills:
+      - Problem Solving
+      - Collaboration
+      - Innovation
+      - Communication
+    industry_experience:
+      - Cloud Computing
+      - Data Engineering
+      - Infrastructure Management
+      - Databricks
+    us_experience_preferred: true
+    project_types:
+      - Terraform Modules
+      - AWS Infrastructure Management
+      - Databricks Optimization
+      - Capacity Management
