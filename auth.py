@@ -223,7 +223,7 @@ def auth_page():
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="login-section">', unsafe_allow_html=True)
-    st.markdown('<h2 class="login-title">Login / Register / Reset Password</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="auth-title">Account Access</h2>', unsafe_allow_html=True)
     
     tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
     
