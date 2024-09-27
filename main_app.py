@@ -79,11 +79,9 @@ def main():
             view_past_evaluations_page()
 
 def evaluate_resumes_page():
-    """Page for evaluating resumes."""
     st.markdown("<h2 class='section-title'>Evaluate Resumes</h2>", unsafe_allow_html=True)
 
-    db_conn = st.session_state.get('db_connection')
-    saved_roles = get_saved_roles(db_conn)
+    saved_roles = get_saved_roles()  # Remove db_conn argument
     role_names = [role['role_name'] for role in saved_roles]
     selected_role = st.selectbox("Select a job role", [""] + role_names)
 
@@ -102,7 +100,7 @@ def evaluate_resumes_page():
                         job_description = role['job_description']
                         job_role_id = role['id']
                         job_title = role['role_name'].replace("- C3", "").strip()  # Standardize job title here
-                        results = process_resumes(uploaded_files, job_description, job_role_id, job_title, db_conn)
+                        results = process_resumes(uploaded_files, job_description, job_role_id, job_title)
                         
                         if results:
                             display_results(results, job_title=job_title)
