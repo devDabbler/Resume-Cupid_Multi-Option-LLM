@@ -184,6 +184,14 @@ import uuid
 from typing import List, Dict, Any
 from utils import generate_recommendation, generate_fit_summary, generate_pdf_report
 
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+import re
+import uuid
+from typing import List, Dict, Any
+from utils import generate_recommendation, generate_fit_summary, generate_pdf_report
+
 def display_results(results: List[Dict[str, Any]], job_title: str):
     st.markdown("<h2 class='section-title'>Evaluation Results</h2>", unsafe_allow_html=True)
 
@@ -297,9 +305,9 @@ def display_results(results: List[Dict[str, Any]], job_title: str):
 
             st.subheader("Recruiter Questions")
             for i, question in enumerate(result.get('recruiter_questions', []), 1):
-                with st.expander(f"Question {i}"):
-                    st.write(f"**Question:** {question['question']}")
-                    st.write(f"**Purpose:** {question['purpose']}")
+                st.write(f"**Question {i}:** {question['question']}")
+                st.write(f"**Purpose:** {question['purpose']}")
+                st.write("")  # Add a blank line for spacing
 
     if results:
         pdf_report = generate_pdf_report(sorted_results, str(uuid.uuid4()), job_title)
