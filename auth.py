@@ -1,6 +1,6 @@
 import streamlit as st
 import bcrypt
-from database import get_user, get_user_by_email, register_user, get_db_connection, release_db_connection
+from database import get_user, get_user_by_email, register_user, get_db_connection
 from config_settings import Config
 import logging
 from utils import is_valid_email
