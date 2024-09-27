@@ -87,22 +87,30 @@ def generate_job_requirements(job_description: str) -> Dict[str, Any]:
     }
 
 def generate_recommendation(match_score: int) -> str:
-    if match_score >= 80:
+    if match_score >= 90:
+        return "Strongly recommend for immediate interview"
+    elif 80 <= match_score < 90:
         return "Highly recommend for interview"
-    elif 65 <= match_score < 80:
+    elif 70 <= match_score < 80:
         return "Recommend for interview"
-    elif 50 <= match_score < 65:
+    elif 60 <= match_score < 70:
         return "Consider for interview with reservations"
+    elif 50 <= match_score < 60:
+        return "Potentially consider for interview, but significant gaps exist"
     else:
-        return "Not recommended for interview at this time"
+        return "Do not recommend for interview at this time"
 
 def generate_fit_summary(match_score: int, job_title: str) -> str:
-    if match_score >= 80:
-        return f"The candidate is an excellent fit for the {job_title} role, meeting or exceeding most job requirements."
-    elif 65 <= match_score < 80:
-        return f"The candidate is a good fit for the {job_title} role, meeting many of the job requirements with some minor gaps."
-    elif 50 <= match_score < 65:
-        return f"The candidate shows potential for the {job_title} role but has some gaps that would require further assessment."
+    if match_score >= 90:
+        return f"The candidate is an exceptional fit for the {job_title} role, exceeding most job requirements and demonstrating outstanding qualifications."
+    elif 80 <= match_score < 90:
+        return f"The candidate is an excellent fit for the {job_title} role, meeting or exceeding most job requirements with minor areas for improvement."
+    elif 70 <= match_score < 80:
+        return f"The candidate is a good fit for the {job_title} role, meeting many of the job requirements with some areas for development."
+    elif 60 <= match_score < 70:
+        return f"The candidate shows potential for the {job_title} role but has notable gaps that would require further assessment and development."
+    elif 50 <= match_score < 60:
+        return f"The candidate has some relevant skills for the {job_title} role, but significant gaps exist that may hinder their immediate success."
     else:
         return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
     

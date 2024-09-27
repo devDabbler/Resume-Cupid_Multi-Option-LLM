@@ -150,9 +150,17 @@ class LlamaService:
     
     def _build_analyze_resume_prompt(self, resume_text: str, job_description: str, job_title: str) -> str:
         prompt = f"""
-        Analyze the candidate's resume for the {job_title} position based on the provided job description. 
-        Focus on identifying specific data science and machine learning skills, experiences, and projects.
-        Be critical in your assessment and provide a realistic evaluation of the candidate's fit for a data science role.
+        Analyze the candidate's resume for the {job_title} position at C3 AI based on the provided job description. 
+        Focus on identifying specific machine learning skills and experiences, especially those related to industrial applications.
+        Pay special attention to the candidate's experience with:
+        1. Designing and deploying Machine Learning algorithms for industrial applications
+        2. Scalable ML (MapReduce, Spark)
+        3. Generative AI, Large Language Models (LLMs), and related technologies
+        4. Reinforcement learning
+        5. Strong mathematical background (linear algebra, calculus, probability, and statistics)
+        6. Proficiency in Python and object-oriented programming
+        
+        Be critical in your assessment and provide a realistic evaluation of the candidate's fit for this specific data scientist role at C3 AI.
         
         Return the analysis in JSON format with the following structure:
 
@@ -165,10 +173,12 @@ class LlamaService:
                 }}
             }},
             "Skills Assessment": {{
-                "Data Science": ["skill1", "skill2"],
                 "Machine Learning": ["skill1", "skill2"],
+                "Deep Learning": ["skill1", "skill2"],
+                "Scalable ML": ["skill1", "skill2"],
+                "Generative AI": ["skill1", "skill2"],
+                "Mathematics": ["skill1", "skill2"],
                 "Programming": ["skill1", "skill2"],
-                "Statistics": ["skill1", "skill2"],
                 "Domain Knowledge": ["skill1", "skill2"]
             }},
             "Missing Critical Skills": ["skill1", "skill2"],
@@ -183,7 +193,7 @@ class LlamaService:
         }}
 
         Ensure your response is in valid JSON format. Do not include any explanation or additional text outside the JSON structure.
-        For the "Experience and Project Relevance" section, always include a score out of 10 in parentheses at the end of each description, e.g., "Relevant data science project (7/10)".
+        For the "Experience and Project Relevance" section, always include a score out of 10 in parentheses at the end of each description, e.g., "Relevant industrial ML project (7/10)".
         In the "Skills Assessment" section, be thorough and list all relevant skills found in the resume, even if they are not explicitly mentioned in the job description.
         For "Recruiter Questions", provide 3-5 detailed questions that will help uncover the candidate's true abilities, especially for skills or experiences that are not clear from the resume. Focus on questions that will help determine if the candidate can bridge any identified skills gaps.
 

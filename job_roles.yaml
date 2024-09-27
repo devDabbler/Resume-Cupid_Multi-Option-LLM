@@ -2,11 +2,9 @@ job_roles:
   Data Scientist:
     description: "Data Scientist role for C3 AI"
     education_level: "MS or PhD in Computer Science, Statistics, or related fields"
-    years_of_experience: 4
+    years_of_experience: 3
     required_skills:
       - Python
-      - R
-      - SQL
       - Machine Learning
       - Deep Learning
       - Statistics
@@ -15,9 +13,13 @@ job_roles:
       - TensorFlow
       - PyTorch
       - Scikit-learn
-      - Spark
-      - MLOps
+      - Pandas
+      - NumPy
+      - LangChain
     specific_knowledge:
+      - Linear Algebra
+      - Calculus
+      - Probability
       - Data Wrangling
       - Statistical Analysis
       - Data Mining

@@ -1,94 +1,142 @@
 from typing import Dict, Any, List
 import re
-import yaml
-import os
 
 class ScoreCalculator:
     def __init__(self):
-        self.job_roles = self.load_job_roles()
+        self.core_skills = {
+            "machine learning": 10,
+            "deep learning": 9,
+            "statistical analysis": 9,
+            "data visualization": 7,
+            "python": 10,
+            "mathematics": 10,
+            "linear algebra": 9,
+            "calculus": 9,
+            "probability": 9,
+            "statistics": 9,
+            "data analytics": 8,
+            "predictive modeling": 9,
+            "nlp": 8,
+            "time series analysis": 8,
+            "feature engineering": 8,
+            "data pipeline": 7,
+            "mlops": 8,
+        }
+        self.preferred_skills = {
+            "scalable ml": 9,
+            "mapreduce": 8,
+            "spark": 8,
+            "generative ai": 9,
+            "large language models": 9,
+            "llm": 9,
+            "embedding models": 8,
+            "prompt engineering": 8,
+            "fine-tuning": 8,
+            "reinforcement learning": 8,
+            "tensorflow": 7,
+            "pytorch": 7,
+            "langchain": 7,
+        }
+        self.programming_skills = {
+            "python": 10,
+            "r": 7,
+            "sql": 8,
+            "javascript": 7,
+            "java": 6,
+            "c++": 6,
+        }
+        self.tools_and_frameworks = {
+            "tensorflow": 8,
+            "pytorch": 8,
+            "scikit-learn": 8,
+            "pandas": 8,
+            "numpy": 8,
+            "langchain": 7,
+            "hugging face": 7,
+            "docker": 6,
+            "kubernetes": 6,
+            "aws": 7,
+            "azure": 7,
+            "gcp": 7,
+        }
 
-    def load_job_roles(self):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        yaml_path = os.path.join(script_dir, 'job_roles.yaml')
-        with open(yaml_path, 'r') as file:
-            return yaml.safe_load(file)['job_roles']
-
-    def calculate_score(self, llm_result: Dict[str, Any], job_title: str) -> int:
-        print(f"Debug: Received job title: '{job_title}'")
-        print(f"Debug: Available job roles: {list(self.job_roles.keys())}")
+    def calculate_score(self, llm_result: Dict[str, Any]) -> int:
+        skills_score = self._calculate_skills_score(llm_result.get("Skills Assessment", {}))
+        experience_score = self._calculate_experience_score(llm_result.get("Experience and Project Relevance", {}))
+        education_score = self._calculate_education_score(llm_result.get("Education", ""))
         
-        # Remove "- C3" if present and normalize
-        normalized_job_title = job_title.replace("- C3", "").strip().title()
-        print(f"Debug: Normalized job title: '{normalized_job_title}'")
+        # Adjust weights to prioritize relevant experience and core skills
+        weighted_score = (skills_score * 0.4) + (experience_score * 0.5) + (education_score * 0.1)
         
-        if normalized_job_title not in self.job_roles:
-            # Try to find a partial match
-            partial_matches = [role for role in self.job_roles.keys() if role in normalized_job_title]
-            if partial_matches:
-                normalized_job_title = partial_matches[0]
-                print(f"Debug: Partial match found: '{normalized_job_title}'")
-            else:
-                raise ValueError(f"Unknown job title: {job_title}. Normalized: {normalized_job_title}")
-
-        job_role = self.job_roles[normalized_job_title]
-        skills_score = self._calculate_skills_score(llm_result.get("Skills Assessment", {}), job_role)
-        experience_score = self._calculate_experience_score(llm_result.get("Experience and Project Relevance", {}), job_role)
-        education_score = self._calculate_education_score(llm_result.get("Education", ""), job_role)
+        # Apply penalties for missing key skills, but with reduced impact
+        missing_skills_penalty = self._calculate_missing_skills_penalty(llm_result.get("Missing Critical Skills", []))
         
-        weighted_score = (skills_score * 0.5) + (experience_score * 0.4) + (education_score * 0.1)
+        # Apply a non-linear transformation to better differentiate scores
         transformed_score = self._apply_score_transformation(weighted_score)
         
-        return min(100, int(transformed_score))
+        # Apply missing skills penalty with reduced impact
+        final_score = max(0, transformed_score - missing_skills_penalty * 0.4)
+        
+        # Cap the maximum score at 98 if there are any missing critical skills
+        if missing_skills_penalty > 0:
+            final_score = min(final_score, 98)
+        
+        return min(100, int(final_score))
 
-    def _calculate_skills_score(self, skills_assessment: Dict[str, List[str]], job_role: Dict[str, Any]) -> float:
+    def _calculate_skills_score(self, skills_assessment: Dict[str, List[str]]) -> float:
         total_score = 0
         total_weight = 0
-        required_skills = {skill.lower(): 10 for skill in job_role.get('required_skills', [])}
-        specific_knowledge = {skill.lower(): 8 for skill in job_role.get('specific_knowledge', [])}
-        soft_skills = {skill.lower(): 5 for skill in job_role.get('soft_skills', [])}
-
+        
         for category, skills in skills_assessment.items():
             for skill in skills:
                 skill_lower = skill.lower()
-                if skill_lower in required_skills:
-                    total_score += required_skills[skill_lower] * 1.2
+                if skill_lower in self.core_skills:
+                    total_score += self.core_skills[skill_lower] * 1.3  # Further increase importance of core skills
+                    total_weight += 13
+                elif skill_lower in self.preferred_skills:
+                    total_score += self.preferred_skills[skill_lower] * 1.2  # Increase importance of preferred skills
                     total_weight += 12
-                elif skill_lower in specific_knowledge:
-                    total_score += specific_knowledge[skill_lower] * 1.1
-                    total_weight += 8.8
-                elif skill_lower in soft_skills:
-                    total_score += soft_skills[skill_lower]
-                    total_weight += 5
+                elif skill_lower in self.programming_skills:
+                    total_score += self.programming_skills[skill_lower]
+                    total_weight += 8
+                elif skill_lower in self.tools_and_frameworks:
+                    total_score += self.tools_and_frameworks[skill_lower]
+                    total_weight += 8
                 else:
-                    total_score += 2
+                    total_score += 3  # Maintain score for unrecognized skills
                     total_weight += 10
         
         return (total_score / total_weight) * 100 if total_weight > 0 else 0
 
-    def _calculate_experience_score(self, experience_relevance: Dict[str, Any], job_role: Dict[str, Any]) -> float:
+    def _calculate_experience_score(self, experience_relevance: Dict[str, Any]) -> float:
         total_score = 0
         total_weight = 0
-        required_experience = job_role.get('years_of_experience', 0)
         
         for project, relevance in experience_relevance.items():
-            score = self._extract_score(relevance)
-            total_score += score
-            total_weight += 10
+            if isinstance(relevance, dict):
+                for sub_project, sub_relevance in relevance.items():
+                    score = self._extract_score(sub_relevance)
+                    total_score += score
+                    total_weight += 10
+            else:
+                score = self._extract_score(relevance)
+                total_score += score
+                total_weight += 10
         
-        project_count_multiplier = min(len(experience_relevance) / required_experience, 1.5)
+        # Apply a multiplier based on the number of relevant projects
+        project_count_multiplier = min(len(experience_relevance) / 2, 1.5)  # Increase the impact of multiple relevant projects
         
         return (total_score / total_weight) * 100 * project_count_multiplier if total_weight > 0 else 0
 
-    def _calculate_education_score(self, education: str, job_role: Dict[str, Any]) -> float:
-        required_education = job_role.get('education_level', '').lower()
-        if "phd" in education.lower() and "phd" in required_education:
+    def _calculate_education_score(self, education: str) -> float:
+        if "PhD" in education:
             return 100
-        elif ("ms" in education.lower() or "master" in education.lower()) and "ms" in required_education:
+        elif "MS" in education or "Master" in education:
+            return 95
+        elif "BS" in education or "Bachelor" in education:
             return 90
-        elif ("bs" in education.lower() or "bachelor" in education.lower()) and "bs" in required_education:
-            return 80
         else:
-            return 60
+            return 80  # Maintain base score for candidates without relevant degrees
 
     def _extract_score(self, relevance: Any) -> int:
         if isinstance(relevance, dict):
@@ -104,18 +152,29 @@ class ScoreCalculator:
             elif 'moderately relevant' in relevance_lower:
                 return 7
             elif 'slightly relevant' in relevance_lower:
-                return 4
+                return 5
             else:
-                return 2
+                return 3  # Maintain base score for irrelevant experience
 
     def _apply_score_transformation(self, score: float) -> float:
+        # Apply a non-linear transformation to better differentiate scores
         if score >= 85:
-            return score * 1.1
+            return score * 1.06  # Further reduce boost for high scores
         elif score >= 70:
-            return score * 1.05
+            return score * 1.04  # Slightly reduce boost for good scores
         elif score >= 55:
-            return score * 0.95
+            return score * 0.98  # Maintain slight penalty for mediocre scores
         else:
-            return score * 0.9
+            return score * 0.95  # Maintain penalty for low scores
+
+    def _calculate_missing_skills_penalty(self, missing_skills: List[str]) -> float:
+        penalty = 0
+        for skill in missing_skills:
+            skill_lower = skill.lower()
+            if skill_lower in self.preferred_skills:
+                penalty += self.preferred_skills[skill_lower] * 0.4  # Increase penalty for missing preferred skills
+            elif skill_lower in self.core_skills:
+                penalty += self.core_skills[skill_lower] * 0.3  # Increase penalty for missing core skills
+        return penalty
 
 score_calculator = ScoreCalculator()
