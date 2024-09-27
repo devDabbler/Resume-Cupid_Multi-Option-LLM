@@ -67,13 +67,17 @@ class ScoreCalculator:
         experience_score = self._calculate_experience_score(llm_result.get("Experience and Project Relevance", {}), job_requirements)
         education_score = self._calculate_education_score(llm_result.get("Education", ""), job_requirements)
         
-        # Adjust weights to prioritize experience more heavily
-        weighted_score = (skills_score * 0.3) + (experience_score * 0.6) + (education_score * 0.1)
+        # Adjust weights to better balance different aspects
+        weighted_score = (skills_score * 0.4) + (experience_score * 0.4) + (education_score * 0.2)
         
         missing_skills_penalty = self._calculate_missing_skills_penalty(llm_result.get("Missing Critical Skills", []), job_requirements)
         
-        # Reduce the impact of missing skills penalty
-        final_score = max(0, weighted_score - missing_skills_penalty * 0.2)
+        # Further reduce the impact of missing skills penalty
+        final_score = max(0, weighted_score - missing_skills_penalty * 0.1)
+        
+        # Apply a boost for candidates with high experience scores
+        if experience_score > 80:
+            final_score = min(100, final_score * 1.1)
         
         return {
             'match_score': min(100, int(final_score)),
@@ -94,8 +98,8 @@ class ScoreCalculator:
             for skill in skills:
                 skill_lower = skill.lower()
                 if self._skill_match(skill_lower, required_skills):
-                    total_score += self._get_skill_score(skill_lower) * 1.3
-                    total_weight += 13
+                    total_score += self._get_skill_score(skill_lower) * 1.5
+                    total_weight += 15
                 elif self._skill_match(skill_lower, preferred_skills):
                     total_score += self._get_skill_score(skill_lower) * 1.2
                     total_weight += 12
@@ -103,7 +107,11 @@ class ScoreCalculator:
                     total_score += self._get_skill_score(skill_lower)
                     total_weight += 10
         
-        return (total_score / total_weight) * 100 if total_weight > 0 else 0
+        # Boost score if candidate has a high percentage of required skills
+        skill_coverage = len([s for s in required_skills if any(self._skill_match(skill, [s]) for skill in skills_assessment.get('Technical Skills', []))]) / len(required_skills) if required_skills else 0
+        skill_score = (total_score / total_weight) * 100 if total_weight > 0 else 0
+        return skill_score * (1 + skill_coverage * 0.2)  # Up to 20% boost for full skill coverage
+        
 
     def _get_skill_score(self, skill: str) -> int:
         if skill in self.core_skills:
@@ -145,7 +153,8 @@ class ScoreCalculator:
         
         industry_match = self._calculate_industry_match(experience_relevance, job_requirements.get('industry_experience', []))
         
-        return (experience_score * 0.4 + years_score * 0.4 + industry_match * 0.2)
+        # Increase the weight of years_score and reduce the weight of industry_match
+        return (experience_score * 0.4 + years_score * 0.5 + industry_match * 0.1)
 
     def _calculate_education_score(self, education: str, job_requirements: Dict[str, Any]) -> float:
         required_education = job_requirements.get('education_level', '').lower()
@@ -157,8 +166,10 @@ class ScoreCalculator:
 
         if candidate_index >= required_index:
             return 100
+        elif candidate_index >= 0 and required_index >= 0:
+            return (candidate_index / required_index) * 100
         else:
-            return (candidate_index / required_index) * 100 if required_index > 0 else 80
+            return 80  # Default score if education level can't be determined
 
     def _extract_score(self, relevance: Any) -> int:
         if isinstance(relevance, dict):
@@ -196,9 +207,9 @@ class ScoreCalculator:
         for skill in missing_skills:
             skill_lower = skill.lower()
             if self._skill_match(skill_lower, required_skills):
-                penalty += self._get_skill_score(skill_lower) * 0.2
+                penalty += self._get_skill_score(skill_lower) * 0.15
             elif self._skill_match(skill_lower, preferred_skills):
-                penalty += self._get_skill_score(skill_lower) * 0.1
+                penalty += self._get_skill_score(skill_lower) * 0.05
         return penalty
 
     def _extract_years_of_experience(self, experience_relevance: Dict[str, Any]) -> int:

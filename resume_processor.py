@@ -50,23 +50,19 @@ class ResumeProcessor:
             description_requirements = generate_job_requirements(job_description)
             self.logger.debug(f"Generated description requirements: {description_requirements}")
 
-            merged_requirements = {**description_requirements, **job_requirements}
+            merged_requirements = self._merge_requirements(job_requirements, description_requirements)
             self.logger.debug(f"Merged requirements: {merged_requirements}")
 
-            # Perform LLM analyses
-            self.logger.info("Calling LLM services for resume analysis")
-            llama_analysis = self._get_llama_analysis(resume_text, job_description, job_title)
-            falcon_analysis = self._get_falcon_analysis(resume_text, job_description, job_title)
+            # Perform LLM analysis
+            self.logger.info("Calling LLM service for resume analysis")
+            llm_analysis = self._get_llama_analysis(resume_text, job_description, job_title)
 
-            if llama_analysis is None and falcon_analysis is None:
-                return self._generate_error_result("Unknown", "Both LLAMA and Falcon analyses failed")
-
-            combined_analysis = self._combine_analyses(llama_analysis, falcon_analysis)
-            self.logger.debug(f"Combined analysis: {combined_analysis}")
+            if llm_analysis is None:
+                return self._generate_error_result("Unknown", "LLAMA analysis failed")
 
             # Process analysis results
             self.logger.info("Processing analysis results")
-            result = self._process_analysis(combined_analysis, "Unknown", job_title, merged_requirements)
+            result = self._process_analysis(llm_analysis, "Unknown", job_title, merged_requirements)
             self.logger.debug(f"Processed analysis result: {result}")
 
             # Extract experience
@@ -74,14 +70,14 @@ class ResumeProcessor:
             self.logger.debug(f"Extracted experience: {result['experience']}")
 
             # Calculate score using the dynamic approach
-            score_result = score_calculator.calculate_score(combined_analysis, merged_requirements)
+            score_result = score_calculator.calculate_score(llm_analysis, merged_requirements)
             result.update(score_result)
             self.logger.debug(f"Calculated score: {score_result}")
 
             # Generate additional fields
             result['recommendation'] = self._generate_recommendation(result['match_score'])
             result['fit_summary'] = self._generate_fit_summary(result['match_score'], job_title)
-            result['recruiter_questions'] = self._generate_recruiter_questions(combined_analysis, job_title, job_description)
+            result['recruiter_questions'] = self._generate_recruiter_questions(llm_analysis, job_title, job_description)
 
             self.logger.info(f"Processed resume. Match score: {result['match_score']}, Recommendation: {result['recommendation']}")
             return result
@@ -127,29 +123,31 @@ class ResumeProcessor:
         experience_section = re.search(r'PROFESSIONAL EXPERIENCE.*?(?=EDUCATION|ACADEMIC PROJECTS|$)', resume_text, re.DOTALL | re.IGNORECASE)
         return experience_section.group(0) if experience_section else ''
 
-    def _process_analysis(self, raw_analysis: Dict[str, Any], file_name: str, job_title: str, job_requirements: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            self.logger.debug(f"Raw analysis: {raw_analysis}")
+    def _process_analysis(self, llm_analysis: Dict[str, Any], file_name: str, job_title: str, job_requirements: Dict[str, Any]) -> Dict[str, Any]:
+        processed = {
+            'file_name': file_name,
+            'brief_summary': llm_analysis.get('Brief Summary', 'No summary available'),
+            'key_strengths': self._format_list(llm_analysis.get('Key Strengths', [])),
+            'areas_for_improvement': self._format_list(llm_analysis.get('Areas for Improvement', [])),
+            'skills_gap': self._format_list(llm_analysis.get('Missing Critical Skills', [])),
+            'experience_relevance': llm_analysis.get('Experience and Project Relevance', 'Not assessed'),
+        }
+        return processed
 
-            processed = {
-                'file_name': file_name,
-                'brief_summary': raw_analysis.get('Brief Summary', 'No summary available'),
-                'match_score': raw_analysis.get('Match Score', 0),
-                'key_strengths': self._format_list(raw_analysis.get('Key Strengths', [])),
-                'areas_for_improvement': self._format_list(raw_analysis.get('Areas for Improvement', [])),
-                'skills_gap': self._format_list(raw_analysis.get('Skills Gap', [])),
-                'experience_relevance': raw_analysis.get('Experience and Project Relevance', 'Not assessed'),
-            }
-
-            self.logger.debug(f"Processed analysis: {processed}")
-
-            return processed
-
-        except Exception as e:
-            self.logger.error(f"Unexpected error processing analysis for {file_name}: {str(e)}", exc_info=True)
-            self.logger.error(f"Raw analysis content: {raw_analysis}")
-            return self._generate_error_result(file_name, f"Unexpected Error: {str(e)}")
-
+    def _merge_requirements(self, job_requirements: Dict[str, Any], description_requirements: Dict[str, Any]) -> Dict[str, Any]:
+        merged = job_requirements.copy()
+        for key, value in description_requirements.items():
+            if key in merged:
+                if isinstance(merged[key], list) and isinstance(value, list):
+                    merged[key] = list(set(merged[key] + value))
+                elif isinstance(merged[key], (int, float)) and isinstance(value, (int, float)):
+                    merged[key] = max(merged[key], value)
+                else:
+                    merged[key] = value
+            else:
+                merged[key] = value
+        return merged
+    
     def _format_list(self, items: List[Any]) -> List[str]:
         if not items:
             return ["No items available"]
@@ -170,21 +168,21 @@ class ResumeProcessor:
         return formatted_items if formatted_items else ["No items available"]
 
     def _generate_recommendation(self, match_score: int) -> str:
-        if match_score >= 80:
-            return "Highly recommend for interview"
-        elif 65 <= match_score < 80:
+        if match_score >= 85:
+            return "Strongly recommend for interview"
+        elif 70 <= match_score < 85:
             return "Recommend for interview"
-        elif 50 <= match_score < 65:
+        elif 55 <= match_score < 70:
             return "Consider for interview with reservations"
         else:
             return "Not recommended for interview at this time"
 
     def _generate_fit_summary(self, match_score: int, job_title: str) -> str:
-        if match_score >= 75:
+        if match_score >= 85:
             return f"The candidate is an excellent fit for the {job_title} role, meeting or exceeding most job requirements."
-        elif 60 <= match_score < 75:
+        elif 70 <= match_score < 85:
             return f"The candidate is a good fit for the {job_title} role, meeting many of the job requirements with some minor gaps."
-        elif 40 <= match_score < 60:
+        elif 55 <= match_score < 70:
             return f"The candidate shows potential for the {job_title} role but has some gaps that would require further assessment."
         else:
             return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
