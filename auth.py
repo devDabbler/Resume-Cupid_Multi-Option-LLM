@@ -14,10 +14,23 @@ def init_auth_state():
         st.session_state.login_success = False
 
 def login_user(username: str, password: str) -> bool:
-    conn = get_db_connection()
-    if conn is None:
-        logger.error("Failed to establish database connection")
-        st.error("Database connection error. Please try again later.")
+    try:
+        user = get_user(username)
+        if user:
+            stored_password = user['password_hash']
+            if isinstance(stored_password, str):
+                stored_password = stored_password.encode('utf-8')
+            if bcrypt.checkpw(password.encode('utf-8'), stored_password):
+                st.session_state.user = user
+                st.session_state.login_success = True
+                logger.info(f"User logged in: {username}")
+                return True
+        logger.warning(f"Failed login attempt for user: {username}")
+        return False
+    except Exception as e:
+        logger.error(f"Error during login for user {username}: {str(e)}")
+        st.error("An unexpected error occurred during login. Please try again later.")
+        return Falsee connection error. Please try again later.")
         return False
 
     try:
@@ -45,6 +58,8 @@ def logout_user():
     st.session_state.login_success = False
     logger.info("User logged out")
 
+from database import get_user, get_user_by_email, register_user  # Add these imports at the top of auth.py
+
 def register_new_user(username: str, email: str, password: str) -> bool:
     if not username or not email or not password:
         st.error("All fields are required.")
@@ -59,24 +74,19 @@ def register_new_user(username: str, email: str, password: str) -> bool:
         return False
 
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    conn = get_db_connection()
-    if conn is None:
-        logger.error("Failed to establish database connection")
-        st.error("Database error. Please try again later.")
-        return False
-
+    
     try:
         # Check if username exists
-        if get_user(conn, username):
+        if get_user(username):
             st.error("Username already exists.")
             return False
 
         # Check if email exists
-        if get_user_by_email(conn, email):
+        if get_user_by_email(email):
             st.error("Email already exists.")
             return False
 
-        if register_user(conn, username, email, hashed_password):
+        if register_user(username, email, hashed_password):
             logger.info(f"New user registered: {username}")
             st.success("Registration successful! You can now log in with your new credentials.")
             return True
@@ -87,36 +97,30 @@ def register_new_user(username: str, email: str, password: str) -> bool:
         logger.error(f"Error registering user {username}: {str(e)}")
         st.error("An unexpected error occurred during registration. Please try again later.")
         return False
-    finally:
-        conn.close()
 
 def reset_password(username_or_email: str, old_password: str, new_password: str) -> bool:
     if len(new_password) < 8:
         st.error("New password must be at least 8 characters long.")
         return False
 
-    conn = get_db_connection()
-    if conn is None:
-        logger.error("Failed to establish database connection")
-        st.error("Database error. Please try again later.")
-        return False
-
     try:
-        user = get_user(conn, username_or_email)
+        user = get_user(username_or_email)
         if not user:
-            user = get_user_by_email(conn, username_or_email)
+            user = get_user_by_email(username_or_email)
         if user:
             stored_password = user['password_hash']
             if isinstance(stored_password, str):
                 stored_password = stored_password.encode('utf-8')
             if bcrypt.checkpw(old_password.encode('utf-8'), stored_password):
                 new_hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-                cur = conn.cursor()
-                cur.execute('''UPDATE users SET password_hash = ? WHERE id = ?''', (new_hashed_password, user['id']))
-                conn.commit()
-                logger.info(f"Password reset successful for user: {user['username']}")
-                st.success("Password reset successfully!")
-                return True
+                # You'll need to implement an update_user_password function in database.py
+                if update_user_password(user['id'], new_hashed_password):
+                    logger.info(f"Password reset successful for user: {user['username']}")
+                    st.success("Password reset successfully!")
+                    return True
+                else:
+                    st.error("Failed to reset password. Please try again.")
+                    return False
             else:
                 st.error("Invalid old password")
                 return False
@@ -127,8 +131,6 @@ def reset_password(username_or_email: str, old_password: str, new_password: str)
         logger.error(f"Error resetting password for user {username_or_email}: {str(e)}")
         st.error("An unexpected error occurred during password reset. Please try again later.")
         return False
-    finally:
-        conn.close()
 
 def check_db_connection() -> bool:
     try:

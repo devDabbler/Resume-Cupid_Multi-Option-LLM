@@ -155,6 +155,21 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         logger.error(f"Error retrieving user by email {email}: {str(e)}")
         return None
 
+def update_user_password(user_id: int, new_password_hash: bytes) -> bool:
+    def _update_password(conn):
+        cur = conn.cursor()
+        cur.execute('''
+        UPDATE users SET password_hash = ? WHERE id = ?
+        ''', (new_password_hash, user_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+    try:
+        return execute_with_retry(_update_password)
+    except Exception as e:
+        logger.error(f"Error updating password for user {user_id}: {str(e)}")
+        return False
+    
 def save_role(role_name: str, job_description: str) -> bool:
     def _save_role(conn):
         cur = conn.cursor()
