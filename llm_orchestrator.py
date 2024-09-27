@@ -47,7 +47,11 @@ class LLMOrchestrator:
         if 'llama' in results and 'error' not in results['llama']:
             llama_result = results['llama']
             job_requirements = generate_job_requirements(job_description)
-            aggregated_result["match_score"] = score_calculator.calculate_score(llama_result, job_requirements)
+            score_result = score_calculator.calculate_score(llama_result, job_requirements)
+            
+            # Extract the match_score from the score_result dictionary
+            aggregated_result["match_score"] = score_result.get("match_score", 0)
+            
             aggregated_result["summary"] = llama_result.get("Brief Summary", "No summary available")
             aggregated_result["key_strengths"] = llama_result.get("Key Strengths", [])
             aggregated_result["areas_for_improvement"] = llama_result.get("Areas for Improvement", [])
