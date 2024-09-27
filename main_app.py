@@ -176,6 +176,14 @@ def generate_fit_summary(match_score: int, job_title: str) -> str:
     else:
         return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
 
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+import re
+import uuid
+from typing import List, Dict, Any
+from utils import generate_recommendation, generate_fit_summary, generate_pdf_report
+
 def display_results(results: List[Dict[str, Any]], job_title: str):
     st.markdown("<h2 class='section-title'>Evaluation Results</h2>", unsafe_allow_html=True)
 
@@ -196,6 +204,10 @@ def display_results(results: List[Dict[str, Any]], job_title: str):
     df.columns = ['Rank', 'Resume', 'Match Score', 'Recommendation']
 
     st.dataframe(df)
+
+    def extract_score(rating):
+        match = re.search(r'\((\d+)', rating)
+        return int(match.group(1)) if match else 0
 
     for result in sorted_results:
         with st.expander(f"Detailed Analysis: {result.get('file_name', 'Unknown')}"):
@@ -244,7 +256,7 @@ def display_results(results: List[Dict[str, Any]], job_title: str):
             for job, details in experience.items():
                 if isinstance(details, dict):
                     for project, rating in details.items():
-                        score = int(rating.split('/')[0])
+                        score = extract_score(rating)
                         if score >= 8:
                             relevance_data['High'].append((f"{job} - {project}", score))
                         elif 6 <= score < 8:
@@ -252,7 +264,7 @@ def display_results(results: List[Dict[str, Any]], job_title: str):
                         else:
                             relevance_data['Low'].append((f"{job} - {project}", score))
                 else:
-                    score = int(details.split('/')[0])
+                    score = extract_score(details)
                     if score >= 8:
                         relevance_data['High'].append((job, score))
                     elif 6 <= score < 8:
