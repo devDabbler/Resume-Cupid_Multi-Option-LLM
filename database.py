@@ -1,5 +1,6 @@
 import sqlite3
 import threading
+import json
 import logging
 from typing import Any, Dict, List, Optional
 from queue import Queue, Empty
@@ -67,15 +68,19 @@ def init_db(conn):
     try:
         cur = conn.cursor()
         
-        # Create users table
+        # Modify the users table creation to include a 'profile' column
         cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
+            username TEXT NOT NULL,
+            email TEXT NOT NULL,
             password_hash TEXT NOT NULL,
+            user_type TEXT NOT NULL,
             is_verified BOOLEAN DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            profile TEXT,
+            UNIQUE(username, user_type),
+            UNIQUE(email, user_type)
         )
         ''')
         
@@ -108,27 +113,27 @@ def init_db(conn):
         logger.error(f"Error initializing database: {str(e)}")
         raise
 
-def register_user(username: str, email: str, password_hash: bytes) -> bool:
+def register_user(username: str, email: str, password_hash: bytes, user_type: str) -> bool:
     def _register(conn):
         cur = conn.cursor()
         cur.execute('''
-        INSERT INTO users (username, email, password_hash)
-        VALUES (?, ?, ?)
-        ''', (username, email, password_hash))
+        INSERT INTO users (username, email, password_hash, user_type, profile)
+        VALUES (?, ?, ?, ?, ?)
+        ''', (username, email, password_hash, user_type, json.dumps({})))
         conn.commit()
-        logger.info(f"User registered successfully: {username}")
+        logger.info(f"{user_type.capitalize()} registered successfully: {username}")
         return True
 
     try:
         return execute_with_retry(_register)
     except Exception as e:
-        logger.error(f"Error registering user {username}: {str(e)}")
+        logger.error(f"Error registering {user_type} {username}: {str(e)}")
         return False
 
-def get_user(username: str) -> Optional[Dict[str, Any]]:
+def get_user(username: str, user_type: str) -> Optional[Dict[str, Any]]:
     def _get_user(conn):
         cur = conn.cursor()
-        cur.execute('SELECT * FROM users WHERE username = ?', (username,))
+        cur.execute('SELECT * FROM users WHERE username = ? AND user_type = ?', (username, user_type))
         user = cur.fetchone()
         if user:
             return dict(zip([column[0] for column in cur.description], user))
@@ -137,13 +142,13 @@ def get_user(username: str) -> Optional[Dict[str, Any]]:
     try:
         return execute_with_retry(_get_user)
     except Exception as e:
-        logger.error(f"Error retrieving user {username}: {str(e)}")
+        logger.error(f"Error retrieving {user_type} {username}: {str(e)}")
         return None
 
-def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+def get_user_by_email(email: str, user_type: str) -> Optional[Dict[str, Any]]:
     def _get_user_by_email(conn):
         cur = conn.cursor()
-        cur.execute('SELECT * FROM users WHERE email = ?', (email,))
+        cur.execute('SELECT * FROM users WHERE email = ? AND user_type = ?', (email, user_type))
         user = cur.fetchone()
         if user:
             return dict(zip([column[0] for column in cur.description], user))
@@ -152,23 +157,126 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     try:
         return execute_with_retry(_get_user_by_email)
     except Exception as e:
-        logger.error(f"Error retrieving user by email {email}: {str(e)}")
+        logger.error(f"Error retrieving {user_type} by email {email}: {str(e)}")
         return None
 
-def update_user_password(user_id: int, new_password_hash: bytes) -> bool:
+def get_user_profile(user_id: int) -> Optional[Dict[str, Any]]:
+    def _get_user_profile(conn):
+        cur = conn.cursor()
+        cur.execute('''
+        SELECT profile
+        FROM users
+        WHERE id = ?
+        ''', (user_id,))
+        result = cur.fetchone()
+        if result and result[0]:
+            return json.loads(result[0])
+        return None
+
+    try:
+        return execute_with_retry(_get_user_profile)
+    except Exception as e:
+        logger.error(f"Error retrieving user profile for user {user_id}: {str(e)}")
+        return None
+
+def update_user_profile(user_id: int, profile: Dict[str, Any]) -> bool:
+    def _update_user_profile(conn):
+        cur = conn.cursor()
+        profile_json = json.dumps(profile)
+        cur.execute('''
+        UPDATE users
+        SET profile = ?
+        WHERE id = ?
+        ''', (profile_json, user_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+    try:
+        return execute_with_retry(_update_user_profile)
+    except Exception as e:
+        logger.error(f"Error updating user profile for user {user_id}: {str(e)}")
+        return False
+
+def get_job_recommendations(user_id: int) -> List[Dict[str, Any]]:
+    def _get_job_recommendations(conn):
+        cur = conn.cursor()
+        # This is a placeholder implementation. In a real-world scenario,
+        # you would implement a more sophisticated recommendation algorithm.
+        cur.execute('''
+        SELECT id, role_name as title, 'Company Name' as company, job_description as description,
+               '0-100000' as salary_range, 'Remote' as location, 80 as match_score
+        FROM saved_roles
+        LIMIT 5
+        ''')
+        jobs = cur.fetchall()
+        return [dict(zip([column[0] for column in cur.description], job)) for job in jobs]
+
+    try:
+        recommendations = execute_with_retry(_get_job_recommendations)
+        for job in recommendations:
+            job['required_skills'] = ['Skill 1', 'Skill 2', 'Skill 3']  # Placeholder
+        return recommendations
+    except Exception as e:
+        logger.error(f"Error retrieving job recommendations for user {user_id}: {str(e)}")
+        return []
+
+def get_latest_evaluation(user_id: int) -> Optional[Dict[str, Any]]:
+    def _get_latest_evaluation(conn):
+        cur = conn.cursor()
+        cur.execute('''
+        SELECT er.id, er.resume_file_name, er.match_score, er.recommendation, er.created_at,
+               er.skills_gap, er.areas_for_improvement
+        FROM evaluation_results er
+        JOIN users u ON u.id = ?
+        ORDER BY er.created_at DESC
+        LIMIT 1
+        ''', (user_id,))
+        result = cur.fetchone()
+        if result:
+            return {
+                'id': result[0],
+                'resume_file_name': result[1],
+                'match_score': result[2],
+                'recommendation': result[3],
+                'created_at': result[4],
+                'skills_gap': json.loads(result[5]) if result[5] else [],
+                'areas_for_improvement': json.loads(result[6]) if result[6] else []
+            }
+        return None
+
+    try:
+        return execute_with_retry(_get_latest_evaluation)
+    except Exception as e:
+        logger.error(f"Error retrieving latest evaluation for user {user_id}: {str(e)}")
+        return None
+    
+def update_user_password(user_id: int, new_password_hash: bytes, user_type: str) -> bool:
     def _update_password(conn):
         cur = conn.cursor()
         cur.execute('''
-        UPDATE users SET password_hash = ? WHERE id = ?
-        ''', (new_password_hash, user_id))
+        UPDATE users SET password_hash = ? WHERE id = ? AND user_type = ?
+        ''', (new_password_hash, user_id, user_type))
         conn.commit()
         return cur.rowcount > 0
 
     try:
         return execute_with_retry(_update_password)
     except Exception as e:
-        logger.error(f"Error updating password for user {user_id}: {str(e)}")
+        logger.error(f"Error updating password for {user_type} {user_id}: {str(e)}")
         return False
+
+def get_users_by_type(user_type: str) -> List[Dict[str, Any]]:
+    def _get_users_by_type(conn):
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM users WHERE user_type = ?', (user_type,))
+        users = cur.fetchall()
+        return [dict(zip([column[0] for column in cur.description], user)) for user in users]
+
+    try:
+        return execute_with_retry(_get_users_by_type)
+    except Exception as e:
+        logger.error(f"Error retrieving {user_type}s: {str(e)}")
+        return []
     
 def save_role(role_name: str, job_description: str) -> bool:
     def _save_role(conn):

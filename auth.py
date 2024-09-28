@@ -13,33 +13,33 @@ def init_auth_state():
     if 'login_success' not in st.session_state:
         st.session_state.login_success = False
 
-def login_user(username: str, password: str) -> bool:
+def login_user(username: str, password: str, user_type: str) -> bool:
     try:
-        user = get_user(username)
+        user = get_user(username, user_type)
         if user:
             stored_password = user['password_hash']
             if isinstance(stored_password, str):
                 stored_password = stored_password.encode('utf-8')
             if bcrypt.checkpw(password.encode('utf-8'), stored_password):
                 st.session_state.user = user
+                st.session_state['logged_in_user_type'] = user_type
                 st.session_state.login_success = True
-                logger.info(f"User logged in: {username}")
+                logger.info(f"{user_type.capitalize()} logged in: {username}")
                 return True
-        logger.warning(f"Failed login attempt for user: {username}")
+        logger.warning(f"Failed login attempt for {user_type}: {username}")
         return False
     except Exception as e:
-        logger.error(f"Error during login for user {username}: {str(e)}")
+        logger.error(f"Error during login for {user_type} {username}: {str(e)}")
         st.error("An unexpected error occurred during login. Please try again later.")
         return False
 
 def logout_user():
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
     st.session_state.user = None
     st.session_state.login_success = False
-    logger.info("User logged out")
 
-from database import get_user, get_user_by_email, register_user  # Add these imports at the top of auth.py
-
-def register_new_user(username: str, email: str, password: str) -> bool:
+def register_new_user(username: str, email: str, password: str, user_type: str) -> bool:
     if not username or not email or not password:
         st.error("All fields are required.")
         return False
@@ -56,45 +56,44 @@ def register_new_user(username: str, email: str, password: str) -> bool:
     
     try:
         # Check if username exists
-        if get_user(username):
-            st.error("Username already exists.")
+        if get_user(username, user_type):
+            st.error(f"{user_type.capitalize()} username already exists.")
             return False
 
         # Check if email exists
-        if get_user_by_email(email):
-            st.error("Email already exists.")
+        if get_user_by_email(email, user_type):
+            st.error(f"{user_type.capitalize()} email already exists.")
             return False
 
-        if register_user(username, email, hashed_password):
-            logger.info(f"New user registered: {username}")
+        if register_user(username, email, hashed_password, user_type):
+            logger.info(f"New {user_type} registered: {username}")
             st.success("Registration successful! You can now log in with your new credentials.")
             return True
         else:
             st.error("An error occurred during registration. Please try again.")
             return False
     except Exception as e:
-        logger.error(f"Error registering user {username}: {str(e)}")
+        logger.error(f"Error registering {user_type} {username}: {str(e)}")
         st.error("An unexpected error occurred during registration. Please try again later.")
         return False
 
-def reset_password(username_or_email: str, old_password: str, new_password: str) -> bool:
+def reset_password(username_or_email: str, old_password: str, new_password: str, user_type: str) -> bool:
     if len(new_password) < 8:
         st.error("New password must be at least 8 characters long.")
         return False
 
     try:
-        user = get_user(username_or_email)
+        user = get_user(username_or_email, user_type)
         if not user:
-            user = get_user_by_email(username_or_email)
+            user = get_user_by_email(username_or_email, user_type)
         if user:
             stored_password = user['password_hash']
             if isinstance(stored_password, str):
                 stored_password = stored_password.encode('utf-8')
             if bcrypt.checkpw(old_password.encode('utf-8'), stored_password):
                 new_hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-                # You'll need to implement an update_user_password function in database.py
-                if update_user_password(user['id'], new_hashed_password):
-                    logger.info(f"Password reset successful for user: {user['username']}")
+                if update_user_password(user['id'], new_hashed_password, user_type):
+                    logger.info(f"Password reset successful for {user_type}: {user['username']}")
                     st.success("Password reset successfully!")
                     return True
                 else:
@@ -104,10 +103,10 @@ def reset_password(username_or_email: str, old_password: str, new_password: str)
                 st.error("Invalid old password")
                 return False
         else:
-            st.error("Username or email not found")
+            st.error(f"{user_type.capitalize()} username or email not found")
             return False
     except Exception as e:
-        logger.error(f"Error resetting password for user {username_or_email}: {str(e)}")
+        logger.error(f"Error resetting password for {user_type} {username_or_email}: {str(e)}")
         st.error("An unexpected error occurred during password reset. Please try again later.")
         return False
 
@@ -141,12 +140,11 @@ def auth_page():
     .welcome-section {
         width: 100%;
         max-width: 1200px;
-        background-color: #f0f8ff;
+        background-color: #ffffff;
         padding: 2rem;
         border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-bottom: 2rem;
         text-align: center;
+        margin-bottom: 1.5rem;
     }
     .main-title {
         font-size: 2.5rem;
@@ -158,104 +156,181 @@ def auth_page():
         color: #555;
         margin-bottom: 1.5rem;
     }
-    .features-title {
-        font-size: 1.5rem;
-        color: #1f4e79;
-        margin-bottom: 1rem;
-    }
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1rem;
-        text-align: left;
-    }
-    .feature-item {
+    .user-type-selection {
         display: flex;
-        align-items: center;
-    }
-    .feature-item:before {
-        content: "✓";
-        color: #3366cc;
-        font-weight: bold;
-        margin-right: 0.5rem;
-    }
-    .powered-by {
-        font-size: 0.9rem;
-        color: #666;
-        margin-top: 1.5rem;
+        justify-content: center;
+        margin-bottom: 0rem;
     }
     .login-section {
         width: 100%;
         max-width: 400px;
         text-align: center;
+        padding: 0rem;
+        border-radius: 10px;
+        background-color: #ffffff;
+        margin-bottom: 1rem;
     }
     .login-title {
         font-size: 1.5rem;
         color: #3366cc;
         margin-bottom: 1rem;
     }
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+        width: 100%;
+        max-width: 1200px;
+    }
+    .feature-item {
+        background-color: #ffffff;
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+    .feature-item h3 {
+        color: #1e3a8a;
+        font-size: 1.3rem;
+        margin-bottom: 0.5rem;
+    }
+    .feature-item p {
+        color: #4b5563;
+        font-size: 1rem;
+    }
+    .powered-by {
+        font-size: 1.1rem;
+        color: #6b7280;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
     @media (max-width: 768px) {
         .main-title {
             font-size: 2rem;
         }
-        .subtitle, .features-title, .login-title {
+        .subtitle, .login-title {
             font-size: 1rem;
+        }
+        .features-grid {
+            grid-template-columns: 1fr;
         }
     }
     </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="main-container">', unsafe_allow_html=True)
-    
+
     st.markdown("""
     <div class="welcome-section">
         <h1 class="main-title">Welcome to Resume Cupid</h1>
-        <p class="subtitle">Revolutionize your hiring process with our cutting-edge AI-powered resume evaluation tool.</p>
-        <h2 class="features-title">Key Features:</h2>
-        <div class="features-grid">
-            <div class="feature-item">Advanced AI analysis of resumes</div>
-            <div class="feature-item">Instant matching against job descriptions</div>
-            <div class="feature-item">Detailed candidate insights and recommendations</div>
-            <div class="feature-item">Time-saving automated evaluations</div>
+        <p class="subtitle">Redefining recruitment by simplifying the hiring process for employers and helping job seekers distinguish themselves. Utilizing advanced Large Language Models and Machine Learning algorithms to drive innovation in talent acquisition and career growth.</p>
+    </div>
+    <div class="features-grid">
+        <div class="feature-item">
+            <h3>AI-Powered Analysis</h3>
+            <p>Cutting-edge resume evaluation using advanced AI algorithms</p>
         </div>
-        <p class="powered-by">Powered by the latest Large Language Models and Machine Learning algorithms.</p>
+        <div class="feature-item">
+            <h3>Instant Matching</h3>
+            <p>Seamless alignment of candidate profiles with job requirements</p>
+        </div>
+        <div class="feature-item">
+            <h3>Deep Insights</h3>
+            <p>Comprehensive candidate assessments and tailored recommendations</p>
+        </div>
+        <div class="feature-item">
+            <h3>Time-Saving Automation</h3>
+            <p>Streamlined hiring process with automated evaluations</p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # User type selection title
+    st.markdown("""
+    <h2 style="text-align:center; color:#1e3a8a; margin-bottom: 1rem;">Begin Your Personalized AI Journey</h2>
+    """, unsafe_allow_html=True)
+
+    # User type selection
+    st.markdown('<div class="user-type-selection">', unsafe_allow_html=True)
+    user_type = st.radio("I am a:", ("Job Seeker", "Employer"), horizontal=True, key="user_type_selection")
+    st.markdown('</div>', unsafe_allow_html=True)
+
     st.markdown('<div class="login-section">', unsafe_allow_html=True)
-    st.markdown('<h2 class="auth-title">Account Access</h2>', unsafe_allow_html=True)
-    
-    tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
-    
-    with tab1:
-        username = st.text_input("Username", key="login_username")
-        password = st.text_input("Password", type="password", key="login_password")
-        if st.button("Login", key="login_button", type="primary", use_container_width=True):
-            if login_user(username, password):
-                st.success("Logged in successfully!")
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
 
-    with tab2:
-        new_username = st.text_input("Username", key="register_username")
-        new_email = st.text_input("Email", key="register_email")
-        new_password = st.text_input("Password", type="password", key="register_password")
-        if st.button("Register", key="register_button", type="primary", use_container_width=True):
-            if register_new_user(new_username, new_email, new_password):
-                st.success("Registered successfully! You can now log in.")
-                st.rerun()
+    if user_type == "Job Seeker":
+        st.markdown('<h2 class="login-title">Job Seeker Access</h2>', unsafe_allow_html=True)
+        tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
 
-    with tab3:
-        username_or_email = st.text_input("Username or Email", key="reset_username_email")
-        old_password = st.text_input("Old Password", type="password", key="reset_old_password")
-        new_password = st.text_input("New Password", type="password", key="reset_new_password")
-        if st.button("Reset Password", key="reset_password_button", type="primary", use_container_width=True):
-            if reset_password(username_or_email, old_password, new_password):
-                st.success("Password reset successful! You can now log in with your new password.")
-                st.rerun()
+        with tab1:
+            username = st.text_input("Username", key="login_username_seeker")
+            password = st.text_input("Password", type="password", key="login_password_seeker")
+            if st.button("Login", key="login_button_seeker", type="primary", use_container_width=True):
+                if login_user(username, password, "job_seeker"):
+                    st.success("Logged in successfully!")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+
+        with tab2:
+            new_username = st.text_input("Username", key="register_username_seeker")
+            new_email = st.text_input("Email", key="register_email_seeker")
+            new_password = st.text_input("Password", type="password", key="register_password_seeker")
+            if st.button("Register", key="register_button_seeker", type="primary", use_container_width=True):
+                if register_new_user(new_username, new_email, new_password, "job_seeker"):
+                    st.success("Registered successfully! You can now log in.")
+                    st.rerun()
+
+        with tab3:
+            username_or_email = st.text_input("Username or Email", key="reset_username_email_seeker")
+            old_password = st.text_input("Old Password", type="password", key="reset_old_password_seeker")
+            new_password = st.text_input("New Password", type="password", key="reset_new_password_seeker")
+            if st.button("Reset Password", key="reset_password_button_seeker", type="primary", use_container_width=True):
+                if reset_password(username_or_email, old_password, new_password, "job_seeker"):
+                    st.success("Password reset successful! You can now log in with your new password.")
+                    st.rerun()
+
+    else:  # Employer
+        st.markdown('<h2 class="login-title">Employer Access</h2>', unsafe_allow_html=True)
+        tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
+
+        with tab1:
+            username = st.text_input("Company Username", key="login_username_employer")
+            password = st.text_input("Password", type="password", key="login_password_employer")
+            if st.button("Login", key="login_button_employer", type="primary", use_container_width=True):
+                if login_user(username, password, "employer"):
+                    st.success("Logged in successfully!")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+
+        with tab2:
+            new_username = st.text_input("Company Username", key="register_username_employer")
+            new_email = st.text_input("Company Email", key="register_email_employer")
+            new_password = st.text_input("Password", type="password", key="register_password_employer")
+            if st.button("Register Your Company", key="register_button_employer", type="primary", use_container_width=True):
+                if register_new_user(new_username, new_email, new_password, "employer"):
+                    st.success("Company registered successfully! You can now log in.")
+                    st.rerun()
+
+        with tab3:
+            username_or_email = st.text_input("Company Username or Email", key="reset_username_email_employer")
+            old_password = st.text_input("Old Password", type="password", key="reset_old_password_employer")
+            new_password = st.text_input("New Password", type="password", key="reset_new_password_employer")
+            if st.button("Reset Password", key="reset_password_button_employer", type="primary", use_container_width=True):
+                if reset_password(username_or_email, old_password, new_password, "employer"):
+                    st.success("Password reset successful! You can now log in with your new password.")
+                    st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # Footer
+    st.markdown("""
+    <footer class="footer" style="text-align:center; padding: 1rem 0; color: #6b7280; margin-top: 1.5rem;">
+        <p>&copy; 2024 Resume Cupid. All rights reserved.</p>
+        <p>Contact us: support@resumecupid.com</p>
+    </footer>
+    """, unsafe_allow_html=True)
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 def require_auth(func):
