@@ -135,13 +135,13 @@ def auth_page():
         flex-direction: column;
         align-items: center;
         width: 100%;
-        padding: 2rem;
+        padding: 0rem;
     }
     .welcome-section {
         width: 100%;
         max-width: 1200px;
         background-color: #ffffff;
-        padding: 2rem;
+        padding: 1rem;
         border-radius: 10px;
         text-align: center;
         margin-bottom: 1.5rem;
