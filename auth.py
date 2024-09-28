@@ -327,7 +327,7 @@ def auth_page():
     st.markdown("""
     <footer class="footer" style="text-align:center; padding: 1rem 0; color: #6b7280; margin-top: 1.5rem;">
         <p>&copy; 2024 Resume Cupid. All rights reserved.</p>
-        <p>Contact us: support@resumecupid.com</p>
+        <p>Contact us: hello@resumecupid.ai</p>
     </footer>
     """, unsafe_allow_html=True)
 
