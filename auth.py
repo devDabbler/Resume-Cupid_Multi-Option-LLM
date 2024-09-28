@@ -1,11 +1,16 @@
 import streamlit as st
 import bcrypt
+import secrets
 from database import get_user, get_user_by_email, register_user, update_user_password
 from config_settings import Config
 import logging
 from utils import is_valid_email
+from email_service import email_service
 
 logger = logging.getLogger(__name__)
+
+def generate_verification_token() -> str:
+    return secrets.token_urlsafe(32)
 
 def init_auth_state():
     if 'user' not in st.session_state:
@@ -53,6 +58,7 @@ def register_new_user(username: str, email: str, password: str, user_type: str) 
         return False
 
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    verification_token = generate_verification_token()
     
     try:
         # Check if username exists
@@ -65,9 +71,40 @@ def register_new_user(username: str, email: str, password: str, user_type: str) 
             st.error(f"{user_type.capitalize()} email already exists.")
             return False
 
-        if register_user(username, email, hashed_password, user_type):
+        if register_user(username, email, hashed_password, user_type, verification_token):
             logger.info(f"New {user_type} registered: {username}")
-            st.success("Registration successful! You can now log in with your new credentials.")
+            
+            if Config.ENVIRONMENT == 'development':
+                verification_link = email_service.get_verification_link(verification_token)
+                success_message = f"""
+                Registration successful! 
+                
+                Since this is a development environment, we're displaying the verification link here:
+                
+                {verification_link}
+                
+                In a production environment, this link would be sent to {email}.
+                Click the link above to verify your account.
+                """
+            else:
+                if email_service.send_verification_email(email, verification_token):
+                    success_message = f"""
+                    Registration successful! 
+                    
+                    An email has been sent to {email} with a verification link. 
+                    Please check your email (including spam folder) and click the link to verify your account.
+                    
+                    After verifying your email, you can return here to log in.
+                    """
+                else:
+                    success_message = """
+                    Registration successful, but we couldn't send the verification email. 
+                    Please contact support to verify your account.
+                    """
+            
+            st.session_state.registration_success = success_message
+            st.rerun()  # Use st.rerun() instead of st.experimental_rerun()
+            
             return True
         else:
             st.error("An error occurred during registration. Please try again.")
@@ -77,36 +114,25 @@ def register_new_user(username: str, email: str, password: str, user_type: str) 
         st.error("An unexpected error occurred during registration. Please try again later.")
         return False
 
-def reset_password(username_or_email: str, old_password: str, new_password: str, user_type: str) -> bool:
-    if len(new_password) < 8:
-        st.error("New password must be at least 8 characters long.")
-        return False
-
+def reset_password(email: str, user_type: str) -> bool:
     try:
-        user = get_user(username_or_email, user_type)
-        if not user:
-            user = get_user_by_email(username_or_email, user_type)
+        user = get_user_by_email(email, user_type)
         if user:
-            stored_password = user['password_hash']
-            if isinstance(stored_password, str):
-                stored_password = stored_password.encode('utf-8')
-            if bcrypt.checkpw(old_password.encode('utf-8'), stored_password):
-                new_hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-                if update_user_password(user['id'], new_hashed_password, user_type):
-                    logger.info(f"Password reset successful for {user_type}: {user['username']}")
-                    st.success("Password reset successfully!")
+            reset_token = generate_verification_token()
+            if update_user_reset_token(user['id'], reset_token):
+                if email_service.send_password_reset_email(email, reset_token):
+                    logger.info(f"Password reset email sent to {email}")
+                    st.success("Password reset instructions have been sent to your email.")
                     return True
                 else:
-                    st.error("Failed to reset password. Please try again.")
-                    return False
+                    st.error("Failed to send password reset email. Please try again.")
             else:
-                st.error("Invalid old password")
-                return False
+                st.error("Failed to initiate password reset. Please try again.")
         else:
-            st.error(f"{user_type.capitalize()} username or email not found")
-            return False
+            st.error(f"{user_type.capitalize()} email not found")
+        return False
     except Exception as e:
-        logger.error(f"Error resetting password for {user_type} {username_or_email}: {str(e)}")
+        logger.error(f"Error resetting password for {user_type} {email}: {str(e)}")
         st.error("An unexpected error occurred during password reset. Please try again later.")
         return False
 
@@ -124,6 +150,9 @@ def check_db_connection() -> bool:
         return False
 
 def auth_page():
+    if 'registration_success' in st.session_state:
+        st.success(st.session_state.registration_success)
+        del st.session_state.registration_success
     st.markdown("""
     <style>
     .stApp {

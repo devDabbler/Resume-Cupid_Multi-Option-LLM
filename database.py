@@ -68,7 +68,6 @@ def init_db(conn):
     try:
         cur = conn.cursor()
         
-        # Modify the users table creation to include a 'profile' column
         cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,6 +76,7 @@ def init_db(conn):
             password_hash TEXT NOT NULL,
             user_type TEXT NOT NULL,
             is_verified BOOLEAN DEFAULT 0,
+            verification_token TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             profile TEXT,
             UNIQUE(username, user_type),
@@ -113,13 +113,13 @@ def init_db(conn):
         logger.error(f"Error initializing database: {str(e)}")
         raise
 
-def register_user(username: str, email: str, password_hash: bytes, user_type: str) -> bool:
+def register_user(username: str, email: str, password_hash: bytes, user_type: str, verification_token: str) -> bool:
     def _register(conn):
         cur = conn.cursor()
         cur.execute('''
-        INSERT INTO users (username, email, password_hash, user_type, profile)
-        VALUES (?, ?, ?, ?, ?)
-        ''', (username, email, password_hash, user_type, json.dumps({})))
+        INSERT INTO users (username, email, password_hash, user_type, profile, verification_token, is_verified)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (username, email, password_hash, user_type, json.dumps({}), verification_token, False))
         conn.commit()
         logger.info(f"{user_type.capitalize()} registered successfully: {username}")
         return True
