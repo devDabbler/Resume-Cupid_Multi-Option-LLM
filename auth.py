@@ -109,7 +109,12 @@ def register_new_user(username: str, email: str, password: str, user_type: str) 
                     """
                     logger.error(f"Exception occurred while sending verification email to {email}: {str(e)}")
             
+            # Use st.success() to display the message
             st.success(success_message)
+            
+            # Force a rerun to ensure the message is displayed
+            st.rerun()
+            
             return True
         else:
             st.error("An error occurred during registration. Please try again.")
