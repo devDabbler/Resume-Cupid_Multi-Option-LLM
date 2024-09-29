@@ -358,8 +358,8 @@ def auth_page():
         with tab3:
             reset_email = st.text_input("Email", key=f"reset_email_{user_type.lower()}")
             if st.button("Reset Password", key=f"reset_password_button_{user_type.lower()}", type="primary", use_container_width=True):
-            if reset_password(reset_email, user_type.lower()):
-                st.rerun()
+                if reset_password(reset_email, user_type.lower()):
+                    st.rerun()
 
     else:  # Employer
         st.markdown('<h2 class="login-title">Employer Access</h2>', unsafe_allow_html=True)
