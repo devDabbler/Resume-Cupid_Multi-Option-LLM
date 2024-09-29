@@ -402,3 +402,6 @@ def require_auth(func):
             else:
                 return func(*args, **kwargs)
     return wrapper
+
+# Explicitly export the functions
+__all__ = ['require_auth', 'init_auth_state', 'auth_page', 'logout_user', 'login_user', 'register_new_user', 'reset_password']
