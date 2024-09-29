@@ -239,38 +239,88 @@ def employer_menu(choice):
     elif choice == "View Past Evaluations":
         view_past_evaluations_page()
 
-def evaluate_resumes_page():
-    st.markdown("<h2 class='section-title'>Evaluate Resumes</h2>", unsafe_allow_html=True)
+def evaluate_resume_page():
+    st.title("Evaluate Resume")
 
-    saved_roles = get_saved_roles()  # Remove db_conn argument
-    role_names = [role['role_name'] for role in saved_roles]
-    selected_role = st.selectbox("Select a job role", [""] + role_names)
+    uploaded_file = st.file_uploader("Upload Your Resume", type=["pdf", "docx"])
+    if uploaded_file:
+        with st.spinner("Processing your resume, please wait..."):
+            try:
+                resume_text = extract_text_from_file(uploaded_file)
+                if not resume_text.strip():
+                    st.error("Uploaded file is empty or unreadable. Please try again with a different file.")
+                    return
 
-    if selected_role:
-        role = next((role for role in saved_roles if role['role_name'] == selected_role), None)
-        if role:
-            st.markdown("<p class='info-box'>Job Description:</p>", unsafe_allow_html=True)
-            sanitized_job_description = sanitize_text(role['job_description'])
-            st.text_area("", value=sanitized_job_description, height=200, key="job_description")
+                # Assuming a default or selected job description for evaluation
+                job_description = st.session_state.get('selected_job_description', '')
+                if not job_description:
+                    st.warning("No job description selected. Please add one in your profile settings.")
+                    return
 
-            uploaded_files = st.file_uploader("Upload Resumes", accept_multiple_files=True, type=["pdf", "docx"])
-            
-            if uploaded_files:
-                if st.button("Evaluate Resumes"):
-                    with st.spinner("Evaluating resumes, please wait..."):
-                        job_description = role['job_description']
-                        job_role_id = role['id']
-                        job_title = role['role_name'].replace("- C3", "").strip()  # Standardize job title here
-                        results = process_resumes(uploaded_files, job_description, job_role_id, job_title)
-                        
-                        if results:
-                            display_results(results, job_title=job_title)
-                        else:
-                            st.warning("No valid results to display. Please check the error messages above.")
-            else:
-                st.warning("Please upload resumes to evaluate.")
-        else:
-            st.error("Selected job role not found.")
+                result = llm_orchestrator.analyze_resume(resume_text, job_description, "General Job Role")
+
+                if isinstance(result, dict) and "error" in result:
+                    st.error(f"Error processing resume: {result['error']}")
+                    return
+
+                # Display results
+                st.success("Resume evaluated successfully!")
+                st.write(f"**Match Score:** {result.get('match_score', 'N/A')}")
+                st.write(f"**Summary:** {result.get('summary', 'N/A')}")
+
+                # Save evaluation result
+                save_user_resume(st.session_state['user']['id'], uploaded_file.name, resume_text)
+                save_evaluation_result(uploaded_file.name, None, result.get('match_score', 0), result.get('summary', 'N/A'))
+
+            except Exception as e:
+                st.error(f"Unexpected error occurred: {str(e)}")
+
+def job_recommendations_page():
+    st.title("Job Recommendations")
+
+    user_id = st.session_state['user']['id']
+    evaluations = get_evaluation_results(user_id)
+    
+    if not evaluations:
+        st.warning("No evaluations found. Please upload a resume for evaluation first.")
+        return
+
+    # Display job recommendations based on evaluation results
+    recommendations = get_job_recommendations(user_id)
+    if not recommendations:
+        st.info("No job recommendations available at the moment. Please check back later.")
+        return
+
+    for recommendation in recommendations:
+        st.subheader(f"Job Title: {recommendation['job_title']}")
+        st.write(f"**Company:** {recommendation.get('company_name', 'N/A')}")
+        st.write(f"**Location:** {recommendation.get('location', 'N/A')}")
+        st.write(f"**Match Score:** {recommendation.get('match_score', 'N/A')}")
+        st.markdown("---")
+
+def improvement_suggestions_page():
+    st.title("Improvement Suggestions")
+
+    user_id = st.session_state['user']['id']
+    latest_evaluation = get_latest_evaluation(user_id)
+
+    if not latest_evaluation:
+        st.warning("No evaluation found. Please upload and evaluate a resume first.")
+        return
+
+    st.write("**Areas for Improvement**")
+    if 'areas_for_improvement' in latest_evaluation:
+        for area in latest_evaluation['areas_for_improvement']:
+            st.write(f"- {area}")
+    else:
+        st.write("No specific areas for improvement found.")
+
+    st.write("**Skills Gap**")
+    if 'skills_gap' in latest_evaluation:
+        for skill in latest_evaluation['skills_gap']:
+            st.write(f"- {skill}")
+    else:
+        st.write("No skills gap found.")
 
 def process_resumes(files: List[Any], job_description: str, job_role_id: int, job_title: str) -> List[Dict[str, Any]]:
     results = []
