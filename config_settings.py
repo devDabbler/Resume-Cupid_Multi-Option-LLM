@@ -33,14 +33,46 @@ class Config:
 
     @staticmethod
     def get_smtp_config():
-        return {
+        config = {
             'server': Config.SMTP_SERVER,
             'port': Config.SMTP_PORT,
             'username': Config.SMTP_USERNAME,
             'password': Config.SMTP_PASSWORD,
             'from_email': Config.FROM_EMAIL
         }
+        
+        # Check for default values
+        default_values = [
+            ('SMTP_SERVER', 'default_smtp_server'),
+            ('SMTP_USERNAME', 'default_username'),
+            ('SMTP_PASSWORD', 'default_password'),
+            ('FROM_EMAIL', 'default_email@example.com')
+        ]
+        
+        for env_var, default_value in default_values:
+            if getattr(Config, env_var) == default_value:
+                logger.warning(f"{env_var} is set to its default value. Please update it in the .env file.")
+        
+        return config
 
 # Log the SMTP configuration
 smtp_config = Config.get_smtp_config()
-logger.debug(f"SMTP Configuration: SERVER={smtp_config['server']}, PORT={smtp_config['port']}, USERNAME={smtp_config['username']}, FROM_EMAIL={smtp_config['from_email']}")
+logger.info(f"SMTP Configuration: SERVER={smtp_config['server']}, PORT={smtp_config['port']}, USERNAME={smtp_config['username']}, FROM_EMAIL={smtp_config['from_email']}")
+
+# Log the environment
+logger.info(f"Current environment: {Config.ENVIRONMENT}")
+
+# Check database path
+if not os.path.exists(Config.DB_PATH):
+    logger.warning(f"Database file not found at {Config.DB_PATH}. It will be created when the application runs.")
+
+# Validate LLAMA API key
+if Config.LLAMA_API_KEY == 'default_llama_api_key':
+    logger.warning("LLAMA_API_KEY is set to its default value. Please update it in the .env file.")
+
+# Additional environment checks
+if Config.ENVIRONMENT == 'production':
+    if 'localhost' in Config.BASE_URL:
+        logger.warning("BASE_URL contains 'localhost' in production environment. Please update it to the actual domain.")
+    if not Config.SMTP_SERVER.endswith(('.com', '.net', '.org', '.edu')):
+        logger.warning("SMTP_SERVER might not be correctly set for production. Please verify the SMTP server address.")

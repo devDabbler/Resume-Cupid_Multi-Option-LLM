@@ -87,7 +87,12 @@ class EmailService:
         Best regards,
         The Resume Cupid Team
         """
-        return self.send_email(to_email, subject, body)
+        success = self.send_email(to_email, subject, body)
+        if success:
+            logger.info(f"Verification email sent successfully to {to_email}")
+        else:
+            logger.error(f"Failed to send verification email to {to_email}")
+        return success
 
     def send_password_reset_email(self, to_email: str, reset_token: str) -> bool:
         subject = "Reset your Resume Cupid password"
@@ -104,7 +109,12 @@ class EmailService:
         Best regards,
         The Resume Cupid Team
         """
-        return self.send_email(to_email, subject, body)
+        success = self.send_email(to_email, subject, body)
+        if success:
+            logger.info(f"Password reset email sent successfully to {to_email}")
+        else:
+            logger.error(f"Failed to send password reset email to {to_email}")
+        return success
 
     def get_verification_link(self, verification_token: str) -> str:
         return f"{Config.BASE_URL}/verify_email?token={verification_token}"
