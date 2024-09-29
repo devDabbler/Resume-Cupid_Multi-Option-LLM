@@ -351,7 +351,7 @@ def auth_page():
         tab1, tab2, tab3 = st.tabs(["Login", "Register", "Reset Password"])
 
         with tab1:
-            username = st.text_input("Company Username", key="login_username_employer")
+            username = st.text_input("Username", key="login_username_employer")
             password = st.text_input("Password", type="password", key="login_password_employer")
             if st.button("Login", key="login_button_employer", type="primary", use_container_width=True):
                 if login_user(username, password, "employer"):
@@ -361,7 +361,7 @@ def auth_page():
                     st.error("Invalid username or password")
 
         with tab2:
-            new_username = st.text_input("Company Username", key="register_username_employer")
+            new_username = st.text_input("Username", key="register_username_employer")
             new_email = st.text_input("Company Email", key="register_email_employer")
             new_password = st.text_input("Password", type="password", key="register_password_employer")
             if st.button("Register Your Company", key="register_button_employer", type="primary", use_container_width=True):
