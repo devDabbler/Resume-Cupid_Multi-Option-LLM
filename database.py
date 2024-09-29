@@ -256,7 +256,42 @@ def get_latest_evaluation(user_id: int) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error retrieving latest evaluation for user {user_id}: {str(e)}")
         return None
-    
+
+def verify_user_email(token: str) -> bool:
+    def _verify_email(conn):
+        cur = conn.cursor()
+        cur.execute('''
+        UPDATE users
+        SET is_verified = 1, verification_token = NULL
+        WHERE verification_token = ?
+        ''', (token,))
+        conn.commit()
+        return cur.rowcount > 0
+
+    try:
+        return execute_with_retry(_verify_email)
+    except Exception as e:
+        logger.error(f"Error verifying user email: {str(e)}")
+        return False
+
+def update_password_with_token(token: str, new_password: str) -> bool:
+    def _update_password(conn):
+        cur = conn.cursor()
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        cur.execute('''
+        UPDATE users
+        SET password_hash = ?, reset_token = NULL
+        WHERE reset_token = ?
+        ''', (hashed_password, token))
+        conn.commit()
+        return cur.rowcount > 0
+
+    try:
+        return execute_with_retry(_update_password)
+    except Exception as e:
+        logger.error(f"Error updating password with token: {str(e)}")
+        return False
+     
 def update_user_password(user_id: int, new_password_hash: bytes, user_type: str) -> bool:
     def _update_password(conn):
         cur = conn.cursor()

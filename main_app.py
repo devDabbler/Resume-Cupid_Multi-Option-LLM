@@ -17,7 +17,7 @@ from database import (
     get_saved_roles, save_role, save_evaluation_result, get_evaluation_results,
     get_user_profile, update_user_profile, get_job_recommendations, get_latest_evaluation
 )
-
+from auth import logout_user
 
 # Load environment variables from the specified .env file
 dotenv_file = os.getenv('DOTENV_FILE', '.env.development')
@@ -207,13 +207,45 @@ def improvement_suggestions_page():
     # Add logging to help debug
     logger.info(f"Latest evaluation data: {latest_evaluation}")
 
-# Update the main() function to include job seeker options
-from auth import logout_user  # Add this import at the top of your file
+def verify_email():
+    token = st.query_params.get('token')
+    if token:
+        if verify_user_email(token):
+            st.success("Your email has been verified successfully. You can now log in.")
+        else:
+            st.error("Invalid or expired verification token.")
+    else:
+        st.error("No verification token provided.")
 
-from auth import logout_user  # Add this import at the top of your file
+def reset_password_page():
+    token = st.query_params.get('token')
+    if token:
+        st.title("Reset Your Password")
+        new_password = st.text_input("New Password", type="password")
+        confirm_password = st.text_input("Confirm New Password", type="password")
+        if st.button("Set New Password"):
+            if new_password == confirm_password:
+                if update_password_with_token(token, new_password):
+                    st.success("Your password has been reset successfully. You can now log in with your new password.")
+                else:
+                    st.error("Failed to reset password. The token may be invalid or expired.")
+            else:
+                st.error("Passwords do not match. Please try again.")
+    else:
+        st.error("Invalid password reset link.")
 
 def main():
     load_css()
+    # Check for special routes first
+    query_params = st.query_params
+    if 'page' in query_params:
+        if query_params['page'] == 'verify_email':
+            verify_email()
+            return
+        elif query_params['page'] == 'reset_password':
+            reset_password_page()
+            return
+    # Continue with the regular flow
     if not st.session_state.get('user'):
         auth_page()
     else:
@@ -377,22 +409,6 @@ def generate_fit_summary(match_score: int, job_title: str) -> str:
         return f"The candidate has some relevant skills for the {job_title} role, but significant gaps exist that may hinder their immediate success."
     else:
         return f"The candidate is not a strong fit for the {job_title} role, with considerable gaps in required skills and experience."
-
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import re
-import uuid
-from typing import List, Dict, Any
-from utils import generate_recommendation, generate_fit_summary, generate_pdf_report
-
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import re
-import uuid
-from typing import List, Dict, Any
-from utils import generate_recommendation, generate_fit_summary, generate_pdf_report
 
 def display_results(results: List[Dict[str, Any]], job_title: str):
     st.markdown("<h2 class='section-title'>Evaluation Results</h2>", unsafe_allow_html=True)

@@ -144,21 +144,36 @@ def reset_password(email: str, user_type: str) -> bool:
             if update_user_reset_token(user['id'], reset_token):
                 if email_service.send_password_reset_email(email, reset_token):
                     logger.info(f"Password reset email sent to {email}")
-                    st.success("Password reset instructions have been sent to your email.")
+                    st.session_state.auth_message = {
+                        'type': 'success',
+                        'content': "Password reset instructions have been sent to your email."
+                    }
                     return True
                 else:
                     logger.error(f"Failed to send password reset email to {email}")
-                    st.error("Failed to send password reset email. Please try again.")
+                    st.session_state.auth_message = {
+                        'type': 'error',
+                        'content': "Failed to send password reset email. Please try again."
+                    }
             else:
                 logger.error(f"Failed to update reset token for user {email}")
-                st.error("Failed to initiate password reset. Please try again.")
+                st.session_state.auth_message = {
+                    'type': 'error',
+                    'content': "Failed to initiate password reset. Please try again."
+                }
         else:
             logger.warning(f"{user_type.capitalize()} email not found: {email}")
-            st.error(f"{user_type.capitalize()} email not found")
+            st.session_state.auth_message = {
+                'type': 'error',
+                'content': f"{user_type.capitalize()} email not found"
+            }
         return False
     except Exception as e:
         logger.error(f"Error resetting password for {user_type} {email}: {str(e)}")
-        st.error("An unexpected error occurred during password reset. Please try again later.")
+        st.session_state.auth_message = {
+            'type': 'error',
+            'content': "An unexpected error occurred during password reset. Please try again later."
+        }
         return False
 
 def check_db_connection() -> bool:
@@ -176,9 +191,14 @@ def check_db_connection() -> bool:
         return False
 
 def auth_page():
-    if 'registration_success' in st.session_state:
-        st.success(st.session_state.registration_success)
-        del st.session_state.registration_success
+    if 'auth_message' in st.session_state:
+        message_type = st.session_state.auth_message['type']
+        message_content = st.session_state.auth_message['content']
+        if message_type == 'success':
+            st.success(message_content)
+        elif message_type == 'error':
+            st.error(message_content)
+        del st.session_state.auth_message
     st.markdown("""
     <style>
     .stApp {
@@ -336,13 +356,10 @@ def auth_page():
                     st.rerun()
 
         with tab3:
-            username_or_email = st.text_input("Username or Email", key="reset_username_email_seeker")
-            old_password = st.text_input("Old Password", type="password", key="reset_old_password_seeker")
-            new_password = st.text_input("New Password", type="password", key="reset_new_password_seeker")
-            if st.button("Reset Password", key="reset_password_button_seeker", type="primary", use_container_width=True):
-                if reset_password(username_or_email, old_password, new_password, "job_seeker"):
-                    st.success("Password reset successful! You can now log in with your new password.")
-                    st.rerun()
+            reset_email = st.text_input("Email", key=f"reset_email_{user_type.lower()}")
+            if st.button("Reset Password", key=f"reset_password_button_{user_type.lower()}", type="primary", use_container_width=True):
+            if reset_password(reset_email, user_type.lower()):
+                st.rerun()
 
     else:  # Employer
         st.markdown('<h2 class="login-title">Employer Access</h2>', unsafe_allow_html=True)
