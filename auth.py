@@ -144,36 +144,20 @@ def reset_password(email: str, user_type: str) -> bool:
             if update_user_reset_token(user['id'], reset_token):
                 if email_service.send_password_reset_email(email, reset_token):
                     logger.info(f"Password reset email sent to {email}")
-                    st.session_state.auth_message = {
-                        'type': 'success',
-                        'content': "Password reset instructions have been sent to your email."
-                    }
                     return True
                 else:
                     logger.error(f"Failed to send password reset email to {email}")
-                    st.session_state.auth_message = {
-                        'type': 'error',
-                        'content': "Failed to send password reset email. Please try again."
-                    }
+                    st.error("Failed to send password reset email. Please try again.")
             else:
                 logger.error(f"Failed to update reset token for user {email}")
-                st.session_state.auth_message = {
-                    'type': 'error',
-                    'content': "Failed to initiate password reset. Please try again."
-                }
+                st.error("Failed to initiate password reset. Please try again.")
         else:
             logger.warning(f"{user_type.capitalize()} email not found: {email}")
-            st.session_state.auth_message = {
-                'type': 'error',
-                'content': f"{user_type.capitalize()} email not found"
-            }
+            st.error(f"{user_type.capitalize()} email not found")
         return False
     except Exception as e:
         logger.error(f"Error resetting password for {user_type} {email}: {str(e)}")
-        st.session_state.auth_message = {
-            'type': 'error',
-            'content': "An unexpected error occurred during password reset. Please try again later."
-        }
+        st.error("An unexpected error occurred during password reset. Please try again later.")
         return False
 
 def check_db_connection() -> bool:
@@ -341,7 +325,7 @@ def auth_page():
             password = st.text_input("Password", type="password", key="login_password_seeker")
             if st.button("Login", key="login_button_seeker", type="primary", use_container_width=True):
                 if login_user(username, password, "job_seeker"):
-                    st.success("Logged in successfully!")
+                    st.session_state.auth_message = {'type': 'success', 'content': "Logged in successfully!"}
                     st.rerun()
                 else:
                     st.error("Invalid username or password")
@@ -352,13 +336,14 @@ def auth_page():
             new_password = st.text_input("Password", type="password", key="register_password_seeker")
             if st.button("Register", key="register_button_seeker", type="primary", use_container_width=True):
                 if register_new_user(new_username, new_email, new_password, "job_seeker"):
-                    st.success("Registered successfully! You can now log in.")
+                    st.session_state.auth_message = {'type': 'success', 'content': "Registered successfully! Please check your email to verify your account."}
                     st.rerun()
 
         with tab3:
-            reset_email = st.text_input("Email", key=f"reset_email_{user_type.lower()}")
-            if st.button("Reset Password", key=f"reset_password_button_{user_type.lower()}", type="primary", use_container_width=True):
-                if reset_password(reset_email, user_type.lower()):
+            reset_email = st.text_input("Email", key="reset_email_seeker")
+            if st.button("Reset Password", key="reset_password_button_seeker", type="primary", use_container_width=True):
+                if reset_password(reset_email, "job_seeker"):
+                    st.session_state.auth_message = {'type': 'success', 'content': "Password reset instructions have been sent to your email."}
                     st.rerun()
 
     else:  # Employer
@@ -370,7 +355,7 @@ def auth_page():
             password = st.text_input("Password", type="password", key="login_password_employer")
             if st.button("Login", key="login_button_employer", type="primary", use_container_width=True):
                 if login_user(username, password, "employer"):
-                    st.success("Logged in successfully!")
+                    st.session_state.auth_message = {'type': 'success', 'content': "Logged in successfully!"}
                     st.rerun()
                 else:
                     st.error("Invalid username or password")
@@ -381,16 +366,14 @@ def auth_page():
             new_password = st.text_input("Password", type="password", key="register_password_employer")
             if st.button("Register Your Company", key="register_button_employer", type="primary", use_container_width=True):
                 if register_new_user(new_username, new_email, new_password, "employer"):
-                    st.success("Company registered successfully! You can now log in.")
+                    st.session_state.auth_message = {'type': 'success', 'content': "Company registered successfully! Please check your email to verify your account."}
                     st.rerun()
 
         with tab3:
-            username_or_email = st.text_input("Company Username or Email", key="reset_username_email_employer")
-            old_password = st.text_input("Old Password", type="password", key="reset_old_password_employer")
-            new_password = st.text_input("New Password", type="password", key="reset_new_password_employer")
+            reset_email = st.text_input("Company Email", key="reset_email_employer")
             if st.button("Reset Password", key="reset_password_button_employer", type="primary", use_container_width=True):
-                if reset_password(username_or_email, old_password, new_password, "employer"):
-                    st.success("Password reset successful! You can now log in with your new password.")
+                if reset_password(reset_email, "employer"):
+                    st.session_state.auth_message = {'type': 'success', 'content': "Password reset instructions have been sent to your email."}
                     st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)

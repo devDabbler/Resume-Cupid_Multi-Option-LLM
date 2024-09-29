@@ -236,15 +236,17 @@ def reset_password_page():
 
 def main():
     load_css()
+    
     # Check for special routes first
-    query_params = st.query_params
+    query_params = st.experimental_get_query_params()
     if 'page' in query_params:
-        if query_params['page'] == 'verify_email':
+        if query_params['page'][0] == 'verify_email':
             verify_email()
             return
-        elif query_params['page'] == 'reset_password':
+        elif query_params['page'][0] == 'reset_password':
             reset_password_page()
             return
+
     # Continue with the regular flow
     if not st.session_state.get('user'):
         auth_page()

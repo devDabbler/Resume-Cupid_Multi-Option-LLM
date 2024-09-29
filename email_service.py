@@ -96,7 +96,7 @@ class EmailService:
 
     def send_password_reset_email(self, to_email: str, reset_token: str) -> bool:
         subject = "Reset your Resume Cupid password"
-        reset_link = f"{Config.BASE_URL}/reset_password?token={reset_token}"
+        reset_link = f"{Config.BASE_URL}?page=reset_password&token={reset_token}"
         body = f"""
         Hello,
 
