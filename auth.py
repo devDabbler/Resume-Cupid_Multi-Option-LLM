@@ -4,7 +4,6 @@ import secrets
 from database import get_user, get_user_by_email, register_user, update_user_password
 from config_settings import Config
 import logging
-from utils import is_valid_email
 from email_service import email_service
 
 logger = logging.getLogger(__name__)
@@ -37,6 +36,13 @@ def login_user(username: str, password: str, user_type: str) -> bool:
         logger.error(f"Error during login for {user_type} {username}: {str(e)}")
         st.error("An unexpected error occurred during login. Please try again later.")
         return False
+
+def is_valid_email(email: str) -> bool:
+    """
+    Validate an email address using a simple regex pattern.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
 def logout_user():
     for key in list(st.session_state.keys()):
