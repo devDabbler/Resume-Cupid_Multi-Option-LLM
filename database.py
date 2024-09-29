@@ -68,6 +68,7 @@ def init_db(conn):
     try:
         cur = conn.cursor()
         
+        # Users table (unchanged)
         cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,18 +84,19 @@ def init_db(conn):
             UNIQUE(email, user_type)
         )
         ''')
-        
-        # Create saved_roles table
+
+        # Updated Saved roles table to include client field
         cur.execute('''
         CREATE TABLE IF NOT EXISTS saved_roles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             role_name TEXT NOT NULL,
+            client TEXT NOT NULL,
             job_description TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         ''')
-        
-        # Create evaluation_results table
+
+        # Evaluation results table (unchanged)
         cur.execute('''
         CREATE TABLE IF NOT EXISTS evaluation_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,7 +108,19 @@ def init_db(conn):
             FOREIGN KEY (job_role_id) REFERENCES saved_roles (id)
         )
         ''')
-        
+
+        # User resumes table (unchanged)
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS user_resumes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            file_name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        ''')
+
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
@@ -203,6 +217,40 @@ def update_user_profile(user_id: int, profile: Dict[str, Any]) -> bool:
     except Exception as e:
         logger.error(f"Error updating user profile for user {user_id}: {str(e)}")
         return False
+
+def save_user_resume(user_id: int, file_name: str, content: str) -> bool:
+    def _save_resume(conn):
+        cur = conn.cursor()
+        cur.execute('''
+        INSERT INTO user_resumes (user_id, file_name, content)
+        VALUES (?, ?, ?)
+        ''', (user_id, file_name, content))
+        conn.commit()
+        return cur.rowcount > 0
+
+    try:
+        return execute_with_retry(_save_resume)
+    except Exception as e:
+        logger.error(f"Error saving resume for user {user_id}: {str(e)}")
+        return False
+
+def get_user_resumes(user_id: int) -> List[Dict[str, Any]]:
+    def _get_resumes(conn):
+        cur = conn.cursor()
+        cur.execute('''
+        SELECT id, file_name, content, created_at
+        FROM user_resumes
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        ''', (user_id,))
+        resumes = cur.fetchall()
+        return [dict(zip([column[0] for column in cur.description], resume)) for resume in resumes]
+
+    try:
+        return execute_with_retry(_get_resumes)
+    except Exception as e:
+        logger.error(f"Error retrieving resumes for user {user_id}: {str(e)}")
+        return []
 
 def get_job_recommendations(user_id: int) -> List[Dict[str, Any]]:
     def _get_job_recommendations(conn):
@@ -320,15 +368,15 @@ def get_users_by_type(user_type: str) -> List[Dict[str, Any]]:
         logger.error(f"Error retrieving {user_type}s: {str(e)}")
         return []
     
-def save_role(role_name: str, job_description: str) -> bool:
+def save_role(role_name: str, client: str, job_description: str) -> bool:
     def _save_role(conn):
         cur = conn.cursor()
         cur.execute('''
-        INSERT INTO saved_roles (role_name, job_description)
-        VALUES (?, ?)
-        ''', (role_name, job_description))
+        INSERT INTO saved_roles (role_name, client, job_description)
+        VALUES (?, ?, ?)
+        ''', (role_name, client, job_description))
         conn.commit()
-        logger.info(f"Role saved successfully: {role_name}")
+        logger.info(f"Role saved successfully: {role_name} for client: {client}")
         return True
 
     try:
@@ -349,6 +397,22 @@ def get_saved_roles() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error retrieving saved roles: {e}")
         return []
+    
+def delete_role(role_id: int) -> bool:
+    def _delete_role(conn):
+        cur = conn.cursor()
+        cur.execute('''
+        DELETE FROM saved_roles
+        WHERE id = ?
+        ''', (role_id,))
+        conn.commit()
+        return cur.rowcount > 0
+
+    try:
+        return execute_with_retry(_delete_role)
+    except Exception as e:
+        logger.error(f"Error deleting role with ID {role_id}: {e}")
+        return False
 
 def save_evaluation_result(resume_file_name: str, job_role_id: int, match_score: int, recommendation: str) -> bool:
     def _save_evaluation_result(conn):
