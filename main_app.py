@@ -238,7 +238,7 @@ def main():
     load_css()
     
     # Check for special routes first
-    query_params = st.query_params()
+    query_params = st.query_params
     if 'page' in query_params:
         if query_params['page'][0] == 'verify_email':
             verify_email()
