@@ -166,14 +166,70 @@ def main():
             employer_menu(choice)
 
 def job_seeker_menu(choice):
+    user_id = st.session_state['user']['id']  # Assuming 'id' is part of the logged-in user data
     if choice == "My Profile":
-        display_job_seeker_profile()
+        display_job_seeker_profile(user_id)
     elif choice == "Evaluate Resume":
         evaluate_resume_page()
     elif choice == "Job Recommendations":
         job_recommendations_page()
     elif choice == "Improvement Suggestions":
         improvement_suggestions_page()
+
+def display_job_seeker_profile(user_id: int):
+    """
+    Displays the job seeker's profile information in a Streamlit app.
+    
+    Parameters:
+    - user_id (int): The ID of the job seeker to display.
+    """
+    st.title("Job Seeker Profile")
+
+    # Retrieve the user's profile data
+    user_profile = get_user_profile(user_id)
+    if not user_profile:
+        st.error("Could not retrieve profile data. Please ensure you are logged in and your profile is complete.")
+        return
+
+    # Display user information
+    st.subheader("Personal Information")
+    st.write(f"**Name:** {user_profile.get('name', 'Not Available')}")
+    st.write(f"**Email:** {user_profile.get('email', 'Not Available')}")
+    if 'location' in user_profile:
+        st.write(f"**Location:** {user_profile.get('location', 'Not Available')}")
+    
+    # Additional fields (skills, summary, etc.)
+    if 'skills' in user_profile:
+        st.subheader("Skills")
+        st.write(", ".join(user_profile['skills']) if user_profile['skills'] else "No skills listed.")
+    
+    if 'summary' in user_profile:
+        st.subheader("Profile Summary")
+        st.write(user_profile['summary'] or "No summary provided.")
+    
+    # Display user resumes
+    st.subheader("Uploaded Resumes")
+    resumes = get_user_resumes(user_id)
+    if resumes:
+        for resume in resumes:
+            st.write(f"**File Name:** {resume['file_name']}")
+            st.write(f"**Uploaded On:** {resume['created_at']}")
+            with st.expander("View Resume Content"):
+                st.write(resume['content'][:500] + "..." if len(resume['content']) > 500 else resume['content'])
+    else:
+        st.write("No resumes uploaded.")
+    
+    # Display evaluation result if available
+    st.subheader("Latest Evaluation Result")
+    evaluation = get_latest_evaluation(user_id)
+    if evaluation:
+        st.write(f"**Resume Evaluated:** {evaluation['resume_file_name']}")
+        st.write(f"**Match Score:** {evaluation['match_score']}")
+        st.write(f"**Recommendation:** {evaluation['recommendation']}")
+        st.write(f"**Skills Gap:** {', '.join(evaluation['skills_gap'])}")
+        st.write(f"**Areas for Improvement:** {', '.join(evaluation['areas_for_improvement'])}")
+    else:
+        st.write("No evaluation results found.")
 
 def employer_menu(choice):
     if choice == "Evaluate Resumes":
