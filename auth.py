@@ -5,6 +5,7 @@ from database import get_user, get_user_by_email, register_user, update_user_pas
 from config_settings import Config
 import logging
 from email_service import email_service
+import re
 
 logger = logging.getLogger(__name__)
 
