@@ -292,7 +292,7 @@ def job_recommendations_page():
         return
 
     for recommendation in recommendations:
-        st.subheader(f"Job Title: {recommendation['job_title']}")
+        st.subheader(f"Job Title: {recommendation['title']}")
         st.write(f"**Company:** {recommendation.get('company_name', 'N/A')}")
         st.write(f"**Location:** {recommendation.get('location', 'N/A')}")
         st.write(f"**Match Score:** {recommendation.get('match_score', 'N/A')}")
