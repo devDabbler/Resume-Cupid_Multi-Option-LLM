@@ -87,32 +87,37 @@ def register_new_user(username: str, email: str, password: str, user_type: str) 
                 Click the link above to verify your account.
                 """
             else:
-                if email_service.send_verification_email(email, verification_token):
-                    success_message = f"""
-                    Registration successful! 
-                    
-                    An email has been sent to {email} with a verification link. 
-                    Please check your email (including spam folder) and click the link to verify your account.
-                    
-                    After verifying your email, you can return here to log in.
-                    """
-                else:
+                try:
+                    if email_service.send_verification_email(email, verification_token):
+                        success_message = f"""
+                        Registration successful! 
+                        
+                        An email has been sent to {email} with a verification link. 
+                        Please check your email (including spam folder) and click the link to verify your account.
+                        
+                        After verifying your email, you can return here to log in.
+                        """
+                        logger.info(f"Verification email sent successfully to {email}")
+                    else:
+                        success_message = """
+                        Registration successful, but we couldn't send the verification email. 
+                        Please contact support to verify your account.
+                        """
+                        logger.error(f"Failed to send verification email to {email}")
+                except Exception as e:
                     success_message = """
                     Registration successful, but we couldn't send the verification email. 
                     Please contact support to verify your account.
                     """
+                    logger.error(f"Exception occurred while sending verification email to {email}: {str(e)}")
             
-            st.session_state.registration_success = success_message
-            st.rerun()  # Use st.rerun() instead of st.experimental_rerun()
+            # Use st.success() instead of st.session_state
+            st.success(success_message)
             
             return True
         else:
             st.error("An error occurred during registration. Please try again.")
             return False
-    except Exception as e:
-        logger.error(f"Error registering {user_type} {username}: {str(e)}")
-        st.error("An unexpected error occurred during registration. Please try again later.")
-        return False
 
 def reset_password(email: str, user_type: str) -> bool:
     try:
