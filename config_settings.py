@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 import logging
+from logging.handlers import RotatingFileHandler
 
 # Load environment-specific .env file
 environment = os.getenv('ENVIRONMENT', 'development')
@@ -9,14 +10,25 @@ env_path = os.path.join(os.path.dirname(__file__), env_file)
 load_dotenv(dotenv_path=env_path)
 
 # Set up logging
+log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+log_file = 'app.log'
+
+# Create a rotating file handler
+file_handler = RotatingFileHandler(log_file, mode='a', maxBytes=5*1024*1024, backupCount=2, encoding=None, delay=0)
+file_handler.setFormatter(log_formatter)
+file_handler.setLevel(logging.INFO)
+
+# Create a stream handler for console output
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(log_formatter)
+stream_handler.setLevel(logging.INFO)
+
+# Configure the root logger
 logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('app.log', mode='a'),
-        logging.StreamHandler()
-    ]
+    level=logging.INFO,
+    handlers=[file_handler, stream_handler]
 )
+
 logger = logging.getLogger(__name__)
 
 class Config:
