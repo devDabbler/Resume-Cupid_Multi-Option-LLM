@@ -312,7 +312,7 @@ def auth_page():
 
         with tab2:
             new_username = st.text_input("Username", key="register_username_employer")
-            new_email = st.text_input("Company Email", key="register_email_employer")
+            new_email = st.text_input("Email", key="register_email_employer")
             new_password = st.text_input("Password", type="password", key="register_password_employer")
             if st.button("Register Your Company", key="register_button_employer", type="primary", use_container_width=True):
                 if register_new_user(new_username, new_email, new_password, "employer"):
