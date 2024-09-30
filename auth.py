@@ -8,6 +8,7 @@ from email_service import email_service
 from datetime import datetime, timedelta
 from typing import Optional
 import re
+import uuid
 
 logger = logging.getLogger(__name__)
 
