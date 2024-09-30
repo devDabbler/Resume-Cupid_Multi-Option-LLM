@@ -8,6 +8,7 @@ import logging
 import time
 import re
 import os
+import textwrap
 from dotenv import load_dotenv
 from llm_orchestrator import llm_orchestrator
 from llama_service import LlamaService
@@ -73,34 +74,31 @@ def load_css():
 def display_dynamic_welcome_message(page):
     """Display dynamic welcome messages based on the selected page."""
     if page == "Evaluate Resumes":
-        return """
-            <h4>Getting Started</h4>
-            <ul>
-                <li>Select an existing job role from the dropdown.</li>
-                <li>Or add new job roles via the 'Manage Job Roles' page.</li>
-                <li>Use the 'Evaluate Resumes' feature to assess candidates against your job descriptions.</li>
-                <li>View past evaluations and manage your job roles.</li>
-            </ul>
-            <p>Let's get started by adding or selecting your job roles!</p>
-        """
+        return """<h4>Getting Started</h4>
+<ul>
+    <li>Select an existing job role from the dropdown.</li>
+    <li>Or add new job roles via the 'Manage Job Roles' page.</li>
+    <li>Use the 'Evaluate Resumes' feature to assess candidates against your job descriptions.</li>
+    <li>View past evaluations and manage your job roles.</li>
+</ul>
+<p>Let's get started by adding or selecting your job roles!</p>
+"""
     elif page == "Manage Job Roles":
-        return """
-            <h4>Getting Started</h4>
-            <ul>
-                <li>Create new job roles by entering the role name, client, description, and key requirements.</li>
-                <li>Update or delete existing roles as needed to keep your job listings current and relevant.</li>
-            </ul>
-        """
+        return """<h4>Getting Started</h4>
+<ul>
+    <li>Create new job roles by entering the role name, client, description, and key requirements.</li>
+    <li>Update or delete existing roles as needed to keep your job listings current and relevant.</li>
+</ul>
+"""
     elif page == "View Past Evaluations":
-        return """
-            <h4>Getting Started</h4>
-            <p>Here, you can access past assessments of candidates to:</p>
-            <ul>
-                <li>Refer back to earlier evaluations</li>
-                <li>Make informed hiring decisions</li>
-                <li>Revisit key candidate information when needed</li>
-            </ul>
-        """
+        return """<h4>Getting Started</h4>
+<p>Here, you can access past assessments of candidates to:</p>
+<ul>
+    <li>Refer back to earlier evaluations</li>
+    <li>Make informed hiring decisions</li>
+    <li>Revisit key candidate information when needed</li>
+</ul>
+"""
     return ""
 
 def main():
@@ -149,13 +147,12 @@ def main():
 
             # Main content area with reduced padding/margin for less white space
             content_message = display_dynamic_welcome_message(choice)
-            st.markdown(f"""
-                <div style="background-color: #f1f3f6; padding: 20px 20px 5px 20px; border-radius: 10px; margin-bottom: 10px;">
-                    <h1 style="color: #3f51b5; margin-bottom: 5px;">Welcome to Resume Cupid 💘!</h1>
-                    <h3 style="color: #3f51b5; margin-top: 0; margin-bottom: 15px;">Your AI-powered hiring assistant.</h3>
-                    {content_message}
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"""<div style="background-color: #f1f3f6; padding: 20px 20px 5px 20px; border-radius: 10px; margin-bottom: 10px;">
+<h1 style="color: #3f51b5; margin-bottom: 5px;">Welcome to Resume Cupid 💘!</h1>
+<h3 style="color: #3f51b5; margin-top: 0; margin-bottom: 15px;">Your AI-powered hiring assistant.</h3>
+{content_message}
+</div>
+""", unsafe_allow_html=True)
 
             # Content based on selection
             if logged_in_user_type == 'job_seeker':
