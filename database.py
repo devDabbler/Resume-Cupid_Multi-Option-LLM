@@ -151,6 +151,74 @@ def register_user(username: str, email: str, password_hash: bytes, user_type: st
         logger.error(f"Error registering {user_type} {username}: {str(e)}")
         return False
 
+from datetime import datetime, timedelta
+
+def update_user_reset_token(user_id: int, reset_token: str, expiration_hours: int = 24) -> bool:
+    def _update_token(conn):
+        cur = conn.cursor()
+        expiration_time = datetime.utcnow() + timedelta(hours=expiration_hours)
+        cur.execute('''
+        UPDATE users
+        SET reset_token = ?, reset_token_expiration = ?
+        WHERE id = ?
+        ''', (reset_token, expiration_time, user_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+    try:
+        return execute_with_retry(_update_token)
+    except Exception as e:
+        logger.error(f"Error updating reset token for user {user_id}: {str(e)}")
+        return False
+
+def get_user_by_reset_token(reset_token: str) -> Optional[dict]:
+    try:
+        def _get_user(conn):
+            cur = conn.cursor()
+            cur.execute('''
+                SELECT id, username, email
+                FROM users
+                WHERE reset_token = ? AND reset_token_expiration > ?
+            ''', (reset_token, datetime.utcnow()))
+            user = cur.fetchone()
+            return dict(user) if user else None
+
+        user = execute_with_retry(_get_user)
+
+        if user:
+            logger.info(f"User {user['id']} retrieved by reset token")
+        else:
+            logger.info("No valid user found for the given reset token")
+
+        return user
+    except Exception as e:
+        logger.error(f"Error retrieving user by reset token: {str(e)}")
+        return None
+
+def clear_reset_token(user_id: int) -> bool:
+    try:
+        def _clear_token(conn):
+            cur = conn.cursor()
+            cur.execute('''
+                UPDATE users
+                SET reset_token = NULL, reset_token_expiration = NULL
+                WHERE id = ?
+            ''', (user_id,))
+            conn.commit()
+            return cur.rowcount > 0
+
+        success = execute_with_retry(_clear_token)
+
+        if success:
+            logger.info(f"Reset token cleared for user {user_id}")
+        else:
+            logger.warning(f"No user found with ID {user_id} when clearing reset token")
+
+        return success
+    except Exception as e:
+        logger.error(f"Error clearing reset token for user {user_id}: {str(e)}")
+        return False
+
 def get_user(username: str, user_type: str) -> Optional[Dict[str, Any]]:
     def _get_user(conn):
         cur = conn.cursor()
