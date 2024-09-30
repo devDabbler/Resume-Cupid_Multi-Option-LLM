@@ -383,35 +383,6 @@ def verify_email(token: str) -> bool:
         logger.error(f"Error during email verification: {str(e)}")
         return False
 
-def reset_password_page():
-    st.title("Reset Password")
-    token = st.query_params.get("token", "")
-    
-    if not token:
-        st.error("Invalid or missing reset token.")
-        return
-
-    user = get_user_by_reset_token(token)
-    if not user:
-        st.error("Invalid or expired reset token.")
-        return
-
-    new_password = st.text_input("New Password", type="password")
-    confirm_password = st.text_input("Confirm New Password", type="password")
-
-    if st.button("Reset Password"):
-        if new_password != confirm_password:
-            st.error("Passwords do not match.")
-        elif len(new_password) < 8:
-            st.error("Password must be at least 8 characters long.")
-        else:
-            if update_user_password(user['id'], bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())):
-                clear_reset_token(user['id'])
-                st.success("Password reset successfully. You can now log in with your new password.")
-                st.markdown('[Go to Login Page](/?page=login)')
-            else:
-                st.error("An error occurred while resetting your password. Please try again.")
-
 def get_user_by_reset_token(reset_token: str) -> Optional[dict]:
     try:
         def _get_user(conn):

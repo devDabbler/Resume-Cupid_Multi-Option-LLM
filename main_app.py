@@ -163,7 +163,36 @@ def main():
     except Exception as e:
         logger.error(f"An error occurred in main(): {str(e)}", exc_info=True)
         st.error("An unexpected error occurred. Please check the logs for more information.")
-        
+
+def reset_password_page():
+    st.title("Reset Password")
+    token = st.query_params.get("token", "")
+    
+    if not token:
+        st.error("Invalid or missing reset token.")
+        return
+
+    user = get_user_by_reset_token(token)
+    if not user:
+        st.error("Invalid or expired reset token.")
+        return
+
+    new_password = st.text_input("New Password", type="password")
+    confirm_password = st.text_input("Confirm New Password", type="password")
+
+    if st.button("Reset Password"):
+        if new_password != confirm_password:
+            st.error("Passwords do not match.")
+        elif len(new_password) < 8:
+            st.error("Password must be at least 8 characters long.")
+        else:
+            if update_user_password(user['id'], bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())):
+                clear_reset_token(user['id'])
+                st.success("Password reset successfully. You can now log in with your new password.")
+                st.markdown('[Go to Login Page](/?page=login)')
+            else:
+                st.error("An error occurred while resetting your password. Please try again.")
+   
 def job_seeker_menu(choice):
     user_id = st.session_state['user']['id']  # Assuming 'id' is part of the logged-in user data
     if choice == "My Profile":
