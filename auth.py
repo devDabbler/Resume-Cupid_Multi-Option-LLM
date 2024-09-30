@@ -8,6 +8,7 @@ from email_service import email_service
 from datetime import datetime, timedelta
 from typing import Optional
 import re
+import json
 import uuid
 import sqlite3
 
@@ -53,7 +54,21 @@ def logout_user():
     st.session_state.login_success = False
 
 def register_user(username: str, email: str, password_hash: bytes, user_type: str) -> bool:
-    verification_token = str(uuid.uuid4())  # Generate a verification token
+    if not is_valid_email(email):
+        logger.error(f"Invalid email format: {email}")
+        return False
+
+    existing_user = get_user(username, user_type)
+    if existing_user:
+        logger.error(f"Username already exists: {username}")
+        return False
+
+    existing_email = get_user_by_email(email, user_type)
+    if existing_email:
+        logger.error(f"Email already registered: {email}")
+        return False
+
+    verification_token = str(uuid.uuid4())
 
     def _register(conn):
         cur = conn.cursor()
@@ -65,7 +80,6 @@ def register_user(username: str, email: str, password_hash: bytes, user_type: st
             conn.commit()
             logger.info(f"{user_type.capitalize()} registered successfully: {username}")
 
-            # Call the email service to send verification email
             email_sent = email_service.send_verification_email(email, verification_token)
             if email_sent:
                 logger.info(f"Verification email sent to {email}")
