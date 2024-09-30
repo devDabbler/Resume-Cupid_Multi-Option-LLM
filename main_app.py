@@ -168,7 +168,7 @@ def reset_password_page():
     st.title("Reset Password")
     
     # Retrieve reset token from the query params
-    reset_token = st.query_params().get("token", [None])[0]
+    reset_token = st.query_params.get("token", [None])[0]
     
     if not reset_token:
         st.error("Invalid or missing reset token.")
