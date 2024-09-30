@@ -72,11 +72,8 @@ def load_css():
 
 def display_dynamic_welcome_message(page):
     """Display dynamic welcome messages based on the selected page."""
-    content_message = ""
-
-    # Determine content based on the page
     if page == "Evaluate Resumes":
-        content_message = """
+        return """
             <h4>Getting Started</h4>
             <ul>
                 <li>Select an existing job role from the dropdown.</li>
@@ -87,7 +84,7 @@ def display_dynamic_welcome_message(page):
             <p>Let's get started by adding or selecting your job roles!</p>
         """
     elif page == "Manage Job Roles":
-        content_message = """
+        return """
             <h4>Getting Started</h4>
             <ul>
                 <li>Create new job roles by entering the role name, client, description, and key requirements.</li>
@@ -95,7 +92,7 @@ def display_dynamic_welcome_message(page):
             </ul>
         """
     elif page == "View Past Evaluations":
-        content_message = """
+        return """
             <h4>Getting Started</h4>
             <p>Here, you can access past assessments of candidates to:</p>
             <ul>
@@ -104,67 +101,72 @@ def display_dynamic_welcome_message(page):
                 <li>Revisit key candidate information when needed</li>
             </ul>
         """
-    return content_message
+    return ""
 
 def main():
-    load_css()
-    
-    # Check for special routes first
-    query_params = st.query_params
-    if 'page' in query_params:
-        if query_params['page'][0] == 'verify_email':
-            verify_email()
-            return
-        elif query_params['page'][0] == 'reset_password':
-            reset_password_page()
-            return
+    try:
+        load_css()
+        
+        # Check for special routes first
+        query_params = st.query_params
+        if 'page' in query_params:
+            if query_params['page'] == 'verify_email':
+                verify_email()
+                return
+            elif query_params['page'] == 'reset_password':
+                reset_password_page()
+                return
 
-    # Continue with the regular flow
-    if not st.session_state.get('user'):
-        auth_page()
-    else:
-        # Sidebar with adjusted title font size
-        st.sidebar.markdown(
-            f"<h3 style='margin-bottom: 30px; font-size: 1.5rem;'>Welcome, {st.session_state.user['username']}</h3>",
-            unsafe_allow_html=True
-        )
+        # Continue with the regular flow
+        if not st.session_state.get('user'):
+            auth_page()
+        else:
+            # Sidebar with adjusted title font size
+            st.sidebar.markdown(
+                f"<h3 style='margin-bottom: 30px; font-size: 1.5rem;'>Welcome, {st.session_state.user['username']}</h3>",
+                unsafe_allow_html=True
+            )
 
-        logged_in_user_type = st.session_state.get('logged_in_user_type')
+            logged_in_user_type = st.session_state.get('logged_in_user_type')
 
-        if logged_in_user_type == 'job_seeker':
-            menu = ["My Profile", "Evaluate Resume", "Job Recommendations", "Improvement Suggestions"]
-        else:  # employer
-            menu = ["Evaluate Resumes", "Manage Job Roles", "View Past Evaluations"]
+            if logged_in_user_type == 'job_seeker':
+                menu = ["My Profile", "Evaluate Resume", "Job Recommendations", "Improvement Suggestions"]
+            else:  # employer
+                menu = ["Evaluate Resumes", "Manage Job Roles", "View Past Evaluations"]
 
-        # Selectbox for menu navigation with adjusted font size
-        st.sidebar.markdown(
-            "<label style='font-size: 1.2rem;'>Navigate to</label>",
-            unsafe_allow_html=True
-        )
-        choice = st.sidebar.selectbox("", menu, key="navigation_menu")
+            # Selectbox for menu navigation with adjusted font size
+            st.sidebar.markdown(
+                "<label style='font-size: 1.2rem;'>Navigate to</label>",
+                unsafe_allow_html=True
+            )
+            choice = st.sidebar.selectbox("", menu, key="navigation_menu")
 
-        st.sidebar.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)  # Spacing above Logout button
+            st.sidebar.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)  # Spacing above Logout button
 
-        if st.sidebar.button("Logout"):
-            logout_user()
-            st.rerun()
+            if st.sidebar.button("Logout"):
+                logout_user()
+                st.rerun()
 
-        # Main content area with reduced padding/margin for less white space
-        content_message = display_dynamic_welcome_message(choice)
-        st.markdown(f"""
-            <div style="background-color: #f1f3f6; padding: 20px 20px 5px 20px; border-radius: 10px; margin-bottom: 10px;">
-                <h1 style="color: #3f51b5; margin-bottom: 5px;">Welcome to Resume Cupid 💘!</h1>
-                <h3 style="color: #3f51b5; margin-top: 0; margin-bottom: 15px;">Your AI-powered hiring assistant.</h3>
-                {content_message}
-            </div>
-            """, unsafe_allow_html=True)
+            # Main content area with reduced padding/margin for less white space
+            content_message = display_dynamic_welcome_message(choice)
+            st.markdown(f"""
+                <div style="background-color: #f1f3f6; padding: 20px 20px 5px 20px; border-radius: 10px; margin-bottom: 10px;">
+                    <h1 style="color: #3f51b5; margin-bottom: 5px;">Welcome to Resume Cupid 💘!</h1>
+                    <h3 style="color: #3f51b5; margin-top: 0; margin-bottom: 15px;">Your AI-powered hiring assistant.</h3>
+                    {content_message}
+                </div>
+                """, unsafe_allow_html=True)
 
-        # Content based on selection
-        if logged_in_user_type == 'job_seeker':
-            job_seeker_menu(choice)
-        else:  # employer
-            employer_menu(choice)
+            # Content based on selection
+            if logged_in_user_type == 'job_seeker':
+                job_seeker_menu(choice)
+            else:  # employer
+                employer_menu(choice)
 
+    except Exception as e:
+        logger.error(f"An error occurred in main(): {str(e)}", exc_info=True)
+        st.error("An unexpected error occurred. Please check the logs for more information.")
+        
 def job_seeker_menu(choice):
     user_id = st.session_state['user']['id']  # Assuming 'id' is part of the logged-in user data
     if choice == "My Profile":
@@ -231,6 +233,32 @@ def display_job_seeker_profile(user_id: int):
     else:
         st.write("No evaluation results found.")
 
+def evaluate_resumes_page():
+    st.title("Evaluate Resumes")
+
+    # Get saved job roles
+    saved_roles = get_saved_roles()
+    role_names = [role['role_name'] for role in saved_roles]
+    
+    selected_role = st.selectbox("Select a job role", [""] + role_names)
+
+    if selected_role:
+        role = next((role for role in saved_roles if role['role_name'] == selected_role), None)
+        if role:
+            st.write(f"**Job Description:**\n{role['job_description']}")
+
+            uploaded_files = st.file_uploader("Upload Resumes", accept_multiple_files=True, type=["pdf", "docx"])
+            
+            if uploaded_files:
+                if st.button("Process Resumes"):
+                    with st.spinner("Processing resumes..."):
+                        results = process_resumes(uploaded_files, role['job_description'], role['id'], role['role_name'])
+                        display_results(results, role['role_name'])
+        else:
+            st.error("Selected job role not found.")
+    else:
+        st.info("Please select a job role to evaluate resumes.")
+                
 def employer_menu(choice):
     if choice == "Evaluate Resumes":
         evaluate_resumes_page()
@@ -238,42 +266,6 @@ def employer_menu(choice):
         manage_job_roles_page()
     elif choice == "View Past Evaluations":
         view_past_evaluations_page()
-
-def evaluate_resume_page():
-    st.title("Evaluate Resume")
-
-    uploaded_file = st.file_uploader("Upload Your Resume", type=["pdf", "docx"])
-    if uploaded_file:
-        with st.spinner("Processing your resume, please wait..."):
-            try:
-                resume_text = extract_text_from_file(uploaded_file)
-                if not resume_text.strip():
-                    st.error("Uploaded file is empty or unreadable. Please try again with a different file.")
-                    return
-
-                # Assuming a default or selected job description for evaluation
-                job_description = st.session_state.get('selected_job_description', '')
-                if not job_description:
-                    st.warning("No job description selected. Please add one in your profile settings.")
-                    return
-
-                result = llm_orchestrator.analyze_resume(resume_text, job_description, "General Job Role")
-
-                if isinstance(result, dict) and "error" in result:
-                    st.error(f"Error processing resume: {result['error']}")
-                    return
-
-                # Display results
-                st.success("Resume evaluated successfully!")
-                st.write(f"**Match Score:** {result.get('match_score', 'N/A')}")
-                st.write(f"**Summary:** {result.get('summary', 'N/A')}")
-
-                # Save evaluation result
-                save_user_resume(st.session_state['user']['id'], uploaded_file.name, resume_text)
-                save_evaluation_result(uploaded_file.name, None, result.get('match_score', 0), result.get('summary', 'N/A'))
-
-            except Exception as e:
-                st.error(f"Unexpected error occurred: {str(e)}")
 
 def job_recommendations_page():
     st.title("Job Recommendations")
@@ -643,5 +635,6 @@ def sanitize_text(text: str) -> str:
     return sanitized.strip()
 
 if __name__ == "__main__":
-    init_auth_state()
+    logger.info("Script started")
     main()
+    logger.info("Script ended")
