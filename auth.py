@@ -291,7 +291,7 @@ def auth_page():
         with tab3:
             reset_email = st.text_input("Email", key="reset_email_seeker")
             if st.button("Reset Password", key="reset_password_button_seeker", type="primary", use_container_width=True):
-                if reset_password(reset_email, "job_seeker"):
+                if initiate_password_reset(reset_email, "job_seeker"):
                     st.session_state.auth_message = {'type': 'success', 'content': "Password reset instructions have been sent to your email."}
                     st.rerun()
 
@@ -321,7 +321,7 @@ def auth_page():
         with tab3:
             reset_email = st.text_input("Company Email", key="reset_email_employer")
             if st.button("Reset Password", key="reset_password_button_employer", type="primary", use_container_width=True):
-                if reset_password(reset_email, "employer"):
+                if initiate_password_reset(reset_email, "employer"):
                     st.session_state.auth_message = {'type': 'success', 'content': "Password reset instructions have been sent to your email."}
                     st.rerun()
 
@@ -485,5 +485,5 @@ def check_db_connection() -> bool:
         return False
 
 # Explicitly export the functions
-__all__ = ['require_auth', 'init_auth_state', 'auth_page', 'logout_user', 'login_user', 'register_new_user', 'reset_password', 'verify_email', 'reset_password_page']
+__all__ = ['require_auth', 'init_auth_state', 'auth_page', 'logout_user', 'login_user', 'register_new_user', 'initiate_password_reset', 'verify_email', 'reset_password_page']
             
