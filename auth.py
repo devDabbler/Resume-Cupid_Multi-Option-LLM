@@ -285,7 +285,7 @@ def auth_page():
             new_email = st.text_input("Email", key="register_email_seeker")
             new_password = st.text_input("Password", type="password", key="register_password_seeker")
             if st.button("Register", key="register_button_seeker", type="primary", use_container_width=True):
-                if register_new_user(new_username, new_email, new_password, "job_seeker"):
+                if register_user(new_username, new_email, new_password, "job_seeker"):
                     st.session_state.auth_message = {'type': 'success', 'content': "Registered successfully! Please check your email to verify your account."}
                     st.rerun()
 
@@ -315,7 +315,7 @@ def auth_page():
             new_email = st.text_input("Email", key="register_email_employer")
             new_password = st.text_input("Password", type="password", key="register_password_employer")
             if st.button("Register Your Company", key="register_button_employer", type="primary", use_container_width=True):
-                if register_new_user(new_username, new_email, new_password, "employer"):
+                if register_user(new_username, new_email, new_password, "employer"):
                     st.session_state.auth_message = {'type': 'success', 'content': "Company registered successfully! Please check your email to verify your account."}
                     st.rerun()
 
