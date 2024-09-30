@@ -2,6 +2,8 @@ import os
 from dotenv import load_dotenv
 import logging
 from logging.handlers import RotatingFileHandler
+from watchdog.observers import Observer
+from watchdog.events import LoggingEventHandler
 
 # Load environment-specific .env file
 environment = os.getenv('ENVIRONMENT', 'development')
@@ -30,6 +32,10 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+# Set watchdog logging level to INFO
+watchdog_logger = logging.getLogger('watchdog')
+watchdog_logger.setLevel(logging.INFO)
 
 class Config:
     API_URL = os.getenv('API_URL', 'http://localhost:8501')
@@ -88,3 +94,16 @@ if Config.ENVIRONMENT == 'production':
         logger.warning("BASE_URL contains 'localhost' in production environment. Please update it to the actual domain.")
     if not Config.SMTP_SERVER.endswith(('.com', '.net', '.org', '.edu')):
         logger.warning("SMTP_SERVER might not be correctly set for production. Please verify the SMTP server address.")
+
+# Example of setting up watchdog observer
+if __name__ == "__main__":
+    event_handler = LoggingEventHandler()
+    observer = Observer()
+    observer.schedule(event_handler, path='.', recursive=False)
+    observer.start()
+    try:
+        while True:
+            pass
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
