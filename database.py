@@ -172,28 +172,17 @@ def update_user_reset_token(user_id: int, reset_token: str, expiration_hours: in
         return False
 
 def get_user_by_reset_token(reset_token: str) -> Optional[dict]:
-    try:
-        def _get_user(conn):
-            cur = conn.cursor()
-            cur.execute('''
-                SELECT id, username, email
-                FROM users
-                WHERE reset_token = ? AND reset_token_expiration > ?
-            ''', (reset_token, datetime.utcnow()))
-            user = cur.fetchone()
-            return dict(user) if user else None
+    def _get_user(conn):
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT id, username, email
+            FROM users
+            WHERE reset_token = ? AND reset_token_expiration > ?
+        ''', (reset_token, datetime.utcnow()))
+        user = cur.fetchone()
+        return dict(user) if user else None
 
-        user = execute_with_retry(_get_user)
-
-        if user:
-            logger.info(f"User {user['id']} retrieved by reset token")
-        else:
-            logger.info("No valid user found for the given reset token")
-
-        return user
-    except Exception as e:
-        logger.error(f"Error retrieving user by reset token: {str(e)}")
-        return None
+    return execute_with_retry(_get_user)
 
 def clear_reset_token(user_id: int) -> bool:
     try:

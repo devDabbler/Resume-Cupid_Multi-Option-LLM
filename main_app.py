@@ -167,30 +167,27 @@ def main():
 def reset_password_page():
     st.title("Reset Password")
     
-    # Retrieve reset token from the query params
     reset_token = st.query_params.get("token", [None])[0]
     
     if not reset_token:
         st.error("Invalid or missing reset token.")
         return
 
-    # Use the token to get user details
     user = get_user_by_reset_token(reset_token)
     if not user:
+        logger.error(f"No valid user found for the given reset token: {reset_token}")
         st.error("Invalid or expired reset token.")
         return
 
-    # UI for entering a new password
     new_password = st.text_input("New Password", type="password")
     confirm_password = st.text_input("Confirm Password", type="password")
 
     if st.button("Reset Password"):
         if new_password and new_password == confirm_password:
-            # Update password using the reset token
-            success = update_password_with_token(reset_token, new_password)
-            if success:
-                st.success("Your password has been successfully reset. You can now log in.")
-                st.query_params(page="login")  # Redirect to login page
+            if update_user_password(user['id'], bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())):
+                st.success("Your password has been successfully reset. You can now log in with your new password.")
+                # Clear the reset token after successful password reset
+                update_user_reset_token(user['id'], None, None)
             else:
                 st.error("Failed to reset password. Please try again or contact support.")
         else:
