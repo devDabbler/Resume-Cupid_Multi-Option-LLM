@@ -1,13 +1,16 @@
 import streamlit as st
-from database import verify_user_email  # Assuming this function verifies the token and updates the database
+from database import verify_user_email
 
 def main():
-    # Get the token from the URL parameters
-    query_params = st.query_params
-    st.write("Query Params:", query_params)  # Debugging line to check the query params
-    token = query_params.get('token', [None])[0]
+    st.title("Email Verification")
 
-    # Check if the token is valid
+    # Get query parameters
+    query_params = st.query_params
+    st.write("Debug - Query Params:", query_params)  # Debugging line
+    
+    token = query_params.get('token', None)
+    st.write("Debug - Token:", token)  # Debugging line
+
     if token:
         success = verify_user_email(token)
         if success:

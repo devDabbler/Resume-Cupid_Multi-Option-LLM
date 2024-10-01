@@ -1,10 +1,15 @@
 import streamlit as st
-from database import reset_user_password  # Function to reset the user password based on the token
+from database import reset_user_password
 
 def main():
+    st.title("Reset Password")
+
     # Get query parameters
     query_params = st.query_params
-    token = query_params.get('token', [None])[0]
+    st.write("Debug - Query Params:", query_params)  # Debugging line
+    
+    token = query_params.get('token', None)
+    st.write("Debug - Token:", token)  # Debugging line
     
     if token:
         new_password = st.text_input("Enter your new password", type="password")
