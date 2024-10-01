@@ -119,5 +119,4 @@ class EmailService:
     def get_verification_link(self, verification_token: str) -> str:
         return f"{Config.BASE_URL}/verify_email?token={verification_token}"
 
-
 email_service = EmailService()
