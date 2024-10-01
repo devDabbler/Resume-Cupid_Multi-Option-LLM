@@ -2,10 +2,10 @@ import sqlite3
 import threading
 import json
 import logging
+import bcrypt  # Import bcrypt for password hashing
 from typing import Any, Dict, List, Optional
 from queue import Queue, Empty
 from contextlib import contextmanager
-import logging
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,31 @@ def execute_with_retry(func, *args, max_retries=3, **kwargs):
             logger.error(f"Database error (attempt {attempt + 1}/{max_retries}): {str(e)}")
             if attempt == max_retries - 1:
                 raise
+
+# Define the reset_user_password function
+def reset_user_password(reset_token: str, new_password: str) -> bool:
+    def _reset_password(conn):
+        cur = conn.cursor()
+        current_time = datetime.utcnow()
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        cur.execute('''
+        UPDATE users
+        SET password_hash = ?, reset_token = NULL, reset_token_expiration = NULL
+        WHERE reset_token = ? AND reset_token_expiration > ?
+        ''', (hashed_password, reset_token, current_time))
+        conn.commit()
+        if cur.rowcount > 0:
+            logger.info(f"Password updated successfully for reset token: {reset_token}")
+            return True
+        else:
+            logger.warning(f"No user found or token expired for reset token: {reset_token}")
+            return False
+
+    try:
+        return execute_with_retry(_reset_password)
+    except Exception as e:
+        logger.error(f"Error resetting password with token: {str(e)}")
+        return False
 
 def init_db(conn):
     try:
