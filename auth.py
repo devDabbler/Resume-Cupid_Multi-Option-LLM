@@ -393,7 +393,7 @@ def check_db_connection() -> bool:
         logger.error(f"Database connection error: {str(e)}")
         return False
 
-def verify_email(token: str) -> bool:
+def auth_verify_email(token: str) -> bool:
     try:
         def _verify(conn):
             cur = conn.cursor()
@@ -490,5 +490,5 @@ def check_db_connection() -> bool:
         return False
 
 # Explicitly export the functions
-__all__ = ['require_auth', 'init_auth_state', 'auth_page', 'logout_user', 'login_user', 'register_new_user', 'initiate_password_reset', 'verify_email', 'reset_password_page']
+__all__ = ['require_auth', 'init_auth_state', 'auth_page', 'logout_user', 'login_user', 'register_new_user', 'initiate_password_reset', 'auth_verify_email', 'reset_password_page']
             

@@ -113,10 +113,10 @@ def main():
         # Check for special routes first
         query_params = st.query_params
         if 'page' in query_params:
-            if query_params['page'][0] == 'verify_email':
+            if query_params['page'] == 'verify_email':
                 verify_email_page()
                 return
-            elif query_params['page'][0] == 'reset_password':
+            elif query_params['page'] == 'reset_password':
                 reset_password_page()
                 return
 
@@ -222,13 +222,18 @@ def verify_email_page():
 
     token = st.query_params.get("token", [None])[0]
     if not token:
+        logger.error("Email verification attempted with missing token")
         st.error("Invalid verification link. Please check your email and try again.")
         return
 
     if auth_verify_email(token):
+        logger.info(f"Email verified successfully with token: {token}")
         st.success("Your email has been successfully verified. You can now log in to your account.")
-        st.button("Go to Login", on_click=lambda: st.query_params.clear())
+        if st.button("Go to Login"):
+            st.query_params.clear()
+            st.rerun()
     else:
+        logger.error(f"Email verification failed for token: {token}")
         st.error("Email verification failed. The link may be invalid or expired. Please try registering again or contact support.")
         
 def job_seeker_menu(choice):
