@@ -109,16 +109,18 @@ logger = logging.getLogger(__name__)
 def main():
     try:
         load_css()
+        init_auth_state()
         
-        # Check for special routes first
+        # Get the current page from the URL
         query_params = st.query_params
-        if 'page' in query_params:
-            if query_params['page'] == 'verify_email':
-                verify_email_page()
-                return
-            elif query_params['page'] == 'reset_password':
-                reset_password_page()
-                return
+        page = query_params.get("page", [None])[0]
+
+        if page == "verify_email":
+            verify_email_page()
+            return
+        elif page == "reset_password":
+            reset_password_page()
+            return
 
         # Continue with the regular flow
         if not st.session_state.get('user'):
