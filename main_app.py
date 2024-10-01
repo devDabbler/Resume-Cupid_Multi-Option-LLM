@@ -101,49 +101,38 @@ def display_dynamic_welcome_message(page):
 """
     return ""
 
-import streamlit as st
-import logging
-
-logger = logging.getLogger(__name__)
-
 def main():
     try:
+        # Load CSS and initialize authentication state
         load_css()
         init_auth_state()
-        
-    try:
-        query_params = st.query_params
-        token = query_params.get('token', [None])[0]  # Attempt to retrieve the token
 
-        if token:
+        # Handle query parameters to check for specific actions like email verification or password reset
+        query_params = st.query_params
+        page = query_params.get('page', [None])[0]
+        token = query_params.get('token', [None])[0]
+
+        if page == "verify_email" and token:
             st.write("Query Params:", query_params)  # Debugging line to check the query params
             st.write("Token Received:", token)  # Debugging line to check the received token
 
-            # Check if the token is valid
+            # Verify the email token
             success = verify_user_email(token)
             if success:
                 st.success("Your email has been successfully verified! You can now log in.")
             else:
                 st.error("The verification link is invalid or expired.")
-        else:
-            st.error("No verification token provided.")
-            logger.error("No verification token found in the query parameters.")
-    
-    except Exception as e:
-        logger.error(f"An error occurred in main(): {e}")
+            return  # Stop further execution as we're handling a specific page
 
-        if page == "verify_email":
-            verify_email_page()
-            return
-        elif page == "reset_password":
-            reset_password_page()
-            return
+        elif page == "reset_password" and token:
+            reset_password_page(token)  # Assuming reset_password_page handles the reset flow
+            return  # Stop further execution
 
-        # Continue with the regular flow
+        # Continue with the regular app flow if no specific page action is required
         if not st.session_state.get('user'):
-            auth_page()
+            auth_page()  # Display authentication page
         else:
-            # Sidebar with adjusted title font size
+            # Display the sidebar with navigation and logout
             st.sidebar.markdown(
                 f"<h3 style='margin-bottom: 30px; font-size: 1.5rem;'>Welcome, {st.session_state.user['username']}</h3>",
                 unsafe_allow_html=True
@@ -151,12 +140,13 @@ def main():
 
             logged_in_user_type = st.session_state.get('logged_in_user_type')
 
+            # Define menu options based on user type
             if logged_in_user_type == 'job_seeker':
                 menu = ["My Profile", "Evaluate Resume", "Job Recommendations", "Improvement Suggestions"]
             else:  # employer
                 menu = ["Evaluate Resumes", "Manage Job Roles", "View Past Evaluations"]
 
-            # Selectbox for menu navigation with adjusted font size
+            # Sidebar navigation
             st.sidebar.markdown(
                 "<label style='font-size: 1.2rem;'>Navigate to</label>",
                 unsafe_allow_html=True
@@ -172,13 +162,13 @@ def main():
             # Main content area with reduced padding/margin for less white space
             content_message = display_dynamic_welcome_message(choice)
             st.markdown(f"""<div style="background-color: #f1f3f6; padding: 20px 20px 5px 20px; border-radius: 10px; margin-bottom: 10px;">
-<h1 style="color: #3f51b5; margin-bottom: 5px;">Welcome to Resume Cupid 💘!</h1>
-<h3 style="color: #3f51b5; margin-top: 0; margin-bottom: 15px;">Your AI-powered hiring assistant.</h3>
-{content_message}
-</div>
-""", unsafe_allow_html=True)
+                <h1 style="color: #3f51b5; margin-bottom: 5px;">Welcome to Resume Cupid 💘!</h1>
+                <h3 style="color: #3f51b5; margin-top: 0; margin-bottom: 15px;">Your AI-powered hiring assistant.</h3>
+                {content_message}
+                </div>
+            """, unsafe_allow_html=True)
 
-            # Content based on selection
+            # Display content based on selection
             if logged_in_user_type == 'job_seeker':
                 job_seeker_menu(choice)
             else:  # employer
