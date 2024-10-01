@@ -101,19 +101,24 @@ def display_dynamic_welcome_message(page):
 """
     return ""
 
+import streamlit as st
+import logging
+
+logger = logging.getLogger(__name__)
+
 def main():
     try:
         load_css()
         
-            # Check for special routes first
-            query_params = st.query_params
-            if 'page' in query_params:
-                if query_params['page'] == 'verify_email':
-                    verify_email_page()
-                    return
-                elif query_params['page'] == 'reset_password':
-                    reset_password_page()
-                    return
+        # Check for special routes first
+        query_params = st.query_params
+        if 'page' in query_params:
+            if query_params['page'][0] == 'verify_email':
+                verify_email_page()
+                return
+            elif query_params['page'][0] == 'reset_password':
+                reset_password_page()
+                return
 
         # Continue with the regular flow
         if not st.session_state.get('user'):
@@ -143,7 +148,7 @@ def main():
 
             if st.sidebar.button("Logout"):
                 logout_user()
-                st.rerun()
+                st.experimental_rerun()
 
             # Main content area with reduced padding/margin for less white space
             content_message = display_dynamic_welcome_message(choice)
