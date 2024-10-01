@@ -182,8 +182,9 @@ def reset_password_page():
     st.title("Reset Password")
     
     # Retrieve reset token from the query params
-    reset_token = st.query_params.get("token", [None])[0]
-    
+    query_params = st.query_params
+    reset_token = query_params.get("token", [None])[0]
+
     if not reset_token:
         logger.error("Reset password attempt with missing token")
         st.error("Invalid or missing reset token.")
@@ -217,8 +218,10 @@ def reset_password_page():
             if success:
                 logger.info(f"Password successfully reset for user ID: {user['id']}")
                 st.success("Your password has been successfully reset. You can now log in with your new password.")
-                # Redirect to login page
-                st.query_params(page="login")
+                
+                # Redirect user to login page after a successful reset
+                st.experimental_set_query_params(page="login")
+                st.experimental_rerun()
             else:
                 logger.error(f"Failed to reset password for user ID: {user['id']}")
                 st.error("Failed to reset password. Please try again or contact support.")
