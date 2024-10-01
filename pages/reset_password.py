@@ -3,7 +3,7 @@ from database import reset_user_password  # Function to reset the user password 
 
 def main():
     # Get query parameters
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params()
     token = query_params.get('token', [None])[0]
     
     if token:
