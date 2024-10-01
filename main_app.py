@@ -32,6 +32,67 @@ st.set_page_config(page_title="Resume Cupid", page_icon="💘")
 # Initialize Authenticator
 authenticator = Authenticator()
 
+def custom_notification(message, type="info", duration=5):
+    """
+    Display a custom notification in Streamlit.
+    
+    Args:
+    message (str): The message to display.
+    type (str): The type of notification. Can be "info", "success", "warning", or "error".
+    duration (int): How long the notification should be displayed, in seconds.
+    """
+    colors = {
+        "info": "#4e73df",
+        "success": "#1cc88a",
+        "warning": "#f6c23e",
+        "error": "#e74a3b"
+    }
+    icons = {
+        "info": "ℹ️",
+        "success": "✅",
+        "warning": "⚠️",
+        "error": "❌"
+    }
+    
+    # Ensure the type is valid
+    if type not in colors:
+        type = "info"
+    
+    # Create a unique key for this notification
+    notification_key = f"notification_{hash(message)}_{type}"
+    
+    # Display the notification
+    notification_placeholder = st.empty()
+    notification_placeholder.markdown(f"""
+    <div style="
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        border: 1px solid {colors[type]};
+        background-color: {colors[type]}22;
+        color: {colors[type]};
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;">
+        <span>{icons[type]} {message}</span>
+        <button onclick="this.parentElement.style.display='none';" style="
+            background: none;
+            border: none;
+            color: {colors[type]};
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: bold;">
+            ×
+        </button>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Automatically clear the notification after the specified duration
+    if duration > 0:
+        import threading
+        threading.Timer(duration, notification_placeholder.empty).start()
+    
 def load_css():
     """Load custom CSS for styling Streamlit elements."""
     st.markdown("""
@@ -117,8 +178,11 @@ def main():
         if action == "verify_email" and token:
             handle_email_verification(token)
         elif action == "reset_password" and token:
-            handle_password_reset(token)
+            reset_password_page(token)
         elif not st.session_state.get('user'):
+            if st.session_state.get('password_reset_success'):
+                st.success("Your password has been reset successfully. Please log in with your new password.")
+                st.session_state.pop('password_reset_success', None)
             auth_page()
         else:
             logged_in_user_type = st.session_state.get('logged_in_user_type')
@@ -170,56 +234,23 @@ def verify_email_page(token):
         logger.warning(f"Email verification failed for token: {token}")
         st.error("Email verification failed. The link may be invalid or expired. Please try registering again or contact support.")
 
-def reset_password_page():
+def reset_password_page(token):
     st.title("Reset Password")
     
-    # Retrieve reset token from the query params
-    query_params = st.query_params
-    reset_token = query_params.get("token", [None])[0]
-
-    if not reset_token:
-        logger.error("Reset password attempt with missing token")
-        st.error("Invalid or missing reset token.")
-        return
-
-    # Validate that the token is a valid UUID
-    try:
-        uuid.UUID(reset_token)
-    except ValueError:
-        logger.error(f"Invalid reset token format: {reset_token}")
-        st.error("Invalid reset token format. Please request a new password reset.")
-        return
-
-    # Use the token to get user details
-    user = get_user_by_reset_token(reset_token)
-    if not user:
-        logger.error(f"No valid user found for reset token: {reset_token}")
-        st.error("Invalid or expired reset token. Please request a new password reset.")
-        return
-
-    logger.info(f"Valid user found for reset token: {reset_token}")
-
-    # UI for entering a new password
     new_password = st.text_input("New Password", type="password")
     confirm_password = st.text_input("Confirm Password", type="password")
-
+    
     if st.button("Reset Password"):
         if new_password and new_password == confirm_password:
-            # Update password using the reset token
-            success = update_password_with_token(reset_token, new_password)
-            if success:
-                logger.info(f"Password successfully reset for user ID: {user['id']}")
+            if update_password_with_token(token, new_password):
                 st.success("Your password has been successfully reset. You can now log in with your new password.")
-                
-                # Redirect user to login page after a successful reset
-                st.query_params(page="login")
-                st.rerun()
+                st.session_state.password_reset_success = True
+                time.sleep(2)
+                st.experimental_rerun()
             else:
-                logger.error(f"Failed to reset password for user ID: {user['id']}")
-                st.error("Failed to reset password. Please try again or contact support.")
+                st.error("Failed to reset password. The link may be invalid or expired.")
         else:
-            logger.warning("Password reset attempt with mismatched passwords")
-            st.error("Passwords do not match. Please try again.")
+            st.error("Passwords do not match or are empty.")
 
 def display_main_app(logged_in_user_type):
     st.sidebar.markdown(

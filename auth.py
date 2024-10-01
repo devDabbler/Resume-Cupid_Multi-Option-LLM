@@ -9,6 +9,7 @@ from database import get_user, get_user_by_email, register_user, update_user_pas
 from email_service import email_service
 from config_settings import Config
 import streamlit as st
+from main_app import custom_notification
 
 logger = logging.getLogger(__name__)
 
@@ -237,10 +238,17 @@ def auth_page():
     if 'auth_message' in st.session_state:
         message_type = st.session_state.auth_message['type']
         message_content = st.session_state.auth_message['content']
+        
+        # Use both standard Streamlit notifications and custom notifications
         if message_type == 'success':
             st.success(message_content)
         elif message_type == 'error':
             st.error(message_content)
+        
+        # Add custom notification (assuming custom_notification is defined in main_app.py)
+        if 'custom_notification' in globals():
+            custom_notification(message_content, message_type)
+        
         del st.session_state.auth_message
 
     # Your existing CSS styles here (unchanged)
