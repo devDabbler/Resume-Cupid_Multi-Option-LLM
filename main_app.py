@@ -164,6 +164,7 @@ def main():
         logger.error(f"An error occurred in main(): {str(e)}", exc_info=True)
         st.error("An unexpected error occurred. Please check the logs for more information.")
 
+
 def reset_password_page():
     st.title("Reset Password")
     
@@ -171,14 +172,18 @@ def reset_password_page():
     reset_token = st.query_params.get("token", [None])[0]
     
     if not reset_token:
+        logger.error("Reset password attempt with missing token")
         st.error("Invalid or missing reset token.")
         return
 
     # Use the token to get user details
     user = get_user_by_reset_token(reset_token)
     if not user:
+        logger.error(f"No valid user found for reset token: {reset_token}")
         st.error("Invalid or expired reset token.")
         return
+
+    logger.info(f"Valid user found for reset token: {reset_token}")
 
     # UI for entering a new password
     new_password = st.text_input("New Password", type="password")
@@ -189,12 +194,15 @@ def reset_password_page():
             # Update password using the reset token
             success = update_password_with_token(reset_token, new_password)
             if success:
+                logger.info(f"Password successfully reset for user ID: {user['id']}")
                 st.success("Your password has been successfully reset. You can now log in with your new password.")
                 # Redirect to login page
                 st.query_params(page="login")
             else:
+                logger.error(f"Failed to reset password for user ID: {user['id']}")
                 st.error("Failed to reset password. Please try again or contact support.")
         else:
+            logger.warning("Password reset attempt with mismatched passwords")
             st.error("Passwords do not match. Please try again.")
    
 def job_seeker_menu(choice):

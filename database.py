@@ -5,6 +5,8 @@ import logging
 from typing import Any, Dict, List, Optional
 from queue import Queue, Empty
 from contextlib import contextmanager
+import logging
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -173,13 +175,19 @@ def update_user_reset_token(user_id: int, reset_token: str, expiration_time: dat
 def get_user_by_reset_token(reset_token: str) -> Optional[dict]:
     def _get_user(conn):
         cur = conn.cursor()
+        current_time = datetime.utcnow()
         cur.execute('''
             SELECT id, username, email
             FROM users
             WHERE reset_token = ? AND reset_token_expiration > ?
-        ''', (reset_token, datetime.utcnow()))
+        ''', (reset_token, current_time))
         user = cur.fetchone()
-        return dict(user) if user else None
+        if user:
+            logger.info(f"Found user with ID {user['id']} for reset token")
+            return dict(user)
+        else:
+            logger.warning(f"No user found for reset token {reset_token}")
+            return None
 
     try:
         return execute_with_retry(_get_user)
@@ -385,14 +393,20 @@ def verify_user_email(token: str) -> bool:
 def update_password_with_token(reset_token: str, new_password: str) -> bool:
     def _update_password(conn):
         cur = conn.cursor()
+        current_time = datetime.utcnow()
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
         cur.execute('''
         UPDATE users
         SET password_hash = ?, reset_token = NULL, reset_token_expiration = NULL
         WHERE reset_token = ? AND reset_token_expiration > ?
-        ''', (hashed_password, reset_token, datetime.utcnow()))
+        ''', (hashed_password, reset_token, current_time))
         conn.commit()
-        return cur.rowcount > 0
+        if cur.rowcount > 0:
+            logger.info(f"Password updated successfully for token {reset_token}")
+            return True
+        else:
+            logger.warning(f"No user found or token expired for reset token {reset_token}")
+            return False
 
     try:
         return execute_with_retry(_update_password)
