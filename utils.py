@@ -11,14 +11,13 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
-from streamlit import st
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 
 # Load spaCy model
 nlp = spacy.load("en_core_web_md")
 
-# Add this function to your utils.py file, preferably near the top after the imports
 def custom_notification(message, type="info", duration=5):
     colors = {
         "info": "#4e73df",
