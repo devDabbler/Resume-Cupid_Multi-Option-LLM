@@ -395,11 +395,18 @@ def check_db_connection() -> bool:
 
 def verify_email(token: str) -> bool:
     try:
-        if execute_with_retry(lambda conn: conn.execute('''
-            UPDATE users
-            SET is_verified = 1, verification_token = NULL
-            WHERE verification_token = ?
-        ''', (token,))):
+        def _verify(conn):
+            cur = conn.cursor()
+            cur.execute('''
+                UPDATE users
+                SET is_verified = 1, verification_token = NULL
+                WHERE verification_token = ?
+            ''', (token,))
+            conn.commit()
+            return cur.rowcount > 0
+
+        result = execute_with_retry(_verify)
+        if result:
             logger.info(f"Email verified successfully with token: {token}")
             return True
         else:

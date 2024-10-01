@@ -105,15 +105,15 @@ def main():
     try:
         load_css()
         
-        # Check for special routes first
-        query_params = st.query_params
-        if 'page' in query_params:
-            if query_params['page'] == 'verify_email':
-                verify_email()
-                return
-            elif query_params['page'] == 'reset_password':
-                reset_password_page()
-                return
+            # Check for special routes first
+            query_params = st.query_params
+            if 'page' in query_params:
+                if query_params['page'] == 'verify_email':
+                    verify_email_page()
+                    return
+                elif query_params['page'] == 'reset_password':
+                    reset_password_page()
+                    return
 
         # Continue with the regular flow
         if not st.session_state.get('user'):
@@ -164,7 +164,6 @@ def main():
         logger.error(f"An error occurred in main(): {str(e)}", exc_info=True)
         st.error("An unexpected error occurred. Please check the logs for more information.")
 
-
 def reset_password_page():
     st.title("Reset Password")
     
@@ -212,7 +211,21 @@ def reset_password_page():
         else:
             logger.warning("Password reset attempt with mismatched passwords")
             st.error("Passwords do not match. Please try again.")
-   
+
+def verify_email_page():
+    st.title("Email Verification")
+
+    token = st.query_params.get("token", [None])[0]
+    if not token:
+        st.error("Invalid verification link. Please check your email and try again.")
+        return
+
+    if auth_verify_email(token):
+        st.success("Your email has been successfully verified. You can now log in to your account.")
+        st.button("Go to Login", on_click=lambda: st.query_params.clear())
+    else:
+        st.error("Email verification failed. The link may be invalid or expired. Please try registering again or contact support.")
+        
 def job_seeker_menu(choice):
     user_id = st.session_state['user']['id']  # Assuming 'id' is part of the logged-in user data
     if choice == "My Profile":
