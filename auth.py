@@ -53,21 +53,26 @@ def logout_user():
     st.session_state.user = None
     st.session_state.login_success = False
 
-def register_user(username: str, email: str, password_hash: bytes, user_type: str) -> bool:
+def register_user(username: str, email: str, password: str, user_type: str) -> bool:
     if not is_valid_email(email):
         logger.error(f"Invalid email format: {email}")
+        st.error("Invalid email format. Please enter a valid email address.")
         return False
 
     existing_user = get_user(username, user_type)
     if existing_user:
         logger.error(f"Username already exists: {username}")
+        st.error("This username is already taken. Please choose a different username.")
         return False
 
     existing_email = get_user_by_email(email, user_type)
     if existing_email:
         logger.error(f"Email already registered: {email}")
+        st.error("This email is already registered. Please use a different email or try to reset your password.")
         return False
 
+    # If we've passed all checks, proceed with registration
+    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     verification_token = str(uuid.uuid4())
 
     def _register(conn):
@@ -86,20 +91,23 @@ def register_user(username: str, email: str, password_hash: bytes, user_type: st
                 st.success("Registration successful. Please check your email to verify your account.")
             else:
                 logger.error(f"Failed to send verification email to {email}")
-                st.error("Failed to send verification email. Please try again later.")
+                st.warning("Registration successful, but failed to send verification email. Please contact support.")
             
             return True
         except sqlite3.IntegrityError as e:
             logger.error(f"IntegrityError while registering {user_type} {username}: {str(e)}")
+            st.error("An error occurred during registration. Please try again or contact support.")
             return False
         except Exception as e:
             logger.error(f"Unexpected error while registering {user_type} {username}: {str(e)}")
+            st.error("An unexpected error occurred. Please try again or contact support.")
             return False
 
     try:
         return execute_with_retry(_register)
     except Exception as e:
         logger.error(f"Error registering {user_type} {username}: {str(e)}")
+        st.error("An error occurred during registration. Please try again later.")
         return False
 
 def initiate_password_reset(email: str, user_type: str = "job_seeker") -> bool:

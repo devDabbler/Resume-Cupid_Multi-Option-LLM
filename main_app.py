@@ -176,11 +176,19 @@ def reset_password_page():
         st.error("Invalid or missing reset token.")
         return
 
+    # Validate that the token is a valid UUID
+    try:
+        uuid.UUID(reset_token)
+    except ValueError:
+        logger.error(f"Invalid reset token format: {reset_token}")
+        st.error("Invalid reset token format. Please request a new password reset.")
+        return
+
     # Use the token to get user details
     user = get_user_by_reset_token(reset_token)
     if not user:
         logger.error(f"No valid user found for reset token: {reset_token}")
-        st.error("Invalid or expired reset token.")
+        st.error("Invalid or expired reset token. Please request a new password reset.")
         return
 
     logger.info(f"Valid user found for reset token: {reset_token}")
