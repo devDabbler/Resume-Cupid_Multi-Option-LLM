@@ -11,13 +11,63 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
-
+from streamlit import st
 
 logger = logging.getLogger(__name__)
 
 # Load spaCy model
 nlp = spacy.load("en_core_web_md")
 
+# Add this function to your utils.py file, preferably near the top after the imports
+def custom_notification(message, type="info", duration=5):
+    colors = {
+        "info": "#4e73df",
+        "success": "#1cc88a",
+        "warning": "#f6c23e",
+        "error": "#e74a3b"
+    }
+    icons = {
+        "info": "ℹ️",
+        "success": "✅",
+        "warning": "⚠️",
+        "error": "❌"
+    }
+    
+    if type not in colors:
+        type = "info"
+    
+    notification_key = f"notification_{hash(message)}_{type}"
+    
+    notification_placeholder = st.empty()
+    notification_placeholder.markdown(f"""
+    <div style="
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        border: 1px solid {colors[type]};
+        background-color: {colors[type]}22;
+        color: {colors[type]};
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;">
+        <span>{icons[type]} {message}</span>
+        <button onclick="this.parentElement.style.display='none';" style="
+            background: none;
+            border: none;
+            color: {colors[type]};
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: bold;">
+            ×
+        </button>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if duration > 0:
+        import threading
+        threading.Timer(duration, notification_placeholder.empty).start()
+        
 def extract_text_from_file(file) -> str:
     if file is None:
         raise ValueError("File object is None.")

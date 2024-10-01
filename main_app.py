@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from llm_orchestrator import llm_orchestrator
 from llama_service import LlamaService
 import plotly.graph_objects as go
-from utils import generate_recommendation, generate_fit_summary, extract_text_from_file, generate_pdf_report
+from utils import generate_recommendation, generate_fit_summary, extract_text_from_file, generate_pdf_report, custom_notification
 from database import (
     get_saved_roles, save_role, save_evaluation_result, get_evaluation_results,
     get_user_profile, update_user_profile, get_user_resumes, save_user_resume, get_job_recommendations, get_latest_evaluation,
@@ -31,67 +31,6 @@ st.set_page_config(page_title="Resume Cupid", page_icon="💘")
 
 # Initialize Authenticator
 authenticator = Authenticator()
-
-def custom_notification(message, type="info", duration=5):
-    """
-    Display a custom notification in Streamlit.
-    
-    Args:
-    message (str): The message to display.
-    type (str): The type of notification. Can be "info", "success", "warning", or "error".
-    duration (int): How long the notification should be displayed, in seconds.
-    """
-    colors = {
-        "info": "#4e73df",
-        "success": "#1cc88a",
-        "warning": "#f6c23e",
-        "error": "#e74a3b"
-    }
-    icons = {
-        "info": "ℹ️",
-        "success": "✅",
-        "warning": "⚠️",
-        "error": "❌"
-    }
-    
-    # Ensure the type is valid
-    if type not in colors:
-        type = "info"
-    
-    # Create a unique key for this notification
-    notification_key = f"notification_{hash(message)}_{type}"
-    
-    # Display the notification
-    notification_placeholder = st.empty()
-    notification_placeholder.markdown(f"""
-    <div style="
-        padding: 10px;
-        border-radius: 5px;
-        margin-bottom: 10px;
-        border: 1px solid {colors[type]};
-        background-color: {colors[type]}22;
-        color: {colors[type]};
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;">
-        <span>{icons[type]} {message}</span>
-        <button onclick="this.parentElement.style.display='none';" style="
-            background: none;
-            border: none;
-            color: {colors[type]};
-            cursor: pointer;
-            font-size: 1.2em;
-            font-weight: bold;">
-            ×
-        </button>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Automatically clear the notification after the specified duration
-    if duration > 0:
-        import threading
-        threading.Timer(duration, notification_placeholder.empty).start()
     
 def load_css():
     """Load custom CSS for styling Streamlit elements."""

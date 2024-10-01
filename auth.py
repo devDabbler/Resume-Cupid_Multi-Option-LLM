@@ -9,7 +9,7 @@ from database import get_user, get_user_by_email, register_user, update_user_pas
 from email_service import email_service
 from config_settings import Config
 import streamlit as st
-from main_app import custom_notification
+from utils import custom_notification
 
 logger = logging.getLogger(__name__)
 
