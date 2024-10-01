@@ -5,16 +5,17 @@ from email.mime.multipart import MIMEMultipart
 import logging
 import time
 import socket
+from typing import Dict, Optional
 from config_settings import Config
 
 logger = logging.getLogger(__name__)
 
 class EmailService:
     def __init__(self):
-        self.smtp_config = Config.get_smtp_config()
-        self.is_development = Config.ENVIRONMENT == 'development'
+        self.smtp_config: Dict[str, str] = Config.get_smtp_config()
+        self.is_development: bool = Config.ENVIRONMENT == 'development'
 
-    def verify_smtp_settings(self):
+    def verify_smtp_settings(self) -> bool:
         try:
             logger.info(f"Verifying SMTP settings: {self.smtp_config['server']}:{self.smtp_config['port']}")
             logger.info(f"Attempting DNS resolution of {self.smtp_config['server']}")
@@ -29,7 +30,7 @@ class EmailService:
             logger.error(f"Failed to connect to SMTP server: {e}")
         return False
 
-    def send_email(self, to_email: str, subject: str, body: str, max_retries=3, retry_delay=5) -> bool:
+    def send_email(self, to_email: str, subject: str, body: str, max_retries: int = 3, retry_delay: int = 5) -> bool:
         if self.is_development:
             logger.info(f"Development mode: Email would be sent to {to_email}")
             logger.info(f"Subject: {subject}")
@@ -76,7 +77,41 @@ class EmailService:
     def send_verification_email(self, to_email: str, verification_token: str) -> bool:
         subject = "Verify your Resume Cupid account"
         verification_link = self.get_verification_link(verification_token)
-        body = f"""
+        body = self._get_verification_email_template(verification_link)
+        success = self.send_email(to_email, subject, body)
+        if success:
+            logger.info(f"Verification email sent successfully to {to_email}")
+        else:
+            logger.error(f"Failed to send verification email to {to_email}")
+        return success
+
+    def send_password_reset_email(self, to_email: str, reset_token: str) -> bool:
+        subject = "Reset your Resume Cupid password"
+        reset_link = self._get_password_reset_link(reset_token)
+        body = self._get_password_reset_email_template(reset_link)
+        success = self.send_email(to_email, subject, body)
+        if success:
+            logger.info(f"Password reset email sent successfully to {to_email}")
+        else:
+            logger.error(f"Failed to send password reset email to {to_email}")
+        return success
+
+    def get_verification_link(self, verification_token: str) -> str:
+        try:
+            return f"{Config.BASE_URL}/?action=verify_email&token={verification_token}"
+        except Exception as e:
+            logger.error(f"Error generating verification link: {e}")
+            return ""
+
+    def _get_password_reset_link(self, reset_token: str) -> str:
+        try:
+            return f"{Config.BASE_URL}/?action=reset_password&token={reset_token}"
+        except Exception as e:
+            logger.error(f"Error generating password reset link: {e}")
+            return ""
+
+    def _get_verification_email_template(self, verification_link: str) -> str:
+        return f"""
         Welcome to Resume Cupid!
 
         Please verify your email by clicking on this link:
@@ -87,17 +122,9 @@ class EmailService:
         Best regards,
         The Resume Cupid Team
         """
-        success = self.send_email(to_email, subject, body)
-        if success:
-            logger.info(f"Verification email sent successfully to {to_email}")
-        else:
-            logger.error(f"Failed to send verification email to {to_email}")
-        return success
 
-    def send_password_reset_email(self, to_email: str, reset_token: str) -> bool:
-        subject = "Reset your Resume Cupid password"
-        reset_link = f"{Config.BASE_URL}/reset_password?token={reset_token}"
-        body = f"""
+    def _get_password_reset_email_template(self, reset_link: str) -> str:
+        return f"""
         Hello,
 
         You have requested to reset your password for Resume Cupid. Please click on the link below to set a new password:
@@ -109,14 +136,5 @@ class EmailService:
         Best regards,
         The Resume Cupid Team
         """
-        success = self.send_email(to_email, subject, body)
-        if success:
-            logger.info(f"Password reset email sent successfully to {to_email}")
-        else:
-            logger.error(f"Failed to send password reset email to {to_email}")
-        return success
-
-    def get_verification_link(self, verification_token: str) -> str:
-        return f"{Config.BASE_URL}/verify_email?token={verification_token}"
 
 email_service = EmailService()

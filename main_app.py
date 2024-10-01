@@ -2,7 +2,7 @@ import streamlit as st
 import uuid
 import pandas as pd
 from typing import List, Dict, Any
-from auth import require_auth, init_auth_state, auth_page, logout_user, get_user_by_reset_token, update_user_password, clear_reset_token, auth_verify_email
+from auth import Authenticator, require_auth, init_auth_state, auth_page
 from resume_processor import resume_processor
 import logging
 import time
@@ -16,8 +16,9 @@ import plotly.graph_objects as go
 from utils import generate_recommendation, generate_fit_summary, extract_text_from_file, generate_pdf_report
 from database import (
     get_saved_roles, save_role, save_evaluation_result, get_evaluation_results,
-    get_user_profile, update_user_profile, get_user_resumes, save_user_resume, get_job_recommendations, get_latest_evaluation
-)
+    get_user_profile, update_user_profile, get_user_resumes, save_user_resume, get_job_recommendations, get_latest_evaluation,
+    get_all_verification_tokens, verify_user_email, reset_user_password, delete_role, get_user_by_reset_token, update_password_with_token)
+
 
 # Load environment variables from the specified .env file
 dotenv_file = os.getenv('DOTENV_FILE', '.env.development')
@@ -27,6 +28,9 @@ load_dotenv(dotenv_file)
 logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Resume Cupid", page_icon="💘")
+
+# Initialize Authenticator
+authenticator = Authenticator()
 
 def load_css():
     """Load custom CSS for styling Streamlit elements."""
@@ -103,87 +107,68 @@ def display_dynamic_welcome_message(page):
 
 def main():
     try:
-        # Load CSS and initialize authentication state
         load_css()
         init_auth_state()
 
-        # Handle query parameters to check for specific actions like email verification or password reset
         query_params = st.query_params
-        page = query_params.get('page', [None])[0]
+        action = query_params.get('action', [None])[0]
         token = query_params.get('token', [None])[0]
 
-        if page == "verify_email" and token:
-            logger.info(f"Received verification request with token: {token}")
-            st.write("Query Params:", query_params)  # Debugging line to check the query params
-            st.write("Token Received:", token)  # Debugging line to check the received token
-
-            # Log all verification tokens in the database
-            all_tokens = get_all_verification_tokens()
-            logger.info(f"All verification tokens in database: {all_tokens}")
-
-            # Verify the email token
-            success = verify_user_email(token)
-            if success:
-                logger.info(f"Email verification successful for token: {token}")
-                st.success("Your email has been successfully verified! You can now log in.")
-            else:
-                logger.warning(f"Email verification failed for token: {token}")
-                st.error("The verification link is invalid or expired.")
-            return  # Stop further execution as we're handling a specific page
-
-        elif page == "reset_password" and token:
-            reset_password_page(token)  # Assuming reset_password_page handles the reset flow
-            return  # Stop further execution
-
-        # Continue with the regular app flow if no specific page action is required
-        if not st.session_state.get('user'):
-            auth_page()  # Display authentication page
+        if action == "verify_email" and token:
+            handle_email_verification(token)
+        elif action == "reset_password" and token:
+            handle_password_reset(token)
+        elif not st.session_state.get('user'):
+            auth_page()
         else:
-            # Display the sidebar with navigation and logout
-            st.sidebar.markdown(
-                f"<h3 style='margin-bottom: 30px; font-size: 1.5rem;'>Welcome, {st.session_state.user['username']}</h3>",
-                unsafe_allow_html=True
-            )
-
             logged_in_user_type = st.session_state.get('logged_in_user_type')
-
-            # Define menu options based on user type
-            if logged_in_user_type == 'job_seeker':
-                menu = ["My Profile", "Evaluate Resume", "Job Recommendations", "Improvement Suggestions"]
-            else:  # employer
-                menu = ["Evaluate Resumes", "Manage Job Roles", "View Past Evaluations"]
-
-            # Sidebar navigation
-            st.sidebar.markdown(
-                "<label style='font-size: 1.2rem;'>Navigate to</label>",
-                unsafe_allow_html=True
-            )
-            choice = st.sidebar.selectbox("", menu, key="navigation_menu")
-
-            st.sidebar.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)  # Spacing above Logout button
-
-            if st.sidebar.button("Logout"):
-                logout_user()
-                st.rerun()
-
-            # Main content area with reduced padding/margin for less white space
-            content_message = display_dynamic_welcome_message(choice)
-            st.markdown(f"""<div style="background-color: #f1f3f6; padding: 20px 20px 5px 20px; border-radius: 10px; margin-bottom: 10px;">
-                <h1 style="color: #3f51b5; margin-bottom: 5px;">Welcome to Resume Cupid 💘!</h1>
-                <h3 style="color: #3f51b5; margin-top: 0; margin-bottom: 15px;">Your AI-powered hiring assistant.</h3>
-                {content_message}
-                </div>
-            """, unsafe_allow_html=True)
-
-            # Display content based on selection
-            if logged_in_user_type == 'job_seeker':
-                job_seeker_menu(choice)
-            else:  # employer
-                employer_menu(choice)
+            display_main_app(logged_in_user_type)
 
     except Exception as e:
         logger.error(f"An error occurred in main(): {str(e)}", exc_info=True)
         st.error("An unexpected error occurred. Please check the logs for more information.")
+
+def handle_email_verification(token):
+    st.title("Email Verification")
+    if verify_user_email(token):
+        st.success("Your email has been successfully verified! You can now log in.")
+        if st.button("Go to Login"):
+            st.query_params.clear()
+            st.rerun()
+    else:
+        st.error("Email verification failed. The link may be invalid or expired.")
+
+def handle_password_reset(token):
+    st.title("Reset Password")
+    new_password = st.text_input("New Password", type="password")
+    confirm_password = st.text_input("Confirm Password", type="password")
+    if st.button("Reset Password"):
+        if new_password and new_password == confirm_password:
+            if reset_user_password(token, new_password):
+                st.success("Your password has been successfully reset. You can now log in with your new password.")
+                st.query_params.clear()
+                st.rerun()
+            else:
+                st.error("Failed to reset password. The link may be invalid or expired.")
+        else:
+            st.error("Passwords do not match or are empty.")
+
+def verify_email_page(token):
+    st.title("Email Verification")
+    logger.info(f"Received verification request with token: {token}")
+
+    all_tokens = get_all_verification_tokens()
+    logger.info(f"All verification tokens in database: {all_tokens}")
+
+    if authenticator.verify_email(token):
+        logger.info(f"Email verified successfully with token: {token}")
+        st.success("Your email has been successfully verified! You can now log in.")
+        if st.button("Go to Login"):
+            st.query_params.clear()
+            st.rerun()
+    else:
+        logger.warning(f"Email verification failed for token: {token}")
+        st.error("Email verification failed. The link may be invalid or expired. Please try registering again or contact support.")
 
 def reset_password_page():
     st.title("Reset Password")
@@ -236,27 +221,73 @@ def reset_password_page():
             logger.warning("Password reset attempt with mismatched passwords")
             st.error("Passwords do not match. Please try again.")
 
-def verify_email_page():
-    st.title("Email Verification")
+def display_main_app(logged_in_user_type):
+    st.sidebar.markdown(
+        f"<h3 style='margin-bottom: 30px; font-size: 1.5rem;'>Welcome, {st.session_state.user['username']}</h3>",
+        unsafe_allow_html=True
+    )
 
-    token = st.query_params.get("token", [None])[0]
-    if not token:
-        logger.error("Email verification attempted with missing token")
-        st.error("Invalid verification link. Please check your email and try again.")
-        return
+    menu = ["My Profile", "Evaluate Resume", "Job Recommendations", "Improvement Suggestions"] if logged_in_user_type == 'job_seeker' else ["Evaluate Resumes", "Manage Job Roles", "View Past Evaluations"]
 
-    if auth_verify_email(token):
-        logger.info(f"Email verified successfully with token: {token}")
-        st.success("Your email has been successfully verified. You can now log in to your account.")
-        if st.button("Go to Login"):
-            st.query_params.clear()
-            st.rerun()
+    st.sidebar.markdown("<label style='font-size: 1.2rem;'>Navigate to</label>", unsafe_allow_html=True)
+    choice = st.sidebar.selectbox("", menu, key="navigation_menu")
+
+    if st.sidebar.button("Logout"):
+        authenticator.logout()
+        st.rerun()
+
+    content_message = display_dynamic_welcome_message(choice)
+    st.markdown(f"""<div style="background-color: #f1f3f6; padding: 20px 20px 5px 20px; border-radius: 10px; margin-bottom: 10px;">
+        <h1 style="color: #3f51b5; margin-bottom: 5px;">Welcome to Resume Cupid 💘!</h1>
+        <h3 style="color: #3f51b5; margin-top: 0; margin-bottom: 15px;">Your AI-powered hiring assistant.</h3>
+        {content_message}
+        </div>
+    """, unsafe_allow_html=True)
+
+    if logged_in_user_type == 'job_seeker':
+        job_seeker_menu(choice)
     else:
-        logger.error(f"Email verification failed for token: {token}")
-        st.error("Email verification failed. The link may be invalid or expired. Please try registering again or contact support.")
+        employer_menu(choice)
+
+def evaluate_resume_page():
+    st.title("Evaluate Resume")
+    
+    # Get the current user's ID
+    user_id = st.session_state['user']['id']
+    
+    # File uploader for resume
+    uploaded_file = st.file_uploader("Upload your resume", type=["pdf", "docx"])
+    
+    if uploaded_file is not None:
+        # Extract text from the uploaded file
+        resume_text = extract_text_from_file(uploaded_file)
+        
+        # Get saved job roles (assuming you want to evaluate against a specific job)
+        saved_roles = get_saved_roles()
+        role_names = [role['role_name'] for role in saved_roles]
+        selected_role = st.selectbox("Select a job role to evaluate against", [""] + role_names)
+        
+        if selected_role:
+            role = next((role for role in saved_roles if role['role_name'] == selected_role), None)
+            if role:
+                if st.button("Evaluate Resume"):
+                    with st.spinner("Evaluating resume..."):
+                        result = llm_orchestrator.analyze_resume(resume_text, role['job_description'], role['role_name'])
+                        
+                        # Display results (you can customize this part)
+                        st.write(f"Match Score: {result.get('match_score', 'N/A')}")
+                        st.write(f"Summary: {result.get('summary', 'N/A')}")
+                        # Add more result display as needed
+                        
+                        # Save the evaluation result
+                        save_evaluation_result(uploaded_file.name, role['id'], result.get('match_score', 0), result.get('summary', 'N/A'))
+            else:
+                st.error("Selected job role not found.")
+        else:
+            st.info("Please select a job role to evaluate against.")
         
 def job_seeker_menu(choice):
-    user_id = st.session_state['user']['id']  # Assuming 'id' is part of the logged-in user data
+    user_id = st.session_state['user']['id']
     if choice == "My Profile":
         display_job_seeker_profile(user_id)
     elif choice == "Evaluate Resume":
@@ -265,6 +296,14 @@ def job_seeker_menu(choice):
         job_recommendations_page()
     elif choice == "Improvement Suggestions":
         improvement_suggestions_page()
+
+def employer_menu(choice):
+    if choice == "Evaluate Resumes":
+        evaluate_resume_page()
+    elif choice == "Manage Job Roles":
+        manage_job_roles_page()
+    elif choice == "View Past Evaluations":
+        view_past_evaluations_page()
 
 def display_job_seeker_profile(user_id: int):
     """
@@ -320,41 +359,7 @@ def display_job_seeker_profile(user_id: int):
         st.write(f"**Areas for Improvement:** {', '.join(evaluation['areas_for_improvement'])}")
     else:
         st.write("No evaluation results found.")
-
-def evaluate_resumes_page():
-    st.title("Evaluate Resumes")
-
-    # Get saved job roles
-    saved_roles = get_saved_roles()
-    role_names = [role['role_name'] for role in saved_roles]
-    
-    selected_role = st.selectbox("Select a job role", [""] + role_names)
-
-    if selected_role:
-        role = next((role for role in saved_roles if role['role_name'] == selected_role), None)
-        if role:
-            st.write(f"**Job Description:**\n{role['job_description']}")
-
-            uploaded_files = st.file_uploader("Upload Resumes", accept_multiple_files=True, type=["pdf", "docx"])
-            
-            if uploaded_files:
-                if st.button("Process Resumes"):
-                    with st.spinner("Processing resumes..."):
-                        results = process_resumes(uploaded_files, role['job_description'], role['id'], role['role_name'])
-                        display_results(results, role['role_name'])
-        else:
-            st.error("Selected job role not found.")
-    else:
-        st.info("Please select a job role to evaluate resumes.")
-                
-def employer_menu(choice):
-    if choice == "Evaluate Resumes":
-        evaluate_resumes_page()
-    elif choice == "Manage Job Roles":
-        manage_job_roles_page()
-    elif choice == "View Past Evaluations":
-        view_past_evaluations_page()
-
+        
 def job_recommendations_page():
     st.title("Job Recommendations")
 
@@ -590,8 +595,6 @@ def display_results(results: List[Dict[str, Any]], job_title: str):
             file_name="resume_evaluation_report.pdf",
             mime="application/pdf"
         )
-
-import uuid
 
 def manage_job_roles_page():
     st.markdown("<h2 class='section-title'>Manage Job Roles</h2>", unsafe_allow_html=True)

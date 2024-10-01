@@ -4,10 +4,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 from watchdog.observers import Observer
 from watchdog.events import LoggingEventHandler
+from typing import Dict, Any
 
 # Load environment-specific .env file
-environment = os.getenv('ENVIRONMENT', 'development')
-env_file = '.env.production' if environment == 'production' else '.env.development'
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+env_file = '.env.production' if ENVIRONMENT == 'production' else '.env.development'
 env_path = os.path.join(os.path.dirname(__file__), env_file)
 load_dotenv(dotenv_path=env_path)
 
@@ -38,25 +39,30 @@ watchdog_logger = logging.getLogger('watchdog')
 watchdog_logger.setLevel(logging.INFO)
 
 class Config:
-    API_URL = os.getenv('API_URL', 'http://localhost:8501')
-    BASE_URL = os.getenv('BASE_URL', 'http://localhost:8501')
-    SMTP_SERVER = os.getenv('SMTP_SERVER', 'default_smtp_server')
-    SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-    SMTP_USERNAME = os.getenv('SMTP_USERNAME', 'default_username')
-    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', 'default_password')
-    FROM_EMAIL = os.getenv('FROM_EMAIL', 'default_email@example.com')
-    DB_PATH = os.getenv('SQLITE_DB_PATH', './resume_cupid.db')
-    ENVIRONMENT = environment
-    LLAMA_API_KEY = os.getenv('LLAMA_API_KEY', 'default_llama_api_key')
+    API_URL: str = os.getenv('API_URL', 'http://localhost:8501')
+    BASE_URL: str = os.getenv('BASE_URL', 'http://localhost:8501')
+    SMTP_SERVER: str = os.getenv('SMTP_SERVER', 'default_smtp_server')
+    SMTP_PORT: int = int(os.getenv('SMTP_PORT', 587))
+    SMTP_USERNAME: str = os.getenv('SMTP_USERNAME', 'default_username')
+    SMTP_PASSWORD: str = os.getenv('SMTP_PASSWORD', 'default_password')
+    FROM_EMAIL: str = os.getenv('FROM_EMAIL', 'default_email@example.com')
+    DB_PATH: str = os.getenv('SQLITE_DB_PATH', './resume_cupid.db')
+    ENVIRONMENT: str = ENVIRONMENT
+    LLAMA_API_KEY: str = os.getenv('LLAMA_API_KEY', 'default_llama_api_key')
+    
+    # New configurations for authentication
+    COOKIE_NAME: str = os.getenv('COOKIE_NAME', 'resume_cupid_auth')
+    COOKIE_KEY: str = os.getenv('COOKIE_KEY', 'default_cookie_key')
+    COOKIE_EXPIRY_DAYS: int = int(os.getenv('COOKIE_EXPIRY_DAYS', 30))
 
-    @staticmethod
-    def get_smtp_config():
+    @classmethod
+    def get_smtp_config(cls) -> Dict[str, Any]:
         config = {
-            'server': Config.SMTP_SERVER,
-            'port': Config.SMTP_PORT,
-            'username': Config.SMTP_USERNAME,
-            'password': Config.SMTP_PASSWORD,
-            'from_email': Config.FROM_EMAIL
+            'server': cls.SMTP_SERVER,
+            'port': cls.SMTP_PORT,
+            'username': cls.SMTP_USERNAME,
+            'password': cls.SMTP_PASSWORD,
+            'from_email': cls.FROM_EMAIL
         }
         
         # Check for default values
@@ -68,32 +74,41 @@ class Config:
         ]
         
         for env_var, default_value in default_values:
-            if getattr(Config, env_var) == default_value:
+            if getattr(cls, env_var) == default_value:
                 logger.warning(f"{env_var} is set to its default value. Please update it in the .env file.")
         
         return config
 
-# Log the SMTP configuration
-smtp_config = Config.get_smtp_config()
-logger.info(f"SMTP Configuration: SERVER={smtp_config['server']}, PORT={smtp_config['port']}, USERNAME={smtp_config['username']}, FROM_EMAIL={smtp_config['from_email']}")
+    @classmethod
+    def validate_config(cls) -> None:
+        # Log the SMTP configuration
+        smtp_config = cls.get_smtp_config()
+        logger.info(f"SMTP Configuration: SERVER={smtp_config['server']}, PORT={smtp_config['port']}, USERNAME={smtp_config['username']}, FROM_EMAIL={smtp_config['from_email']}")
 
-# Log the environment
-logger.info(f"Current environment: {Config.ENVIRONMENT}")
+        # Log the environment
+        logger.info(f"Current environment: {cls.ENVIRONMENT}")
 
-# Check database path
-if not os.path.exists(Config.DB_PATH):
-    logger.warning(f"Database file not found at {Config.DB_PATH}. It will be created when the application runs.")
+        # Check database path
+        if not os.path.exists(cls.DB_PATH):
+            logger.warning(f"Database file not found at {cls.DB_PATH}. It will be created when the application runs.")
 
-# Validate LLAMA API key
-if Config.LLAMA_API_KEY == 'default_llama_api_key':
-    logger.warning("LLAMA_API_KEY is set to its default value. Please update it in the .env file.")
+        # Validate LLAMA API key
+        if cls.LLAMA_API_KEY == 'default_llama_api_key':
+            logger.warning("LLAMA_API_KEY is set to its default value. Please update it in the .env file.")
 
-# Additional environment checks
-if Config.ENVIRONMENT == 'production':
-    if 'localhost' in Config.BASE_URL:
-        logger.warning("BASE_URL contains 'localhost' in production environment. Please update it to the actual domain.")
-    if not Config.SMTP_SERVER.endswith(('.com', '.net', '.org', '.edu')):
-        logger.warning("SMTP_SERVER might not be correctly set for production. Please verify the SMTP server address.")
+        # Additional environment checks
+        if cls.ENVIRONMENT == 'production':
+            if 'localhost' in cls.BASE_URL:
+                logger.warning("BASE_URL contains 'localhost' in production environment. Please update it to the actual domain.")
+            if not cls.SMTP_SERVER.endswith(('.com', '.net', '.org', '.edu')):
+                logger.warning("SMTP_SERVER might not be correctly set for production. Please verify the SMTP server address.")
+
+        # Validate authentication settings
+        if cls.COOKIE_KEY == 'default_cookie_key':
+            logger.warning("COOKIE_KEY is set to its default value. Please update it in the .env file for security.")
+
+# Run validation on import
+Config.validate_config()
 
 # Example of setting up watchdog observer
 if __name__ == "__main__":
