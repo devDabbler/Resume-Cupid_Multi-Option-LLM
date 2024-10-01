@@ -2,7 +2,7 @@ import streamlit as st
 import uuid
 import pandas as pd
 from typing import List, Dict, Any
-from auth import require_auth, init_auth_state, auth_page, logout_user, get_user_by_reset_token, update_user_password, clear_reset_token
+from auth import require_auth, init_auth_state, auth_page, logout_user, get_user_by_reset_token, update_user_password, clear_reset_token, auth_verify_email
 from resume_processor import resume_processor
 import logging
 import time
