@@ -111,12 +111,26 @@ def main():
         load_css()
         init_auth_state()
         
-        # Get the current page from the URL
+    try:
         query_params = st.query_params
-        page = query_params.get("page", [None])[0]
+        token = query_params.get('token', [None])[0]  # Attempt to retrieve the token
 
-        st.write("Query Params:", query_params)  # Debugging line to check the query params
-        st.write("Token Received:", token)  # Debugging line to check the received token
+        if token:
+            st.write("Query Params:", query_params)  # Debugging line to check the query params
+            st.write("Token Received:", token)  # Debugging line to check the received token
+
+            # Check if the token is valid
+            success = verify_user_email(token)
+            if success:
+                st.success("Your email has been successfully verified! You can now log in.")
+            else:
+                st.error("The verification link is invalid or expired.")
+        else:
+            st.error("No verification token provided.")
+            logger.error("No verification token found in the query parameters.")
+    
+    except Exception as e:
+        logger.error(f"An error occurred in main(): {e}")
 
         if page == "verify_email":
             verify_email_page()
@@ -153,7 +167,7 @@ def main():
 
             if st.sidebar.button("Logout"):
                 logout_user()
-                st.experimental_rerun()
+                st.rerun()
 
             # Main content area with reduced padding/margin for less white space
             content_message = display_dynamic_welcome_message(choice)
