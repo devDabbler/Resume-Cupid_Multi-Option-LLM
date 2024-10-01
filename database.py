@@ -374,20 +374,19 @@ def get_latest_evaluation(user_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 def verify_user_email(token: str) -> bool:
-    def _verify_email(conn):
-        cur = conn.cursor()
-        cur.execute('''
-        UPDATE users
-        SET is_verified = 1, verification_token = NULL
-        WHERE verification_token = ?
-        ''', (token,))
-        conn.commit()
-        return cur.rowcount > 0
-
     try:
-        return execute_with_retry(_verify_email)
+        user = get_user_by_token(token)  # Assuming a function to get user by token
+        if user:
+            # Update user record to mark the email as verified
+            user['email_verified'] = True
+            save_user(user)  # Save updated user info back to the database
+            logger.info(f"Email verified successfully for user ID: {user['id']}")
+            return True
+        else:
+            logger.warning(f"Token not found in the database: {token}")
+            return False
     except Exception as e:
-        logger.error(f"Error verifying user email: {str(e)}")
+        logger.error(f"Error verifying email for token {token}: {e}")
         return False
 
 def update_password_with_token(reset_token: str, new_password: str) -> bool:

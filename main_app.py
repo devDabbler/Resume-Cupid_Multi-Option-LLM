@@ -115,6 +115,9 @@ def main():
         query_params = st.query_params
         page = query_params.get("page", [None])[0]
 
+        st.write("Query Params:", query_params)  # Debugging line to check the query params
+        st.write("Token Received:", token)  # Debugging line to check the received token
+
         if page == "verify_email":
             verify_email_page()
             return
