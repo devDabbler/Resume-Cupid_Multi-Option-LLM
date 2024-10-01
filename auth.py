@@ -104,13 +104,19 @@ def register_user(username: str, email: str, password_hash: bytes, user_type: st
 
 def initiate_password_reset(email: str, user_type: str = "job_seeker") -> bool:
     try:
+        # Retrieve user by email and user_type
         user = get_user_by_email(email, user_type)
         
         if user:
+            # Generate reset token
             reset_token = str(uuid.uuid4())
-            expiration_time = datetime.utcnow() + timedelta(hours=24)  # Token valid for 24 hours
             
+            # Set expiration time (e.g., 24 hours from now)
+            expiration_time = datetime.utcnow() + timedelta(hours=24)
+            
+            # Update the reset token in the database
             if update_user_reset_token(user['id'], reset_token, expiration_time):
+                # Send the password reset email
                 email_sent = email_service.send_password_reset_email(email, reset_token)
                 if email_sent:
                     logger.info(f"Password reset email sent to {email}")
@@ -127,7 +133,7 @@ def initiate_password_reset(email: str, user_type: str = "job_seeker") -> bool:
             st.error("No user found with this email address.")
 
         return False
-    
+
     except Exception as e:
         logger.error(f"Error initiating password reset for {user_type} {email}: {str(e)}", exc_info=True)
         st.error("An unexpected error occurred while processing the password reset. Please try again later.")

@@ -153,10 +153,9 @@ def register_user(username: str, email: str, password_hash: bytes, user_type: st
 
 from datetime import datetime, timedelta
 
-def update_user_reset_token(user_id: int, reset_token: str, expiration_hours: int = 24) -> bool:
+def update_user_reset_token(user_id: int, reset_token: str, expiration_time: datetime) -> bool:
     def _update_token(conn):
         cur = conn.cursor()
-        expiration_time = datetime.utcnow() + timedelta(hours=expiration_hours)
         cur.execute('''
         UPDATE users
         SET reset_token = ?, reset_token_expiration = ?
@@ -182,7 +181,11 @@ def get_user_by_reset_token(reset_token: str) -> Optional[dict]:
         user = cur.fetchone()
         return dict(user) if user else None
 
-    return execute_with_retry(_get_user)
+    try:
+        return execute_with_retry(_get_user)
+    except Exception as e:
+        logger.error(f"Error retrieving user by reset token: {str(e)}")
+        return None
 
 def clear_reset_token(user_id: int) -> bool:
     try:
@@ -379,15 +382,15 @@ def verify_user_email(token: str) -> bool:
         logger.error(f"Error verifying user email: {str(e)}")
         return False
 
-def update_password_with_token(token: str, new_password: str) -> bool:
+def update_password_with_token(reset_token: str, new_password: str) -> bool:
     def _update_password(conn):
         cur = conn.cursor()
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
         cur.execute('''
         UPDATE users
-        SET password_hash = ?, reset_token = NULL
-        WHERE reset_token = ?
-        ''', (hashed_password, token))
+        SET password_hash = ?, reset_token = NULL, reset_token_expiration = NULL
+        WHERE reset_token = ? AND reset_token_expiration > ?
+        ''', (hashed_password, reset_token, datetime.utcnow()))
         conn.commit()
         return cur.rowcount > 0
 
