@@ -220,8 +220,8 @@ def reset_password_page():
                 st.success("Your password has been successfully reset. You can now log in with your new password.")
                 
                 # Redirect user to login page after a successful reset
-                st.experimental_set_query_params(page="login")
-                st.experimental_rerun()
+                st.query_params(page="login")
+                st.rerun()
             else:
                 logger.error(f"Failed to reset password for user ID: {user['id']}")
                 st.error("Failed to reset password. Please try again or contact support.")
