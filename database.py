@@ -178,8 +178,6 @@ def register_user(username: str, email: str, password_hash: bytes, user_type: st
         logger.error(f"Error registering {user_type} {username}: {str(e)}")
         return False
 
-from datetime import datetime, timedelta
-
 def update_user_reset_token(user_id: int, reset_token: str, expiration_time: datetime) -> bool:
     def _update_token(conn):
         cur = conn.cursor()
@@ -197,6 +195,24 @@ def update_user_reset_token(user_id: int, reset_token: str, expiration_time: dat
         logger.error(f"Error updating reset token for user {user_id}: {str(e)}")
         return False
 
+def get_user_by_token(token: str) -> Optional[Dict[str, Any]]:
+    def _get_user(conn):
+        cur = conn.cursor()
+        cur.execute('''
+        SELECT * FROM users
+        WHERE verification_token = ?
+        ''', (token,))
+        user = cur.fetchone()
+        if user:
+            return dict(zip([column[0] for column in cur.description], user))
+        return None
+
+    try:
+        return execute_with_retry(_get_user)
+    except Exception as e:
+        logger.error(f"Error retrieving user by token: {str(e)}")
+        return None
+    
 def get_user_by_reset_token(reset_token: str) -> Optional[dict]:
     def _get_user(conn):
         cur = conn.cursor()
@@ -399,21 +415,36 @@ def get_latest_evaluation(user_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 def verify_user_email(token: str) -> bool:
+    logger.info(f"Attempting to verify email with token: {token}")
     try:
-        user = get_user_by_token(token)  # Assuming a function to get user by token
+        user = get_user_by_token(token)
         if user:
+            logger.info(f"User found for token: {token}")
             # Update user record to mark the email as verified
             user['email_verified'] = True
-            save_user(user)  # Save updated user info back to the database
+            save_user(user)
             logger.info(f"Email verified successfully for user ID: {user['id']}")
             return True
         else:
-            logger.warning(f"Token not found in the database: {token}")
+            logger.warning(f"No user found for token: {token}")
             return False
     except Exception as e:
-        logger.error(f"Error verifying email for token {token}: {e}")
+        logger.error(f"Error verifying email for token {token}: {e}", exc_info=True)
         return False
 
+def is_user_email_verified(user_id: int) -> bool:
+    def _check_verification(conn):
+        cur = conn.cursor()
+        cur.execute('SELECT is_verified FROM users WHERE id = ?', (user_id,))
+        result = cur.fetchone()
+        return result[0] if result else False
+
+    try:
+        return execute_with_retry(_check_verification)
+    except Exception as e:
+        logger.error(f"Error checking email verification status for user {user_id}: {str(e)}")
+        return False
+    
 def update_password_with_token(reset_token: str, new_password: str) -> bool:
     def _update_password(conn):
         cur = conn.cursor()
