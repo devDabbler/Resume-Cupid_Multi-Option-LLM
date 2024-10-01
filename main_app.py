@@ -113,14 +113,21 @@ def main():
         token = query_params.get('token', [None])[0]
 
         if page == "verify_email" and token:
+            logger.info(f"Received verification request with token: {token}")
             st.write("Query Params:", query_params)  # Debugging line to check the query params
             st.write("Token Received:", token)  # Debugging line to check the received token
+
+            # Log all verification tokens in the database
+            all_tokens = get_all_verification_tokens()
+            logger.info(f"All verification tokens in database: {all_tokens}")
 
             # Verify the email token
             success = verify_user_email(token)
             if success:
+                logger.info(f"Email verification successful for token: {token}")
                 st.success("Your email has been successfully verified! You can now log in.")
             else:
+                logger.warning(f"Email verification failed for token: {token}")
                 st.error("The verification link is invalid or expired.")
             return  # Stop further execution as we're handling a specific page
 

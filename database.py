@@ -196,6 +196,7 @@ def update_user_reset_token(user_id: int, reset_token: str, expiration_time: dat
         return False
 
 def get_user_by_token(token: str) -> Optional[Dict[str, Any]]:
+    logger.info(f"Attempting to retrieve user with token: {token}")
     def _get_user(conn):
         cur = conn.cursor()
         cur.execute('''
@@ -204,14 +205,29 @@ def get_user_by_token(token: str) -> Optional[Dict[str, Any]]:
         ''', (token,))
         user = cur.fetchone()
         if user:
+            logger.info(f"User found with token: {token}")
             return dict(zip([column[0] for column in cur.description], user))
+        logger.warning(f"No user found with token: {token}")
         return None
 
     try:
         return execute_with_retry(_get_user)
     except Exception as e:
-        logger.error(f"Error retrieving user by token: {str(e)}")
+        logger.error(f"Error retrieving user by token: {str(e)}", exc_info=True)
         return None
+    
+def get_all_verification_tokens() -> List[str]:
+    def _get_tokens(conn):
+        cur = conn.cursor()
+        cur.execute('SELECT verification_token FROM users WHERE verification_token IS NOT NULL')
+        tokens = cur.fetchall()
+        return [token[0] for token in tokens if token[0]]
+
+    try:
+        return execute_with_retry(_get_tokens)
+    except Exception as e:
+        logger.error(f"Error retrieving verification tokens: {str(e)}", exc_info=True)
+        return []
     
 def get_user_by_reset_token(reset_token: str) -> Optional[dict]:
     def _get_user(conn):
@@ -415,6 +431,9 @@ def get_latest_evaluation(user_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 def verify_user_email(token: str) -> bool:
+    logger.info(f"Attempting to verify email with token: {token}")
+    all_tokens = get_all_verification_tokens()
+    logger.info(f"All verification tokens in database: {all_tokens}")
     logger.info(f"Attempting to verify email with token: {token}")
     try:
         user = get_user_by_token(token)
